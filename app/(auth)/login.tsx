@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+import { KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native'
 import { Link, Redirect } from 'expo-router'
 
 import {
@@ -13,6 +13,7 @@ import {
   Title,
 } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
+import { colors } from '../../lib/theme'
 
 export default function LoginScreen() {
   const { session, profile, isLoading, signIn } = useAuth()
@@ -24,7 +25,9 @@ export default function LoginScreen() {
   if (isLoading) return <LoadingScreen />
   if (session) {
     return (
-      <Redirect href={profile?.couple_id ? '/(app)' : '/(app)/pair'} />
+      <Redirect
+        href={profile?.couple_id ? '/(app)/(tabs)' : '/(app)/pair'}
+      />
     )
   }
 
@@ -46,6 +49,7 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ flexGrow: 1 }}
         >
+          <Text style={{ fontSize: 44, marginBottom: 4 }}>😊</Text>
           <Title>Bond</Title>
           <Subtitle>Sign in to check in with your partner.</Subtitle>
 
@@ -77,7 +81,15 @@ export default function LoginScreen() {
             disabled={!email || !password}
           />
 
-          <Link href="/(auth)/signup" style={{ marginTop: 20, textAlign: 'center' }}>
+          <Link
+            href="/(auth)/signup"
+            style={{
+              marginTop: 20,
+              textAlign: 'center',
+              color: colors.accentPressed,
+              fontWeight: '700',
+            }}
+          >
             Need an account? Sign up
           </Link>
         </ScrollView>

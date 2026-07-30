@@ -154,3 +154,81 @@ export function useCheckInHistory() {
 
   return { days, isLoading, error, refresh }
 }
+
+export type MonthDayData = {
+  date: string
+  mine: DailyCheckIn | null
+  partner: DailyCheckIn | null
+  revealed: boolean
+}
+
+export function useMonthCheckIns(year: number, monthIndex: number) {
+  const { user, profile } = useAuth()
+  const [byDate, setByDate] = useState<Record<string, MonthDayData>>({})
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const refresh = useCallback(async () => {
+    if (!user?.id || !profile?.couple_id) {
+      setByDate({})
+      setIsLoading(false)
+      return
+    }
+
+    const start = `${year}-${String(monthIndex + 1).padStart(2, '0')}-01`
+    const lastDay = new Date(year, monthIndex + 1, 0).getDate()
+    const end = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+
+    setError(null)
+    const { data, error: fetchError } = await supabase
+      .from('daily_check_ins')
+      .select('*')
+      .eq('couple_id', profile.couple_id)
+      .gte('check_in_date', start)
+      .lte('check_in_date', end)
+
+    if (fetchError) {
+      setError(fetchError.message)
+      setIsLoading(false)
+      return
+    }
+
+    const map: Record<string, MonthDayData> = {}
+    for (const row of data ?? []) {
+      const existing = map[row.check_in_date] ?? {
+        date: row.check_in_date,
+        mine: null,
+        partner: null,
+        revealed: false,
+      }
+      if (row.user_id === user.id) existing.mine = row
+      else existing.partner = row
+      existing.revealed = Boolean(existing.mine && existing.partner)
+      map[row.check_in_date] = existing
+    }
+
+    setByDate(map)
+    setIsLoading(false)
+  }, [monthIndex, profile?.couple_id, user?.id, year])
+
+  useEffect(() => {
+    setIsLoading(true)
+    void refresh()
+  }, [refresh])
+
+  return { byDate, isLoading, error, refresh }
+}
+
+export function computeStreak(myDates: string[], today: string): number {
+  const set = new Set(myDates)
+  let streak = 0
+  let cursor = today
+  while (set.has(cursor)) {
+    streak += 1
+    const [y, m, d] = cursor.split('-').map(Number)
+    const prev = new Date(y, m - 1, d)
+    prev.setDate(prev.getDate() - 1)
+    cursor = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-${String(prev.getDate()).padStart(2, '0')}`
+  }
+  return streak
+}

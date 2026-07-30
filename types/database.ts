@@ -31,6 +31,16 @@ export type DailyCheckIn = {
   created_at: string
 }
 
+export type WeeklyReview = {
+  id: string
+  couple_id: string
+  user_id: string
+  week_start: string
+  week_end: string
+  answers: Json
+  created_at: string
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -78,6 +88,22 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_reviews: {
+        Row: WeeklyReview
+        Insert: {
+          id?: string
+          couple_id: string
+          user_id: string
+          week_start: string
+          week_end: string
+          answers?: Json
+          created_at?: string
+        }
+        Update: {
+          answers?: Json
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -95,6 +121,10 @@ export type Database = {
       }
       has_own_check_in: {
         Args: { p_couple_id: string; p_date: string }
+        Returns: boolean
+      }
+      has_own_weekly_review: {
+        Args: { p_couple_id: string; p_week_start: string }
         Returns: boolean
       }
     }

@@ -16,12 +16,37 @@ export function formatDisplayDate(isoDate: string): string {
   })
 }
 
+export function formatMonthTitle(year: number, monthIndex: number): string {
+  return new Date(year, monthIndex, 1).toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
 export const DAILY_PROMPT = 'How connected did you feel today?'
 
-export const SCORE_LABELS: Record<number, string> = {
-  1: 'Distant',
-  2: 'A little',
-  3: 'Okay',
-  4: 'Close',
-  5: 'Very connected',
+export { SCORE_LABELS } from './theme'
+
+/** Days in a month grid starting Sunday (0) — padded with nulls */
+export function getMonthGrid(year: number, monthIndex: number): (number | null)[] {
+  const first = new Date(year, monthIndex, 1)
+  const startPad = first.getDay()
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
+  const cells: (number | null)[] = []
+  for (let i = 0; i < startPad; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+  while (cells.length % 7 !== 0) cells.push(null)
+  return cells
+}
+
+export function dateKey(year: number, monthIndex: number, day: number): string {
+  return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+/** Shift YYYY-MM-DD by delta days */
+export function addDays(isoDate: string, delta: number): string {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  date.setDate(date.getDate() + delta)
+  return localDateString(date)
 }

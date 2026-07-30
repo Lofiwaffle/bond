@@ -10,16 +10,14 @@ import {
   type ViewStyle,
 } from 'react-native'
 
-const colors = {
-  bg: '#F7F4EF',
-  ink: '#1C1917',
-  muted: '#78716C',
-  accent: '#0F766E',
-  accentPressed: '#0D9488',
-  border: '#D6D3D1',
-  danger: '#B91C1C',
-  card: '#FFFFFF',
-}
+import {
+  SCORE_LABELS,
+  colors,
+  radii,
+  scoreColors,
+  scoreColorsSoft,
+  scoreEmojis,
+} from '../lib/theme'
 
 export function Screen({
   children,
@@ -79,7 +77,7 @@ export function PrimaryButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.white} />
       ) : (
         <Text style={styles.buttonLabel}>{label}</Text>
       )}
@@ -126,37 +124,108 @@ export function LoadingScreen() {
   )
 }
 
+export function Card({
+  children,
+  style,
+}: {
+  children: ReactNode
+  style?: ViewStyle
+}) {
+  return <View style={[styles.card, style]}>{children}</View>
+}
+
+export function ScoreEmoji({
+  score,
+  size = 40,
+}: {
+  score: number
+  size?: number
+}) {
+  return (
+    <Text style={{ fontSize: size, lineHeight: size + 4 }}>
+      {scoreEmojis[score] ?? '😐'}
+    </Text>
+  )
+}
+
+export function ScoreFacePicker({
+  value,
+  onChange,
+  size = 'large',
+}: {
+  value: number | null
+  onChange: (score: number) => void
+  size?: 'large' | 'compact'
+}) {
+  const faceSize = size === 'large' ? 52 : 36
+  const circle = size === 'large' ? 72 : 52
+
+  return (
+    <View style={styles.faceRow}>
+      {[1, 2, 3, 4, 5].map((score) => {
+        const selected = value === score
+        return (
+          <Pressable
+            key={score}
+            accessibilityRole="button"
+            accessibilityLabel={`${score}, ${SCORE_LABELS[score]}`}
+            onPress={() => onChange(score)}
+            style={[
+              styles.faceButton,
+              {
+                width: circle,
+                height: circle,
+                borderRadius: circle / 2,
+                backgroundColor: selected
+                  ? scoreColors[score]
+                  : scoreColorsSoft[score],
+                borderColor: selected ? scoreColors[score] : 'transparent',
+                borderWidth: selected ? 3 : 0,
+                transform: [{ scale: selected ? 1.08 : 1 }],
+              },
+            ]}
+          >
+            <Text style={{ fontSize: faceSize }}>{scoreEmojis[score]}</Text>
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
-    paddingHorizontal: 24,
-    paddingTop: 64,
-    paddingBottom: 32,
+    paddingHorizontal: 20,
+    paddingTop: 56,
+    paddingBottom: 24,
   },
   title: {
-    fontSize: 32,
+    fontSize: 30,
+    fontWeight: '800',
+    color: colors.ink,
+    marginBottom: 6,
+  },
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 21,
+    color: colors.muted,
+    marginBottom: 22,
+  },
+  label: {
+    fontSize: 13,
     fontWeight: '700',
     color: colors.ink,
     marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    lineHeight: 22,
-    color: colors.muted,
-    marginBottom: 28,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.ink,
-    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: radii.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
@@ -165,8 +234,8 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingVertical: 14,
+    borderRadius: radii.pill,
+    paddingVertical: 15,
     alignItems: 'center',
     marginTop: 8,
   },
@@ -174,36 +243,58 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentPressed,
   },
   buttonDisabled: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
   buttonLabel: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   secondaryButton: {
-    borderRadius: 12,
+    borderRadius: radii.pill,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 8,
+    backgroundColor: colors.accentSoft,
   },
   secondaryPressed: {
-    opacity: 0.7,
+    opacity: 0.75,
   },
   secondaryLabel: {
-    color: colors.accent,
+    color: colors.accentPressed,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   error: {
     color: colors.danger,
     marginBottom: 8,
     fontSize: 14,
+    fontWeight: '600',
   },
   loading: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.bg,
+  },
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 14,
+  },
+  faceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
+  faceButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 1,
   },
 })

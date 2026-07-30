@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Redirect, router } from 'expo-router'
-import * as Clipboard from 'expo-clipboard'
 import { StyleSheet, Text, View } from 'react-native'
+import * as Clipboard from 'expo-clipboard'
 
 import {
+  Card,
   ErrorText,
   Field,
   Label,
@@ -15,6 +16,7 @@ import {
   Title,
 } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
+import { colors, radii } from '../../lib/theme'
 
 export default function PairScreen() {
   const {
@@ -35,7 +37,7 @@ export default function PairScreen() {
   if (isLoading) return <LoadingScreen />
 
   if (profile?.couple_id && partner) {
-    return <Redirect href="/(app)" />
+    return <Redirect href="/(app)/(tabs)" />
   }
 
   const onCreate = async () => {
@@ -47,7 +49,6 @@ export default function PairScreen() {
       setError(result.error)
       return
     }
-    router.replace('/(app)')
   }
 
   const onJoin = async () => {
@@ -59,10 +60,10 @@ export default function PairScreen() {
       setError(result.error)
       return
     }
-    router.replace('/(app)')
+    router.replace('/(app)/(tabs)')
   }
 
-  const copyInviteCode = async (code: string) => {
+  const copyCode = async (code: string) => {
     await Clipboard.setStringAsync(code)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -71,20 +72,21 @@ export default function PairScreen() {
   if (profile?.couple_id && couple && !partner) {
     return (
       <Screen>
+        <Text style={styles.heroEmoji}>💌</Text>
         <Title>Share your code</Title>
         <Subtitle>
-          Give this invite code to your partner so they can link accounts.
+          Give this invite to your partner so you can check in together.
         </Subtitle>
-        <View style={styles.codeBox}>
+        <Card style={styles.codeCard}>
           <Text style={styles.code}>{couple.invite_code}</Text>
-        </View>
+        </Card>
         <PrimaryButton
           label={copied ? 'Copied!' : 'Copy invite code'}
-          onPress={() => void copyInviteCode(couple.invite_code)}
+          onPress={() => void copyCode(couple.invite_code)}
         />
         <SecondaryButton
-          label="Continue to home"
-          onPress={() => router.replace('/(app)')}
+          label="Continue"
+          onPress={() => router.replace('/(app)/(tabs)')}
         />
         <SecondaryButton label="Sign out" onPress={() => void signOut()} />
       </Screen>
@@ -93,6 +95,7 @@ export default function PairScreen() {
 
   return (
     <Screen>
+      <Text style={styles.heroEmoji}>💛</Text>
       <Title>Pair with partner</Title>
       <Subtitle>
         Generate an invite code, or enter the one your partner shared.
@@ -130,27 +133,33 @@ export default function PairScreen() {
 }
 
 const styles = StyleSheet.create({
-  codeBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 28,
+  heroEmoji: {
+    fontSize: 48,
+    marginBottom: 8,
+  },
+  codeCard: {
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#D6D3D1',
-    marginBottom: 24,
+    paddingVertical: 28,
+    backgroundColor: colors.accentSoft,
   },
   code: {
     fontSize: 36,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 6,
-    color: '#0F766E',
+    color: colors.accentPressed,
   },
   divider: {
     alignItems: 'center',
-    marginVertical: 24,
+    marginVertical: 20,
   },
   dividerText: {
-    color: '#78716C',
+    color: colors.muted,
     fontSize: 14,
+    fontWeight: '600',
+    backgroundColor: colors.bgSoft,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    overflow: 'hidden',
   },
 })

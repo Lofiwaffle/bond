@@ -1,25 +1,41 @@
 {
-  "expo": {
-    "name": "touchbase",
-    "slug": "touchbase",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "ios": {
-      "supportsTablet": true
+  "name": "Bond",
+  "slug": "bond",
+  "version": "1.0.0",
+  "orientation": "portrait",
+  "icon": "./assets/icon.png",
+  "scheme": "bond",
+  "userInterfaceStyle": "light",
+  "newArchEnabled": true,
+  "ios": {
+    "supportsTablet": true,
+    "bundleIdentifier": "com.bond.app"
+  },
+  "android": {
+    "adaptiveIcon": {
+      "backgroundColor": "#E6F4FE",
+      "foregroundImage": "./assets/android-icon-foreground.png",
+      "backgroundImage": "./assets/android-icon-background.png",
+      "monochromeImage": "./assets/android-icon-monochrome.png"
     },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "predictiveBackGestureEnabled": false,
+    "package": "com.bond.app"
+  },
+  "web": {
+    "favicon": "./assets/favicon.png",
+    "bundler": "metro"
+  },
+  "plugins": [
+    "expo-router",
+    [
+      "expo-notifications",
+      {
+        "icon": "./assets/icon.png",
+        "color": "#0F766E"
+      }
+    ]
+  ],
+  "experiments": {
+    "typedRoutes": true
   }
 }

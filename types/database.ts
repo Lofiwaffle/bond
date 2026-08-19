@@ -28,6 +28,7 @@ export type DailyCheckIn = {
   check_in_date: string
   score: number
   note: string | null
+  activities: string[]
   created_at: string
 }
 
@@ -119,11 +120,13 @@ export type Database = {
           check_in_date: string
           score: number
           note?: string | null
+          activities?: string[]
           created_at?: string
         }
         Update: {
           score?: number
           note?: string | null
+          activities?: string[]
         }
         Relationships: []
       }

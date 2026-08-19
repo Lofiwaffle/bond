@@ -48,12 +48,15 @@ export function useTodayCheckIn() {
   }, [refresh])
 
   const submit = useCallback(
-    async (score: number, note: string) => {
+    async (score: number, note: string, activities: string[] = []) => {
       if (!user?.id || !profile?.couple_id) {
         return { error: 'You must be paired to check in' }
       }
       if (score < 1 || score > 5) {
         return { error: 'Choose a score from 1 to 5' }
+      }
+      if (activities.length > 5) {
+        return { error: 'Pick up to 5 activity tags' }
       }
 
       const trimmed = note.trim()
@@ -65,6 +68,7 @@ export function useTodayCheckIn() {
           check_in_date: localDateString(),
           score,
           note: trimmed.length > 0 ? trimmed : null,
+          activities,
         })
 
       if (insertError) {
@@ -118,7 +122,7 @@ export function useCheckInHistory() {
       .select('*')
       .eq('couple_id', profile.couple_id)
       .order('check_in_date', { ascending: false })
-      .limit(60)
+      .limit(400)
 
     if (fetchError) {
       setError(fetchError.message)

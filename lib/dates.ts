@@ -7,7 +7,9 @@ export function localDateString(date: Date = new Date()): string {
 }
 
 export function formatDisplayDate(isoDate: string): string {
-  const [year, month, day] = isoDate.split('-').map(Number)
+  const raw = String(isoDate ?? '')
+  const [year, month, day] = raw.split('-').map(Number)
+  if (!year || !month || !day) return raw
   const date = new Date(year, month - 1, day)
   return date.toLocaleDateString(undefined, {
     weekday: 'short',

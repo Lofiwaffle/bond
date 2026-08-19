@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useMemo, useState } from 'react'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router } from 'expo-router'
 
 import {
+  ActivityIconGrid,
   Card,
   ErrorText,
   Field,
@@ -12,10 +13,17 @@ import {
   ScoreFacePicker,
   Screen,
   SecondaryButton,
+  StreakChip,
   Subtitle,
   Title,
 } from '../../components/ui'
-import { useTodayCheckIn } from '../../hooks/useCheckIn'
+import type { ActivityId } from '../../lib/activities'
+import { activityById } from '../../lib/activities'
+import {
+  computeStreak,
+  useCheckInHistory,
+  useTodayCheckIn,
+} from '../../hooks/useCheckIn'
 import { useWeeklyReview } from '../../hooks/useWeeklyReview'
 import { useAuth } from '../../lib/auth'
 import {
@@ -25,7 +33,7 @@ import {
   localDateString,
 } from '../../lib/dates'
 import { syncCheckInReminder } from '../../lib/notifications'
-import { colors, scoreColorsSoft } from '../../lib/theme'
+import { colors } from '../../lib/theme'
 
 export default function CheckInScreen() {
   const { profile, partner, isLoading: authLoading } = useAuth()
@@ -39,8 +47,9 @@ export default function CheckInScreen() {
     refresh,
     submit,
   } = useTodayCheckIn()
+  const { days } = useCheckInHistory()
   const {
-    streak,
+    streak: weeklyStreak,
     unlocked,
     needsReview,
     bothSubmitted: weeklyBoth,
@@ -48,10 +57,17 @@ export default function CheckInScreen() {
     refresh: refreshWeekly,
   } = useWeeklyReview()
   const [score, setScore] = useState<number | null>(null)
+  const [activities, setActivities] = useState<ActivityId[]>([])
   const [note, setNote] = useState('')
   const [showNote, setShowNote] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const streak = useMemo(() => {
+    const today = localDateString()
+    const myDates = days.filter((d) => d.mine).map((d) => d.date)
+    return computeStreak(myDates, today)
+  }, [days])
 
   useEffect(() => {
     if (isLoading || authLoading) return
@@ -80,70 +96,80 @@ export default function CheckInScreen() {
     }
     setSubmitError(null)
     setSubmitting(true)
-    const result = await submit(score, note)
+    const result = await submit(score, note, activities)
     setSubmitting(false)
     if (result.error) setSubmitError(result.error)
   }
 
   return (
-    <Screen>
-      <Title>Check in</Title>
-      <Subtitle>
-        {DAILY_PROMPT} · {formatDisplayDate(localDateString())}
-      </Subtitle>
+    <Screen style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.headerRow}>
+          <Title>Check in</Title>
+          <StreakChip streak={streak} />
+        </View>
+        <Subtitle>
+          {DAILY_PROMPT} · {formatDisplayDate(localDateString())}
+        </Subtitle>
 
-      <ErrorText message={error} />
+        <ErrorText message={error} />
 
-      {unlocked ? (
-        <Card style={{ backgroundColor: scoreColorsSoft[5] }}>
-          <Text style={styles.weeklyTitle}>
-            {needsReview
-              ? 'Weekly review unlocked 🎉'
-              : weeklyWaiting
-                ? 'Weekly review waiting on partner'
-                : weeklyBoth
-                  ? 'Weekly review complete'
-                  : 'Weekly review'}
-          </Text>
-          <Text style={styles.weeklyBody}>
-            {streak}-day streak · reflect together with private prompts that
-            reveal when you both finish.
-          </Text>
-          <PrimaryButton
-            label={
-              needsReview
-                ? 'Start weekly check-in'
-                : weeklyBoth
-                  ? 'View weekly review'
-                  : 'Open weekly review'
-            }
-            onPress={() => router.push('/(app)/weekly-review')}
-          />
-        </Card>
-      ) : (
-        <Card>
-          <Text style={styles.weeklyTitle}>Weekly review</Text>
-          <Text style={styles.weeklyBody}>
-            Check in {7 - streak} more day{7 - streak === 1 ? '' : 's'} in a row
-            to unlock your weekly reflection together ({streak}/7).
-          </Text>
-        </Card>
-      )}
-
-      {!mine ? (
-        <Card style={{ backgroundColor: scoreColorsSoft[score ?? 3] }}>
-          <Text style={styles.heroPrompt}>Pick a face</Text>
-          <ScoreFacePicker value={score} onChange={setScore} />
-          {score != null ? (
-            <Text style={styles.scoreLabel}>
-              {score} · {SCORE_LABELS[score]}
+        {unlocked ? (
+          <Card>
+            <Text style={styles.weeklyTitle}>
+              {needsReview
+                ? 'Weekly review unlocked'
+                : weeklyWaiting
+                  ? 'Weekly review waiting on partner'
+                  : weeklyBoth
+                    ? 'Weekly review complete'
+                    : 'Weekly review'}
             </Text>
-          ) : (
-            <Text style={styles.scoreHint}>Tap how connected you felt</Text>
-          )}
+            <Text style={styles.weeklyBody}>
+              {weeklyStreak}-day streak · reflect together with private prompts
+              that reveal when you both finish.
+            </Text>
+            <PrimaryButton
+              label={
+                needsReview
+                  ? 'Start weekly check-in'
+                  : weeklyBoth
+                    ? 'View weekly review'
+                    : 'Open weekly review'
+              }
+              onPress={() => router.push('/(app)/weekly-review')}
+            />
+          </Card>
+        ) : (
+          <Card>
+            <Text style={styles.weeklyTitle}>Weekly review</Text>
+            <Text style={styles.weeklyBody}>
+              Check in {7 - weeklyStreak} more day
+              {7 - weeklyStreak === 1 ? '' : 's'} in a row to unlock your weekly
+              reflection together ({weeklyStreak}/7).
+            </Text>
+          </Card>
+        )}
 
-          {showNote ? (
-            <>
+        {!mine ? (
+          <Card>
+            <Text style={styles.heroPrompt}>How connected do you feel?</Text>
+            <ScoreFacePicker value={score} onChange={setScore} />
+            {score != null ? (
+              <Text style={styles.scoreLabel}>
+                {score} · {SCORE_LABELS[score]}
+              </Text>
+            ) : (
+              <Text style={styles.scoreHint}>Tap a face</Text>
+            )}
+
+            <Text style={styles.sectionLabel}>Activities</Text>
+            <Text style={styles.sectionHint}>
+              Tap tags that shaped today — no typing required.
+            </Text>
+            <ActivityIconGrid value={activities} onChange={setActivities} />
+
+            {showNote ? (
               <Field
                 value={note}
                 onChangeText={setNote}
@@ -152,86 +178,122 @@ export default function CheckInScreen() {
                 multiline
                 style={styles.note}
               />
-            </>
-          ) : (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setShowNote(true)}
-              style={styles.noteToggle}
-            >
-              <Text style={styles.noteToggleText}>+ Add a note</Text>
-            </Pressable>
-          )}
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setShowNote(true)}
+                style={styles.noteToggle}
+              >
+                <Text style={styles.noteToggleText}>+ Add a note</Text>
+              </Pressable>
+            )}
 
-          <ErrorText message={submitError} />
-          <PrimaryButton
-            label="Save"
-            onPress={onSubmit}
-            loading={submitting}
-            disabled={score == null}
-          />
-        </Card>
-      ) : null}
+            <ErrorText message={submitError} />
+            <PrimaryButton
+              label="Save"
+              onPress={onSubmit}
+              loading={submitting}
+              disabled={score == null}
+            />
+          </Card>
+        ) : null}
 
-      {mine && waitingForPartner ? (
-        <Card>
-          <Text style={styles.waitingTitle}>Saved — waiting on partner</Text>
-          <View style={styles.scoreLine}>
-            <ScoreEmoji score={mine.score} size={44} />
-            <View>
+        {mine && waitingForPartner ? (
+          <Card>
+            <Text style={styles.waitingTitle}>Saved — waiting on partner</Text>
+            <View style={styles.scoreLine}>
+              <ScoreEmoji score={mine.score} size={44} />
+              <View>
+                <Text style={styles.scoreText}>
+                  {mine.score} · {SCORE_LABELS[mine.score]}
+                </Text>
+                <Text style={styles.waitingBody}>
+                  {partner.display_name} can’t see this until they check in too.
+                </Text>
+              </View>
+            </View>
+            <ActivityChips ids={mine.activities ?? []} />
+            {mine.note ? <Text style={styles.noteText}>{mine.note}</Text> : null}
+          </Card>
+        ) : null}
+
+        {bothSubmitted && mine && partnerCheckIn ? (
+          <Card>
+            <Text style={styles.revealTitle}>Both checked in</Text>
+            <Text style={styles.metaLabel}>You</Text>
+            <View style={styles.scoreLine}>
+              <ScoreEmoji score={mine.score} size={40} />
               <Text style={styles.scoreText}>
                 {mine.score} · {SCORE_LABELS[mine.score]}
               </Text>
-              <Text style={styles.waitingBody}>
-                {partner.display_name} can’t see this until they check in too.
+            </View>
+            <ActivityChips ids={mine.activities ?? []} />
+            {mine.note ? <Text style={styles.noteText}>{mine.note}</Text> : null}
+
+            <Text style={styles.metaLabel}>{partner.display_name}</Text>
+            <View style={styles.scoreLine}>
+              <ScoreEmoji score={partnerCheckIn.score} size={40} />
+              <Text style={styles.scoreText}>
+                {partnerCheckIn.score} · {SCORE_LABELS[partnerCheckIn.score]}
               </Text>
             </View>
-          </View>
-          {mine.note ? <Text style={styles.noteText}>{mine.note}</Text> : null}
-        </Card>
-      ) : null}
+            <ActivityChips ids={partnerCheckIn.activities ?? []} />
+            {partnerCheckIn.note ? (
+              <Text style={styles.noteText}>{partnerCheckIn.note}</Text>
+            ) : null}
+          </Card>
+        ) : null}
 
-      {bothSubmitted && mine && partnerCheckIn ? (
-        <Card>
-          <Text style={styles.revealTitle}>Both checked in ✨</Text>
-          <Text style={styles.metaLabel}>You</Text>
-          <View style={styles.scoreLine}>
-            <ScoreEmoji score={mine.score} size={40} />
-            <Text style={styles.scoreText}>
-              {mine.score} · {SCORE_LABELS[mine.score]}
-            </Text>
-          </View>
-          {mine.note ? <Text style={styles.noteText}>{mine.note}</Text> : null}
-
-          <Text style={styles.metaLabel}>{partner.display_name}</Text>
-          <View style={styles.scoreLine}>
-            <ScoreEmoji score={partnerCheckIn.score} size={40} />
-            <Text style={styles.scoreText}>
-              {partnerCheckIn.score} · {SCORE_LABELS[partnerCheckIn.score]}
-            </Text>
-          </View>
-          {partnerCheckIn.note ? (
-            <Text style={styles.noteText}>{partnerCheckIn.note}</Text>
-          ) : null}
-        </Card>
-      ) : null}
-
-      <SecondaryButton
-        label="Refresh"
-        onPress={() => {
-          void refresh()
-          void refreshWeekly()
-        }}
-      />
-      <SecondaryButton label="Done" onPress={() => router.back()} />
+        <SecondaryButton
+          label="Refresh"
+          onPress={() => {
+            void refresh()
+            void refreshWeekly()
+          }}
+        />
+        <SecondaryButton label="Done" onPress={() => router.back()} />
+      </ScrollView>
     </Screen>
   )
 }
 
+function ActivityChips({ ids }: { ids: string[] }) {
+  if (!ids.length) return null
+  return (
+    <View style={styles.chipRow}>
+      {ids.map((id) => {
+        const activity = activityById(id)
+        if (!activity) return null
+        return (
+          <View key={id} style={styles.chip}>
+            <Text style={styles.chipText}>
+              {activity.glyph} {activity.label}
+            </Text>
+          </View>
+        )
+      })}
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
+  screen: {
+    paddingTop: 48,
+    paddingHorizontal: 0,
+  },
+  scroll: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   weeklyTitle: {
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.ink,
     marginBottom: 6,
   },
@@ -241,8 +303,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   heroPrompt: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '700',
     color: colors.ink,
     marginBottom: 16,
     textAlign: 'center',
@@ -252,12 +314,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.ink,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   scoreHint: {
     textAlign: 'center',
     color: colors.muted,
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  sectionHint: {
+    color: colors.muted,
+    fontSize: 13,
+    marginBottom: 10,
   },
   noteToggle: {
     alignItems: 'center',
@@ -265,7 +340,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   noteToggleText: {
-    color: colors.accentPressed,
+    color: colors.accent,
     fontWeight: '700',
   },
   note: {
@@ -274,7 +349,7 @@ const styles = StyleSheet.create({
   },
   waitingTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.ink,
     marginBottom: 12,
   },
@@ -286,8 +361,8 @@ const styles = StyleSheet.create({
   },
   revealTitle: {
     fontSize: 18,
-    fontWeight: '800',
-    color: colors.accentPressed,
+    fontWeight: '700',
+    color: colors.accent,
     marginBottom: 8,
   },
   metaLabel: {
@@ -297,6 +372,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 4,
     textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   scoreLine: {
     flexDirection: 'row',
@@ -312,5 +388,23 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: colors.ink,
     lineHeight: 20,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 10,
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  chipText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
   },
 })

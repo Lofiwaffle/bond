@@ -3,177 +3,268 @@ import { StyleSheet, Text, View } from 'react-native'
 import { Redirect } from 'expo-router'
 
 import {
+  BadgeRow,
   Card,
   LoadingScreen,
-  ScoreEmoji,
   Screen,
   SecondaryButton,
+  StreakChip,
   Subtitle,
   Title,
 } from '../../../components/ui'
 import {
   computeStreak,
   useCheckInHistory,
+  useMonthCheckIns,
 } from '../../../hooks/useCheckIn'
 import { useAuth } from '../../../lib/auth'
-import { addDays, localDateString } from '../../../lib/dates'
-import { colors, scoreColors } from '../../../lib/theme'
+import {
+  formatMonthTitle,
+  getMonthGrid,
+  dateKey,
+  localDateString,
+} from '../../../lib/dates'
+import { SCORE_LABELS, colors, radii, scoreColors } from '../../../lib/theme'
 
 export default function StatsScreen() {
   const { profile, partner, isLoading: authLoading } = useAuth()
   const { days, isLoading, refresh } = useCheckInHistory()
+  const now = useMemo(() => new Date(), [])
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const { byDate, isLoading: monthLoading } = useMonthCheckIns(year, month)
 
   const stats = useMemo(() => {
     const today = localDateString()
     const myDates = days.filter((d) => d.mine).map((d) => d.date)
     const streak = computeStreak(myDates, today)
+    const hasMutualReveal = days.some((d) => d.revealed)
 
-    const last7Keys = Array.from({ length: 7 }, (_, i) => addDays(today, -6 + i))
-    const last7 = last7Keys.map((date) => {
-      const day = days.find((d) => d.date === date)
-      return { date, score: day?.mine?.score ?? null }
-    })
+    const yearMine = [0, 0, 0, 0, 0]
+    const yearPartner = [0, 0, 0, 0, 0]
+    for (const day of days) {
+      if (!day.date.startsWith(String(year))) continue
+      if (day.mine?.score) yearMine[day.mine.score - 1] += 1
+      if (day.revealed && day.partner?.score) {
+        yearPartner[day.partner.score - 1] += 1
+      }
+    }
 
-    const myScores = last7.filter((d) => d.score != null).map((d) => d.score!)
-    const myAvg =
-      myScores.length > 0
-        ? myScores.reduce((a, b) => a + b, 0) / myScores.length
-        : null
+    const mineTotal = yearMine.reduce((a, b) => a + b, 0)
+    const partnerTotal = yearPartner.reduce((a, b) => a + b, 0)
 
-    const partnerScores = days
-      .filter((d) => d.revealed && d.partner)
-      .slice(0, 7)
-      .map((d) => d.partner!.score)
-    const partnerAvg =
-      partnerScores.length > 0
-        ? partnerScores.reduce((a, b) => a + b, 0) / partnerScores.length
-        : null
+    return {
+      streak,
+      hasMutualReveal,
+      yearMine,
+      yearPartner,
+      mineTotal,
+      partnerTotal,
+    }
+  }, [days, year])
 
-    return { streak, last7, myAvg, partnerAvg }
-  }, [days])
-
-  if (authLoading || isLoading) return <LoadingScreen />
+  if (authLoading || isLoading || monthLoading) return <LoadingScreen />
   if (!profile?.couple_id) return <Redirect href="/(app)/pair" />
+
+  const grid = getMonthGrid(year, month)
 
   return (
     <Screen>
-      <Title>Stats</Title>
-      <Subtitle>Your connection streak and recent vibes.</Subtitle>
-
-      <View style={styles.row}>
-        <Card style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.streak}</Text>
-          <Text style={styles.statLabel}>Day streak</Text>
-        </Card>
-        <Card style={styles.statCard}>
-          <Text style={styles.statValue}>
-            {stats.myAvg != null ? stats.myAvg.toFixed(1) : '—'}
-          </Text>
-          <Text style={styles.statLabel}>7-day avg</Text>
-        </Card>
+      <View style={styles.headerRow}>
+        <Title>Bond</Title>
+        <StreakChip streak={stats.streak} />
       </View>
+      <Subtitle>
+        Your connection at a glance
+        {partner ? ` with ${partner.display_name}` : ''}.
+      </Subtitle>
 
       <Card>
-        <Text style={styles.sectionTitle}>Last 7 days</Text>
-        <View style={styles.weekRow}>
-          {stats.last7.map((day) => (
-            <View key={day.date} style={styles.weekCell}>
-              <Text style={styles.weekDow}>
-                {day.date.slice(8)}
-              </Text>
-              {day.score != null ? (
-                <View
-                  style={[
-                    styles.weekFace,
-                    { backgroundColor: scoreColors[day.score] },
-                  ]}
-                >
-                  <ScoreEmoji score={day.score} size={22} />
-                </View>
-              ) : (
-                <View style={styles.weekEmpty} />
-              )}
+        <Text style={styles.sectionTitle}>Badges</Text>
+        <BadgeRow
+          progress={{
+            streak: stats.streak,
+            hasMutualReveal: stats.hasMutualReveal,
+          }}
+        />
+      </Card>
+
+      <Card>
+        <Text style={styles.sectionTitle}>
+          {formatMonthTitle(year, month)} matrix
+        </Text>
+        <View style={styles.matrix}>
+          {grid.map((day, index) => {
+            if (day == null) {
+              return <View key={`e-${index}`} style={styles.matrixCell} />
+            }
+            const key = dateKey(year, month, day)
+            const score = byDate[key]?.mine?.score
+            return (
+              <View
+                key={key}
+                style={[
+                  styles.matrixCell,
+                  {
+                    backgroundColor:
+                      score != null ? scoreColors[score] : colors.bgSoft,
+                    borderColor: colors.hairline,
+                  },
+                ]}
+              />
+            )
+          })}
+        </View>
+        <View style={styles.legendRow}>
+          {[1, 2, 3, 4, 5].map((score) => (
+            <View key={score} style={styles.legendItem}>
+              <View
+                style={[styles.legendSwatch, { backgroundColor: scoreColors[score] }]}
+              />
+              <Text style={styles.legendText}>{score}</Text>
             </View>
           ))}
         </View>
       </Card>
 
-      {partner ? (
-        <Card>
-          <Text style={styles.sectionTitle}>
-            {partner.display_name} (revealed days)
-          </Text>
-          <Text style={styles.partnerAvg}>
-            {stats.partnerAvg != null
-              ? `Avg ${stats.partnerAvg.toFixed(1)} from recent shared days`
-              : 'No revealed days yet — both need to check in.'}
-          </Text>
-        </Card>
-      ) : null}
+      <Card>
+        <Text style={styles.sectionTitle}>{year} distribution</Text>
+        <Text style={styles.meta}>You · {stats.mineTotal} check-ins</Text>
+        <DistributionBars counts={stats.yearMine} total={stats.mineTotal} />
+        {partner ? (
+          <>
+            <Text style={[styles.meta, { marginTop: 16 }]}>
+              {partner.display_name} · {stats.partnerTotal} revealed
+            </Text>
+            <DistributionBars
+              counts={stats.yearPartner}
+              total={stats.partnerTotal}
+            />
+          </>
+        ) : null}
+      </Card>
 
       <SecondaryButton label="Refresh" onPress={() => void refresh()} />
     </Screen>
   )
 }
 
+function DistributionBars({
+  counts,
+  total,
+}: {
+  counts: number[]
+  total: number
+}) {
+  return (
+    <View style={styles.distList}>
+      {counts.map((count, index) => {
+        const score = index + 1
+        const pct = total > 0 ? Math.round((count / total) * 100) : 0
+        return (
+          <View key={score} style={styles.distRow}>
+            <Text style={styles.distLabel}>{SCORE_LABELS[score]}</Text>
+            <View style={styles.distTrack}>
+              <View
+                style={[
+                  styles.distFill,
+                  {
+                    width: `${pct}%`,
+                    backgroundColor: scoreColors[score],
+                  },
+                ]}
+              />
+            </View>
+            <Text style={styles.distCount}>{count}</Text>
+          </View>
+        )
+      })}
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
-  row: {
+  headerRow: {
     flexDirection: 'row',
-    gap: 10,
-  },
-  statCard: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: 22,
-  },
-  statValue: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: colors.accentPressed,
-  },
-  statLabel: {
-    marginTop: 4,
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.muted,
+    justifyContent: 'space-between',
+    gap: 12,
   },
   sectionTitle: {
-    fontSize: 15,
-    fontWeight: '800',
     color: colors.ink,
+    fontWeight: '700',
+    fontSize: 15,
     marginBottom: 12,
   },
-  weekRow: {
+  matrix: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  matrixCell: {
+    width: `${100 / 7}%`,
+    aspectRatio: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 2,
+  },
+  legendRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 12,
   },
-  weekCell: {
+  legendItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
-  weekDow: {
-    fontSize: 11,
-    fontWeight: '700',
+  legendSwatch: {
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+  },
+  legendText: {
     color: colors.muted,
+    fontSize: 11,
+    fontWeight: '600',
   },
-  weekFace: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  meta: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  distList: {
+    gap: 8,
+  },
+  distRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
   },
-  weekEmpty: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  distLabel: {
+    width: 96,
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  distTrack: {
+    flex: 1,
+    height: 10,
+    borderRadius: radii.sm,
     backgroundColor: colors.bgSoft,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
+    borderColor: colors.hairline,
+    overflow: 'hidden',
   },
-  partnerAvg: {
-    color: colors.muted,
-    lineHeight: 20,
+  distFill: {
+    height: '100%',
+  },
+  distCount: {
+    width: 28,
+    textAlign: 'right',
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: '700',
   },
 })

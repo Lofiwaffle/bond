@@ -1,8 +1,9 @@
 import { Redirect, Tabs, router } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+
 import { LoadingScreen } from '../../../components/ui'
 import { useAuth } from '../../../lib/auth'
-import { colors } from '../../../lib/theme'
+import { colors, radii } from '../../../lib/theme'
 
 function CheckInFab() {
   return (
@@ -12,7 +13,7 @@ function CheckInFab() {
       onPress={() => router.push('/(app)/check-in')}
       style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
     >
-      <Text style={styles.fabEmoji}>😊</Text>
+      <Text style={styles.fabEmoji}>◎</Text>
       <Text style={styles.fabLabel}>Check in</Text>
     </Pressable>
   )
@@ -28,7 +29,7 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.accentPressed,
+        tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabLabel,
@@ -39,7 +40,7 @@ export default function TabsLayout() {
         options={{
           title: 'Entries',
           tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 20, color }}>📅</Text>
+            <Text style={{ fontSize: 18, color }}>▦</Text>
           ),
         }}
       />
@@ -58,9 +59,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="stats"
         options={{
-          title: 'Stats',
+          title: 'Bond',
           tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 20, color }}>📊</Text>
+            <Text style={{ fontSize: 18, color }}>◈</Text>
           ),
         }}
       />
@@ -69,7 +70,7 @@ export default function TabsLayout() {
         options={{
           title: 'More',
           tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 20, color }}>⚙️</Text>
+            <Text style={{ fontSize: 18, color }}>☰</Text>
           ),
         }}
       />
@@ -80,7 +81,8 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: colors.tabBar,
-    borderTopColor: colors.border,
+    borderTopColor: colors.hairline,
+    borderTopWidth: 1,
     height: 72,
     paddingBottom: 10,
     paddingTop: 8,
@@ -90,34 +92,33 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   fabSlot: {
-    top: -18,
+    top: -16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   fab: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 68,
+    height: 68,
+    borderRadius: radii.md,
     backgroundColor: colors.accent,
+    borderWidth: 1,
+    borderColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
   },
   fabPressed: {
     backgroundColor: colors.accentPressed,
   },
   fabEmoji: {
-    fontSize: 26,
+    fontSize: 20,
+    color: colors.black,
+    fontWeight: '800',
     marginTop: -2,
   },
   fabLabel: {
-    color: colors.white,
+    color: colors.black,
     fontSize: 10,
     fontWeight: '800',
-    marginTop: -2,
+    marginTop: 2,
   },
 })

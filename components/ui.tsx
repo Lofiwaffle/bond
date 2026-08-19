@@ -10,6 +10,8 @@ import {
   type ViewStyle,
 } from 'react-native'
 
+import { ACTIVITIES, type ActivityId } from '../lib/activities'
+import { badgesForProgress, type BadgeProgress } from '../lib/badges'
 import {
   SCORE_LABELS,
   colors,
@@ -77,7 +79,7 @@ export function PrimaryButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={colors.white} />
+        <ActivityIndicator color={colors.black} />
       ) : (
         <Text style={styles.buttonLabel}>{label}</Text>
       )}
@@ -157,8 +159,8 @@ export function ScoreFacePicker({
   onChange: (score: number) => void
   size?: 'large' | 'compact'
 }) {
-  const faceSize = size === 'large' ? 52 : 36
-  const circle = size === 'large' ? 72 : 52
+  const faceSize = size === 'large' ? 44 : 30
+  const circle = size === 'large' ? 64 : 48
 
   return (
     <View style={styles.faceRow}>
@@ -168,6 +170,7 @@ export function ScoreFacePicker({
           <Pressable
             key={score}
             accessibilityRole="button"
+            accessibilityState={{ selected }}
             accessibilityLabel={`${score}, ${SCORE_LABELS[score]}`}
             onPress={() => onChange(score)}
             style={[
@@ -175,13 +178,12 @@ export function ScoreFacePicker({
               {
                 width: circle,
                 height: circle,
-                borderRadius: circle / 2,
+                borderRadius: radii.md,
                 backgroundColor: selected
                   ? scoreColors[score]
                   : scoreColorsSoft[score],
-                borderColor: selected ? scoreColors[score] : 'transparent',
-                borderWidth: selected ? 3 : 0,
-                transform: [{ scale: selected ? 1.08 : 1 }],
+                borderColor: selected ? colors.accent : colors.hairline,
+                borderWidth: selected ? 2 : 1,
               },
             ]}
           >
@@ -189,6 +191,93 @@ export function ScoreFacePicker({
           </Pressable>
         )
       })}
+    </View>
+  )
+}
+
+export function ActivityIconGrid({
+  value,
+  onChange,
+  max = 5,
+}: {
+  value: ActivityId[]
+  onChange: (next: ActivityId[]) => void
+  max?: number
+}) {
+  const toggle = (id: ActivityId) => {
+    if (value.includes(id)) {
+      onChange(value.filter((item) => item !== id))
+      return
+    }
+    if (value.length >= max) return
+    onChange([...value, id])
+  }
+
+  return (
+    <View style={styles.activityGrid}>
+      {ACTIVITIES.map((activity) => {
+        const selected = value.includes(activity.id)
+        const blocked = !selected && value.length >= max
+        return (
+          <Pressable
+            key={activity.id}
+            accessibilityRole="button"
+            accessibilityState={{ selected, disabled: blocked }}
+            accessibilityLabel={activity.label}
+            disabled={blocked}
+            onPress={() => toggle(activity.id)}
+            style={[
+              styles.activityCell,
+              selected && styles.activityCellSelected,
+              blocked && styles.activityCellBlocked,
+            ]}
+          >
+            <Text style={styles.activityGlyph}>{activity.glyph}</Text>
+            <Text
+              style={[
+                styles.activityLabel,
+                selected && styles.activityLabelSelected,
+              ]}
+            >
+              {activity.label}
+            </Text>
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
+export function StreakChip({ streak }: { streak: number }) {
+  return (
+    <View style={styles.streakChip}>
+      <Text style={styles.streakChipValue}>{streak}</Text>
+      <Text style={styles.streakChipLabel}>day streak</Text>
+    </View>
+  )
+}
+
+export function BadgeRow({ progress }: { progress: BadgeProgress }) {
+  const badges = badgesForProgress(progress)
+  return (
+    <View style={styles.badgeRow}>
+      {badges.map((badge) => (
+        <View
+          key={badge.id}
+          style={[styles.badgeCell, badge.earned && styles.badgeCellEarned]}
+        >
+          <Text
+            style={[styles.badgeGlyph, !badge.earned && styles.badgeMuted]}
+          >
+            {badge.glyph}
+          </Text>
+          <Text
+            style={[styles.badgeLabel, !badge.earned && styles.badgeMuted]}
+          >
+            {badge.label}
+          </Text>
+        </View>
+      ))}
     </View>
   )
 }
@@ -202,10 +291,11 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   title: {
-    fontSize: 30,
-    fontWeight: '800',
+    fontSize: 28,
+    fontWeight: '700',
     color: colors.ink,
     marginBottom: 6,
+    letterSpacing: -0.4,
   },
   subtitle: {
     fontSize: 15,
@@ -214,17 +304,17 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   label: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: colors.ink,
+    color: colors.muted,
     marginBottom: 8,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.8,
   },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
+    borderColor: colors.hairline,
+    backgroundColor: colors.bgSoft,
     borderRadius: radii.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -234,7 +324,7 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: colors.accent,
-    borderRadius: radii.pill,
+    borderRadius: radii.md,
     paddingVertical: 15,
     alignItems: 'center',
     marginTop: 8,
@@ -243,25 +333,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentPressed,
   },
   buttonDisabled: {
-    opacity: 0.45,
+    opacity: 0.4,
   },
   buttonLabel: {
-    color: colors.white,
+    color: colors.black,
     fontSize: 16,
     fontWeight: '800',
   },
   secondaryButton: {
-    borderRadius: radii.pill,
+    borderRadius: radii.md,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 8,
-    backgroundColor: colors.accentSoft,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.hairline,
   },
   secondaryPressed: {
-    opacity: 0.75,
+    borderColor: colors.accent,
   },
   secondaryLabel: {
-    color: colors.accentPressed,
+    color: colors.accent,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -280,9 +372,9 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
     borderRadius: radii.lg,
-    padding: 18,
+    padding: 16,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.hairline,
     marginBottom: 14,
   },
   faceRow: {
@@ -296,5 +388,96 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 1,
+  },
+  activityGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  activityCell: {
+    width: '23%',
+    minWidth: 72,
+    flexGrow: 1,
+    aspectRatio: 1,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgSoft,
+    padding: 6,
+  },
+  activityCellSelected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentSoft,
+  },
+  activityCellBlocked: {
+    opacity: 0.35,
+  },
+  activityGlyph: {
+    fontSize: 22,
+    marginBottom: 4,
+  },
+  activityLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.muted,
+  },
+  activityLabelSelected: {
+    color: colors.accent,
+  },
+  streakChip: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: radii.md,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  streakChipValue: {
+    color: colors.accent,
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  streakChipLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  badgeCell: {
+    width: '30%',
+    flexGrow: 1,
+    minWidth: 88,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    borderRadius: radii.md,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: colors.bgSoft,
+  },
+  badgeCellEarned: {
+    borderColor: colors.accent,
+  },
+  badgeGlyph: {
+    fontSize: 20,
+    color: colors.accent,
+    marginBottom: 4,
+  },
+  badgeLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  badgeMuted: {
+    color: colors.muted,
+    opacity: 0.55,
   },
 })

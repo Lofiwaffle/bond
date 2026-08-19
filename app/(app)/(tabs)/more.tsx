@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
     letterSpacing: 4,
-    color: colors.accentPressed,
+    color: colors.accent,
   },
   footer: {
     marginTop: 28,

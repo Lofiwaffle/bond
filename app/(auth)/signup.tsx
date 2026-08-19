@@ -44,7 +44,7 @@ export default function SignUpScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ flexGrow: 1 }}
         >
-          <Text style={{ fontSize: 44, marginBottom: 4 }}>💛</Text>
+          <Text style={{ fontSize: 44, marginBottom: 4, color: '#7CFFB2' }}>◎</Text>
           <Title>Create account</Title>
           <Subtitle>Start pairing with your partner in Bond.</Subtitle>
 
@@ -91,7 +91,7 @@ export default function SignUpScreen() {
             style={{
               marginTop: 20,
               textAlign: 'center',
-              color: '#F4511E',
+              color: '#7CFFB2',
               fontWeight: '700',
             }}
           >

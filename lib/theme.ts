@@ -1,37 +1,37 @@
 export const colors = {
-  bg: '#FFF7F0',
-  bgSoft: '#FFE9D6',
-  ink: '#1F1C1A',
-  muted: '#7A726A',
-  accent: '#FF7A59',
-  accentPressed: '#E85A38',
-  accentSoft: '#FFE2D8',
-  border: '#EADFD4',
-  hairline: '#E5D9CD',
-  danger: '#D32F2F',
-  success: '#2E7D32',
-  card: '#FFFFFF',
-  tabBar: '#FFFFFF',
+  bg: '#0A0A0A',
+  bgSoft: '#121212',
+  ink: '#F2F2F2',
+  muted: '#8A8A8A',
+  accent: '#7CFFB2',
+  accentPressed: '#5AE89A',
+  accentSoft: '#143D2A',
+  border: '#2A2A2A',
+  hairline: '#2A2A2A',
+  danger: '#FF6B6B',
+  success: '#7CFFB2',
+  card: '#111111',
+  tabBar: '#0A0A0A',
   white: '#FFFFFF',
-  overlay: 'rgba(31, 28, 26, 0.45)',
+  black: '#000000',
+  overlay: 'rgba(0, 0, 0, 0.65)',
 }
 
-/** Daylio-like pastel colors for connection scores 1–5 */
+/** Saturated connection scores 1–5 — readable on true black */
 export const scoreColors: Record<number, string> = {
-  1: '#EF9A9A',
-  2: '#FFCC80',
-  3: '#FFF59D',
-  4: '#A5D6A7',
-  5: '#80CBC4',
+  1: '#FF5C5C',
+  2: '#FFB020',
+  3: '#F5E06A',
+  4: '#4CD964',
+  5: '#7CFFB2',
 }
 
-/** Daylio-like pastel colors for connection scores 1–5 */
 export const scoreColorsSoft: Record<number, string> = {
-  1: '#FFEBEE',
-  2: '#FFF3E0',
-  3: '#FFFDE7',
-  4: '#E8F5E9',
-  5: '#E0F2F1',
+  1: '#2A1212',
+  2: '#2A1E0A',
+  3: '#2A2610',
+  4: '#0F2414',
+  5: '#0F241C',
 }
 
 export const scoreEmojis: Record<number, string> = {
@@ -50,15 +50,14 @@ export const SCORE_LABELS: Record<number, string> = {
   5: 'Very connected',
 }
 
-/** iOS prefers continuous/pill; MD3 prefers 12–16dp filled buttons */
+/** Wireframe geometry — square-ish, thin borders */
 export const radii = {
-  sm: 12,
-  md: 18,
-  lg: 28,
+  sm: 8,
+  md: 10,
+  lg: 12,
   pill: 999,
 }
 
-/** Minimum interactive target — 44pt HIG / 48dp Material */
 export const hit = 44
 
 export const type = {
@@ -73,38 +72,18 @@ export const type = {
   caption: 12,
 }
 
-/** iOS ripple effect; MD3 ripple */
+/** Flat wireframe — no soft shadows */
 export const elevation = {
   ios: {
-    card: {
-      shadowColor: '#1F1C1A',
-      shadowOpacity: 0.06,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 4 },
-    },
-    fab: {
-      shadowColor: '#1F1C1A',
-      shadowOpacity: 0.18,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 6 },
-    },
+    card: {},
+    fab: {},
   },
   android: {
-    card: { elevation: 1 },
-    fab: { elevation: 6 },
+    card: { elevation: 0 },
+    fab: { elevation: 0 },
   },
   default: {
-    card: {
-      shadowColor: '#1F1C1A',
-      shadowOpacity: 0.06,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 4 },
-    },
-    fab: {
-      shadowColor: '#1F1C1A',
-      shadowOpacity: 0.18,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 6 },
-    },
+    card: {},
+    fab: {},
   },
 }

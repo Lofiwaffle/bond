@@ -72,7 +72,7 @@ export default function PairScreen() {
   if (profile?.couple_id && couple && !partner) {
     return (
       <Screen>
-        <Text style={styles.heroEmoji}>💌</Text>
+        <Text style={styles.heroEmoji}>◎</Text>
         <Title>Share your code</Title>
         <Subtitle>
           Give this invite to your partner so you can check in together.
@@ -95,7 +95,7 @@ export default function PairScreen() {
 
   return (
     <Screen>
-      <Text style={styles.heroEmoji}>💛</Text>
+      <Text style={styles.heroEmoji}>◎</Text>
       <Title>Pair with partner</Title>
       <Subtitle>
         Generate an invite code, or enter the one your partner shared.
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: '800',
     letterSpacing: 6,
-    color: colors.accentPressed,
+    color: colors.accent,
   },
   divider: {
     alignItems: 'center',

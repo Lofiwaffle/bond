@@ -39,7 +39,7 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ flexGrow: 1 }}
         >
-          <Text style={{ fontSize: 44, marginBottom: 4 }}>😊</Text>
+          <Text style={{ fontSize: 44, marginBottom: 4, color: '#7CFFB2' }}>◎</Text>
           <Title>Bond</Title>
           <Subtitle>Sign in to check in with your partner.</Subtitle>
 
@@ -77,7 +77,7 @@ export default function LoginScreen() {
             style={{
               marginTop: 20,
               textAlign: 'center',
-              color: '#F4511E',
+              color: '#7CFFB2',
               fontWeight: '700',
             }}
           >

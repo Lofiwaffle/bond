@@ -1,6 +1,5 @@
 import { Redirect, Tabs, router } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-
 import { LoadingScreen } from '../../../components/ui'
 import { useAuth } from '../../../lib/auth'
 import { colors } from '../../../lib/theme'

@@ -2,18 +2,8 @@ import { useState } from 'react'
 import { KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native'
 import { Link, Redirect } from 'expo-router'
 
-import {
-  ErrorText,
-  Field,
-  Label,
-  LoadingScreen,
-  PrimaryButton,
-  Screen,
-  Subtitle,
-  Title,
-} from '../../components/ui'
+import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen, Subtitle, Title } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
-import { colors } from '../../lib/theme'
 
 export default function LoginScreen() {
   const { session, profile, isLoading, signIn } = useAuth()
@@ -74,6 +64,7 @@ export default function LoginScreen() {
           />
 
           <ErrorText message={error} />
+
           <PrimaryButton
             label="Sign in"
             onPress={onSubmit}
@@ -86,7 +77,7 @@ export default function LoginScreen() {
             style={{
               marginTop: 20,
               textAlign: 'center',
-              color: colors.accentPressed,
+              color: '#F4511E',
               fontWeight: '700',
             }}
           >

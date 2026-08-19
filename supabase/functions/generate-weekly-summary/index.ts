@@ -311,7 +311,7 @@ function buildFallback(
     `Bond week summary (${weekStart} – ${weekEnd}).`,
     'Here is every daily check-in from your week together:',
     ...dayLines.map((line) => `• ${line}`),
-    `Keep checking in with ${partnerName} — consistency is how Bond grows.`,
+    `Keep checking in with ${partnerName}. Consistency is how Bond grows.`,
   ].join('\n')
 }
 

@@ -12,6 +12,7 @@ export default function AppLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="bond" />
       <Stack.Screen
         name="check-in"
         options={{

@@ -3,7 +3,7 @@ import { Redirect } from 'expo-router'
 import { LoadingScreen } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 
-/** Legacy /(app) index — send paired users to tabs, unpaired to pair. */
+/** Legacy /(app) index: send paired users to tabs, unpaired to pair. */
 export default function AppIndex() {
   const { profile, isLoading } = useAuth()
   if (isLoading) return <LoadingScreen />

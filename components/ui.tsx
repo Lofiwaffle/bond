@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
+import { useMemo } from 'react'
 import {
   ActivityIndicator,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,7 +13,16 @@ import {
 } from 'react-native'
 
 import { ACTIVITIES, type ActivityId } from '../lib/activities'
-import { badgesForProgress, type BadgeProgress } from '../lib/badges'
+import {
+  BADGES,
+  badgesForProgress,
+  habitCalendarWeeks,
+  habitCombinedDaySummary,
+  habitDayCounts,
+  type BadgeId,
+  type BadgeProgress,
+} from '../lib/badges'
+import { localDateString } from '../lib/dates'
 import {
   SCORE_LABELS,
   colors,
@@ -257,26 +268,173 @@ export function StreakChip({ streak }: { streak: number }) {
   )
 }
 
-export function BadgeRow({ progress }: { progress: BadgeProgress }) {
+const HABIT_EMPTY = '#1A1A1A'
+const HABIT_CELL = 13
+const HABIT_GAP = 3
+
+export function HabitCalendar({
+  completions,
+  onPressHabit,
+  weekCount = 16,
+}: {
+  completions: Array<{ habit_id: string; created_at: string }>
+  onPressHabit?: (id: BadgeId) => void
+  weekCount?: number
+}) {
+  const weeks = useMemo(() => habitCalendarWeeks(weekCount), [weekCount])
+  const dayCounts = useMemo(() => habitDayCounts(completions), [completions])
+  const today = localDateString()
+  const badgeById = useMemo(
+    () => Object.fromEntries(BADGES.map((b) => [b.id, b])) as Record<
+      BadgeId,
+      (typeof BADGES)[number]
+    >,
+    [],
+  )
+  const progress = useMemo(() => {
+    const counts = BADGES.reduce(
+      (acc, b) => {
+        acc[b.id] = Object.values(dayCounts[b.id]).reduce((a, n) => a + n, 0)
+        return acc
+      },
+      {} as Record<BadgeId, number>,
+    )
+    return badgesForProgress({ completions: counts })
+  }, [dayCounts])
+
+  return (
+    <View style={styles.habitCal}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.habitCalGrid}
+      >
+        {weeks.map((week, wi) => (
+          <View key={wi} style={styles.habitCalWeek}>
+            {week.map((date) => {
+              const summary = habitCombinedDaySummary(dayCounts, date)
+              const future = date > today
+              const badge = summary.primary
+                ? badgeById[summary.primary]
+                : null
+              const multi = summary.habits.length > 1
+              const fill = future
+                ? 'transparent'
+                : !badge
+                  ? HABIT_EMPTY
+                  : summary.total === 1
+                    ? badge.colorSoft
+                    : badge.color
+              const border = future
+                ? 'transparent'
+                : date === today
+                  ? colors.accent
+                  : multi
+                    ? colors.ink
+                    : badge
+                      ? badge.color
+                      : colors.hairline
+
+              return (
+                <View
+                  key={date}
+                  accessibilityLabel={
+                    future
+                      ? undefined
+                      : summary.total === 0
+                        ? `${date}: no habits`
+                        : `${date}: ${summary.habits.join(', ')}`
+                  }
+                  style={[
+                    styles.habitCalCell,
+                    {
+                      backgroundColor: fill,
+                      borderColor: border,
+                      opacity: future ? 0 : 1,
+                    },
+                  ]}
+                />
+              )
+            })}
+          </View>
+        ))}
+      </ScrollView>
+
+      <Text style={styles.habitCalKeyTitle}>Key</Text>
+      <View style={styles.habitCalKey}>
+        {progress.map((badge) => (
+          <Pressable
+            key={badge.id}
+            accessibilityRole={onPressHabit ? 'button' : undefined}
+            accessibilityLabel={`${badge.label}, ${badge.count} logged. Tap to log.`}
+            disabled={!onPressHabit}
+            onPress={() => onPressHabit?.(badge.id)}
+            style={[
+              styles.habitCalKeyItem,
+              badge.earned && { borderColor: badge.color },
+            ]}
+          >
+            <View
+              style={[styles.habitCalSwatch, { backgroundColor: badge.color }]}
+            />
+            <View style={styles.habitCalKeyCopy}>
+              <Text style={styles.habitCalLabel} numberOfLines={1}>
+                {badge.glyph} {badge.label}
+              </Text>
+              <Text style={styles.habitCalCount}>
+                {badge.count > 0 ? `×${badge.count}` : 'tap to log'}
+              </Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  )
+}
+
+/** @deprecated Prefer HabitCalendar: kept for any leftover callers */
+export function BadgeRow({
+  progress,
+  onPress,
+}: {
+  progress: BadgeProgress
+  onPress?: (id: BadgeId) => void
+}) {
   const badges = badgesForProgress(progress)
   return (
     <View style={styles.badgeRow}>
       {badges.map((badge) => (
-        <View
+        <Pressable
           key={badge.id}
-          style={[styles.badgeCell, badge.earned && styles.badgeCellEarned]}
+          accessibilityRole={onPress ? 'button' : undefined}
+          accessibilityLabel={`${badge.label}${badge.count > 0 ? `, logged ${badge.count} times` : ', not logged yet'}`}
+          disabled={!onPress}
+          onPress={() => onPress?.(badge.id)}
+          style={[
+            styles.badgeCell,
+            badge.earned && { borderColor: badge.color },
+          ]}
         >
-          <Text
-            style={[styles.badgeGlyph, !badge.earned && styles.badgeMuted]}
-          >
-            {badge.glyph}
-          </Text>
+          <View
+            style={[
+              styles.badgeSquare,
+              {
+                backgroundColor: badge.earned ? badge.color : HABIT_EMPTY,
+                borderColor: badge.earned ? badge.color : colors.hairline,
+              },
+            ]}
+          />
           <Text
             style={[styles.badgeLabel, !badge.earned && styles.badgeMuted]}
           >
-            {badge.label}
+            {badge.glyph} {badge.label}
           </Text>
-        </View>
+          {badge.count > 0 ? (
+            <Text style={[styles.badgeCount, { color: badge.color }]}>
+              ×{badge.count}
+            </Text>
+          ) : null}
+        </Pressable>
       ))}
     </View>
   )
@@ -460,16 +618,16 @@ const styles = StyleSheet.create({
     borderColor: colors.hairline,
     borderRadius: radii.md,
     paddingVertical: 12,
+    paddingHorizontal: 4,
     alignItems: 'center',
     backgroundColor: colors.bgSoft,
   },
-  badgeCellEarned: {
-    borderColor: colors.accent,
-  },
-  badgeGlyph: {
-    fontSize: 20,
-    color: colors.accent,
-    marginBottom: 4,
+  badgeSquare: {
+    width: 18,
+    height: 18,
+    borderRadius: 3,
+    borderWidth: 1,
+    marginBottom: 6,
   },
   badgeLabel: {
     fontSize: 12,
@@ -479,5 +637,74 @@ const styles = StyleSheet.create({
   badgeMuted: {
     color: colors.muted,
     opacity: 0.55,
+  },
+  badgeCount: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.accent,
+    marginTop: 2,
+  },
+  habitCal: {
+    gap: 12,
+  },
+  habitCalSwatch: {
+    width: 12,
+    height: 12,
+    borderRadius: 2,
+  },
+  habitCalLabel: {
+    color: colors.ink,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  habitCalCount: {
+    color: colors.muted,
+    fontWeight: '600',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  habitCalGrid: {
+    flexDirection: 'row',
+    gap: HABIT_GAP,
+    paddingVertical: 2,
+  },
+  habitCalWeek: {
+    gap: HABIT_GAP,
+  },
+  habitCalCell: {
+    width: HABIT_CELL,
+    height: HABIT_CELL,
+    borderRadius: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+  },
+  habitCalKeyTitle: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: 4,
+  },
+  habitCalKey: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  habitCalKeyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    borderRadius: radii.md,
+    backgroundColor: colors.bgSoft,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    minWidth: '45%',
+    flexGrow: 1,
+  },
+  habitCalKeyCopy: {
+    flex: 1,
   },
 })

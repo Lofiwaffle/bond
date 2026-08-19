@@ -165,7 +165,7 @@ export default function CheckInScreen() {
 
             <Text style={styles.sectionLabel}>Activities</Text>
             <Text style={styles.sectionHint}>
-              Tap tags that shaped today — no typing required.
+              Tap tags that shaped today. No typing required.
             </Text>
             <ActivityIconGrid value={activities} onChange={setActivities} />
 
@@ -200,7 +200,7 @@ export default function CheckInScreen() {
 
         {mine && waitingForPartner ? (
           <Card>
-            <Text style={styles.waitingTitle}>Saved — waiting on partner</Text>
+            <Text style={styles.waitingTitle}>Saved. Waiting on partner</Text>
             <View style={styles.scoreLine}>
               <ScoreEmoji score={mine.score} size={44} />
               <View>

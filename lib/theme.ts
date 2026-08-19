@@ -17,7 +17,7 @@ export const colors = {
   overlay: 'rgba(0, 0, 0, 0.65)',
 }
 
-/** Saturated connection scores 1–5 — readable on true black */
+/** Saturated connection scores 1–5: readable on true black */
 export const scoreColors: Record<number, string> = {
   1: '#FF5C5C',
   2: '#FFB020',
@@ -50,7 +50,7 @@ export const SCORE_LABELS: Record<number, string> = {
   5: 'Very connected',
 }
 
-/** Wireframe geometry — square-ish, thin borders */
+/** Wireframe geometry: square-ish, thin borders */
 export const radii = {
   sm: 8,
   md: 10,
@@ -72,7 +72,7 @@ export const type = {
   caption: 12,
 }
 
-/** Flat wireframe — no soft shadows */
+/** Flat wireframe: no soft shadows */
 export const elevation = {
   ios: {
     card: {},

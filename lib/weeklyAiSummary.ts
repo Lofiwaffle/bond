@@ -96,7 +96,7 @@ export function buildFallbackWeeklySummary(input: {
   }
 
   lines.push(
-    'Keep showing up for each other — small daily check-ins are how Bond grows.',
+    'Keep showing up for each other. Small daily check-ins are how Bond grows.',
   )
   return lines.join('\n')
 }

@@ -68,9 +68,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="more"
         options={{
-          title: 'More',
+          title: 'Us',
           tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 18, color }}>☰</Text>
+            <Text style={{ fontSize: 18, color }}>◎</Text>
           ),
         }}
       />

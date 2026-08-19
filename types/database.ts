@@ -52,6 +52,15 @@ export type Appreciation = {
   timestamp: string
 }
 
+export type HabitCompletion = {
+  id: string
+  couple_id: string
+  user_id: string
+  habit_id: 'spark' | 'glow' | 'forge' | 'bond' | 'sync'
+  note: string | null
+  created_at: string
+}
+
 export type Ritual = {
   id: string
   couple_id: string
@@ -171,6 +180,21 @@ export type Database = {
         }
         Update: {
           message?: string
+        }
+        Relationships: []
+      }
+      habit_completions: {
+        Row: HabitCompletion
+        Insert: {
+          id?: string
+          couple_id: string
+          user_id: string
+          habit_id: 'spark' | 'glow' | 'forge' | 'bond' | 'sync'
+          note?: string | null
+          created_at?: string
+        }
+        Update: {
+          note?: string | null
         }
         Relationships: []
       }

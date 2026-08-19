@@ -29,7 +29,7 @@ export const DAILY_PROMPT = 'How connected did you feel today?'
 
 export { SCORE_LABELS } from './theme'
 
-/** Days in a month grid starting Sunday (0) — padded with nulls */
+/** Days in a month grid starting Sunday (0): padded with nulls */
 export function getMonthGrid(year: number, monthIndex: number): (number | null)[] {
   const first = new Date(year, monthIndex, 1)
   const startPad = first.getDay()

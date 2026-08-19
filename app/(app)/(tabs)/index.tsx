@@ -1,362 +1,473 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router } from 'expo-router'
 
 import {
-  Card,
   LoadingScreen,
   PrimaryButton,
   ScoreEmoji,
   Screen,
   SecondaryButton,
   StreakChip,
-  Subtitle,
-  Title,
 } from '../../../components/ui'
 import {
   computeStreak,
   useCheckInHistory,
-  useMonthCheckIns,
+  useTodayCheckIn,
+  type HistoryDay,
 } from '../../../hooks/useCheckIn'
+import { activityById } from '../../../lib/activities'
 import { useAuth } from '../../../lib/auth'
 import {
-  DAILY_PROMPT,
   SCORE_LABELS,
-  dateKey,
   formatDisplayDate,
-  formatMonthTitle,
-  getMonthGrid,
   localDateString,
 } from '../../../lib/dates'
-import { colors, radii, scoreColors } from '../../../lib/theme'
+import { colors, radii, scoreColors, scoreColorsSoft } from '../../../lib/theme'
+import type { DailyCheckIn } from '../../../types/database'
 
-const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+function handleize(name: string): string {
+  const raw = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '')
+    .slice(0, 15)
+  return raw.length > 0 ? raw : 'you'
+}
+
+function relativeDay(date: string, today: string): string {
+  if (date === today) return 'now'
+  const [ty, tm, td] = today.split('-').map(Number)
+  const [y, m, d] = date.split('-').map(Number)
+  const a = Date.UTC(ty, tm - 1, td)
+  const b = Date.UTC(y, m - 1, d)
+  const days = Math.round((a - b) / 86400000)
+  if (days === 1) return '1d'
+  if (days < 7) return `${days}d`
+  if (days < 30) return `${Math.floor(days / 7)}w`
+  return formatDisplayDate(date)
+}
 
 export default function EntriesScreen() {
   const { profile, partner, isLoading: authLoading } = useAuth()
   const today = localDateString()
-  const initial = useMemo(() => {
-    const d = new Date()
-    return { year: d.getFullYear(), month: d.getMonth() }
-  }, [])
-  const [year, setYear] = useState(initial.year)
-  const [month, setMonth] = useState(initial.month)
-  const [selectedDate, setSelectedDate] = useState(today)
-
-  const { byDate, isLoading, refresh } = useMonthCheckIns(year, month)
-  const { days } = useCheckInHistory()
+  const { days, isLoading, refresh } = useCheckInHistory()
+  const { mine: todayMine } = useTodayCheckIn()
 
   const streak = useMemo(() => {
     const myDates = days.filter((d) => d.mine).map((d) => d.date)
     return computeStreak(myDates, today)
   }, [days, today])
 
+  const feed = useMemo(
+    () => days.filter((d) => d.mine || (d.revealed && d.partner)),
+    [days],
+  )
+
   if (authLoading || isLoading) return <LoadingScreen />
   if (!profile?.couple_id) return <Redirect href="/(app)/pair" />
 
-  const grid = getMonthGrid(year, month)
-  const selected = byDate[selectedDate]
-  const isToday = selectedDate === today
-
-  const shiftMonth = (delta: number) => {
-    const d = new Date(year, month + delta, 1)
-    setYear(d.getFullYear())
-    setMonth(d.getMonth())
-  }
+  const myName = profile.display_name?.trim() || 'You'
+  const myHandle = handleize(myName === 'You' ? 'you' : myName)
+  const partnerName = partner?.display_name ?? 'Partner'
+  const partnerHandle = handleize(partnerName)
 
   return (
     <Screen style={styles.screen}>
+      <View style={styles.topBar}>
+        <Text style={styles.topTitle}>Entries</Text>
+        <StreakChip streak={streak} />
+      </View>
+
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerText}>
-            <Title>Entries</Title>
-            {partner ? (
-              <Text style={styles.partnerChip}>with {partner.display_name}</Text>
+        {!todayMine ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/(app)/check-in')}
+            style={styles.composer}
+          >
+            <View style={[styles.avatar, styles.avatarAccent]}>
+              <Text style={styles.avatarLetter}>
+                {myName.slice(0, 1).toUpperCase()}
+              </Text>
+            </View>
+            <Text style={styles.composerPlaceholder}>
+              How connected do you feel?
+            </Text>
+            <View style={styles.composerBtn}>
+              <Text style={styles.composerBtnText}>Post</Text>
+            </View>
+          </Pressable>
+        ) : null}
+
+        <View style={styles.divider} />
+
+        {feed.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>No posts yet</Text>
+            <Text style={styles.emptyBody}>
+              Check-ins show up here as a shared timeline
+              {partner ? ` with @${partnerHandle}` : ''}.
+            </Text>
+            {!todayMine ? (
+              <PrimaryButton
+                label="Post your first check-in"
+                onPress={() => router.push('/(app)/check-in')}
+              />
             ) : null}
           </View>
-          <StreakChip streak={streak} />
+        ) : (
+          feed.map((day) => (
+            <TweetThread
+              key={day.date}
+              day={day}
+              today={today}
+              myName={myName}
+              myHandle={myHandle}
+              partnerName={partnerName}
+              partnerHandle={partnerHandle}
+            />
+          ))
+        )}
+
+        <View style={styles.footer}>
+          <SecondaryButton label="Refresh" onPress={() => void refresh()} />
         </View>
-        <Subtitle>{DAILY_PROMPT}</Subtitle>
-
-        <Card style={styles.calendarCard}>
-          <View style={styles.monthNav}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Previous month"
-              onPress={() => shiftMonth(-1)}
-              style={styles.navBtn}
-            >
-              <Text style={styles.navBtnText}>‹</Text>
-            </Pressable>
-            <Text style={styles.monthTitle}>{formatMonthTitle(year, month)}</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Next month"
-              onPress={() => shiftMonth(1)}
-              style={styles.navBtn}
-            >
-              <Text style={styles.navBtnText}>›</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.weekHeader}>
-            {WEEKDAYS.map((d, i) => (
-              <Text key={`${d}-${i}`} style={styles.weekHeaderText}>
-                {d}
-              </Text>
-            ))}
-          </View>
-
-          <View style={styles.grid}>
-            {grid.map((day, index) => {
-              if (day == null) {
-                return <View key={`empty-${index}`} style={styles.dayCell} />
-              }
-              const key = dateKey(year, month, day)
-              const data = byDate[key]
-              const mineScore = data?.mine?.score
-              const isSelected = key === selectedDate
-              const isTodayCell = key === today
-
-              return (
-                <Pressable
-                  key={key}
-                  accessibilityRole="button"
-                  accessibilityLabel={formatDisplayDate(key)}
-                  onPress={() => setSelectedDate(key)}
-                  style={[
-                    styles.dayCell,
-                    isSelected && styles.daySelected,
-                    isTodayCell && styles.dayToday,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.dayNumber,
-                      isSelected && styles.dayNumberSelected,
-                    ]}
-                  >
-                    {day}
-                  </Text>
-                  <View style={styles.dayDots}>
-                    {mineScore != null ? (
-                      <View
-                        style={[
-                          styles.moodDot,
-                          { backgroundColor: scoreColors[mineScore] },
-                        ]}
-                      />
-                    ) : (
-                      <View style={styles.moodDotEmpty} />
-                    )}
-                    {data?.revealed && data.partner ? (
-                      <View
-                        style={[
-                          styles.partnerDot,
-                          { backgroundColor: scoreColors[data.partner.score] },
-                        ]}
-                      />
-                    ) : null}
-                  </View>
-                </Pressable>
-              )
-            })}
-          </View>
-        </Card>
-
-        <Card>
-          <Text style={styles.selectedTitle}>{formatDisplayDate(selectedDate)}</Text>
-          {selected?.mine ? (
-            <View style={styles.selectedRow}>
-              <View
-                style={[
-                  styles.faceBlob,
-                  { backgroundColor: scoreColors[selected.mine.score] },
-                ]}
-              >
-                <ScoreEmoji score={selected.mine.score} size={28} />
-              </View>
-              <View>
-                <Text style={styles.selectedScore}>
-                  You · {SCORE_LABELS[selected.mine.score]}
-                </Text>
-                {selected.revealed && selected.partner ? (
-                  <Text style={styles.selectedPartner}>
-                    {partner?.display_name ?? 'Partner'} ·{' '}
-                    {SCORE_LABELS[selected.partner.score]}
-                  </Text>
-                ) : selected.mine && !selected.revealed ? (
-                  <Text style={styles.selectedPartner}>
-                    Waiting for partner to reveal
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          ) : (
-            <Text style={styles.emptyDay}>No check-in logged for this day.</Text>
-          )}
-
-          {isToday && !selected?.mine ? (
-            <PrimaryButton
-              label="Check in today"
-              onPress={() => router.push('/(app)/check-in')}
-            />
-          ) : (
-            <SecondaryButton
-              label="Open day"
-              onPress={() => router.push(`/(app)/day/${selectedDate}`)}
-            />
-          )}
-        </Card>
-
-        <SecondaryButton label="Refresh" onPress={() => void refresh()} />
       </ScrollView>
     </Screen>
   )
 }
 
+function TweetThread({
+  day,
+  today,
+  myName,
+  myHandle,
+  partnerName,
+  partnerHandle,
+}: {
+  day: HistoryDay
+  today: string
+  myName: string
+  myHandle: string
+  partnerName: string
+  partnerHandle: string
+}) {
+  const time = relativeDay(day.date, today)
+  const showReply = Boolean(day.revealed && day.partner && day.mine)
+
+  return (
+    <View>
+      {day.mine ? (
+        <Tweet
+          name={myName}
+          handle={myHandle}
+          time={time}
+          checkIn={day.mine}
+          accent={colors.accent}
+          soft={colors.accentSoft}
+          showRail={showReply}
+          waiting={!day.revealed}
+          partnerHandle={partnerHandle}
+          onPress={() => router.push(`/(app)/day/${day.date}`)}
+        />
+      ) : null}
+
+      {day.revealed && day.partner ? (
+        <Tweet
+          name={partnerName}
+          handle={partnerHandle}
+          time={time}
+          checkIn={day.partner}
+          accent={scoreColors[day.partner.score]}
+          soft={scoreColorsSoft[day.partner.score]}
+          isReply={Boolean(day.mine)}
+          replyToHandle={day.mine ? myHandle : undefined}
+          onPress={() => router.push(`/(app)/day/${day.date}`)}
+        />
+      ) : null}
+
+      <View style={styles.divider} />
+    </View>
+  )
+}
+
+function Tweet({
+  name,
+  handle,
+  time,
+  checkIn,
+  accent,
+  soft,
+  showRail = false,
+  isReply = false,
+  replyToHandle,
+  waiting = false,
+  partnerHandle,
+  onPress,
+}: {
+  name: string
+  handle: string
+  time: string
+  checkIn: DailyCheckIn
+  accent: string
+  soft: string
+  showRail?: boolean
+  isReply?: boolean
+  replyToHandle?: string
+  waiting?: boolean
+  partnerHandle?: string
+  onPress: () => void
+}) {
+  const note = checkIn.note?.trim()
+  const activities = (checkIn.activities ?? [])
+    .map((id) => activityById(id))
+    .filter(Boolean)
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.tweet, pressed && styles.tweetPressed]}
+    >
+      <View style={styles.avatarCol}>
+        <View style={[styles.avatar, { backgroundColor: soft, borderColor: accent }]}>
+          <Text style={[styles.avatarLetter, { color: accent }]}>
+            {name.slice(0, 1).toUpperCase()}
+          </Text>
+        </View>
+        {showRail ? <View style={styles.rail} /> : null}
+      </View>
+
+      <View style={styles.tweetMain}>
+        <View style={styles.nameRow}>
+          <Text style={styles.displayName} numberOfLines={1}>
+            {name}
+          </Text>
+          <Text style={styles.handle} numberOfLines={1}>
+            @{handle}
+          </Text>
+          <Text style={styles.dot}>·</Text>
+          <Text style={styles.time}>{time}</Text>
+        </View>
+
+        {isReply && replyToHandle ? (
+          <Text style={styles.replyingTo}>
+            Replying to <Text style={styles.replyHandle}>@{replyToHandle}</Text>
+          </Text>
+        ) : null}
+
+        <View style={styles.vibeRow}>
+          <ScoreEmoji score={checkIn.score} size={18} />
+          <Text style={styles.tweetText}>
+            Feeling{' '}
+            <Text style={{ color: accent, fontWeight: '700' }}>
+              {SCORE_LABELS[checkIn.score].toLowerCase()}
+            </Text>
+            {note ? '' : '.'}
+          </Text>
+        </View>
+
+        {note ? <Text style={styles.tweetText}>{note}</Text> : null}
+
+        {activities.length > 0 ? (
+          <Text style={styles.hashtags}>
+            {activities
+              .map((a) => (a ? `#${a.id}` : null))
+              .filter(Boolean)
+              .join(' ')}
+          </Text>
+        ) : null}
+
+        {waiting && partnerHandle ? (
+          <Text style={styles.waiting}>
+            Waiting for @{partnerHandle} to check in
+          </Text>
+        ) : null}
+
+        <View style={styles.actions}>
+          <Text style={styles.action}>💬</Text>
+          <Text style={styles.action}>↻</Text>
+          <Text style={styles.action}>♡</Text>
+          <Text style={styles.action}>↗</Text>
+        </View>
+      </View>
+    </Pressable>
+  )
+}
+
 const styles = StyleSheet.create({
   screen: {
-    paddingBottom: 8,
+    paddingHorizontal: 0,
+    paddingBottom: 0,
   },
-  headerRow: {
+  topBar: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  topTitle: {
+    color: colors.ink,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  composer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
-  headerText: {
+  composerPlaceholder: {
     flex: 1,
-  },
-  partnerChip: {
-    color: colors.accent,
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: -2,
-    marginBottom: 8,
-  },
-  calendarCard: {
-    paddingBottom: 12,
-  },
-  monthNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-  monthTitle: {
-    color: colors.ink,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  navBtn: {
-    width: 36,
-    height: 36,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navBtnText: {
-    color: colors.ink,
-    fontSize: 22,
-    lineHeight: 24,
-  },
-  weekHeader: {
-    flexDirection: 'row',
-    marginBottom: 6,
-  },
-  weekHeaderText: {
-    flex: 1,
-    textAlign: 'center',
     color: colors.muted,
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 17,
   },
-  grid: {
+  composerBtn: {
+    backgroundColor: colors.accent,
+    borderRadius: radii.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  composerBtnText: {
+    color: colors.black,
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.hairline,
+  },
+  tweet: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
   },
-  dayCell: {
-    width: `${100 / 7}%`,
-    aspectRatio: 1,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
-  },
-  daySelected: {
-    borderColor: colors.accent,
-    borderWidth: 1,
-  },
-  dayToday: {
+  tweetPressed: {
     backgroundColor: colors.bgSoft,
   },
-  dayNumber: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  dayNumberSelected: {
-    color: colors.accent,
-  },
-  dayDots: {
-    flexDirection: 'row',
-    gap: 3,
-    marginTop: 4,
-    minHeight: 6,
-  },
-  moodDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  moodDotEmpty: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-  },
-  partnerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    opacity: 0.85,
-  },
-  selectedTitle: {
-    color: colors.ink,
-    fontWeight: '700',
-    fontSize: 16,
-    marginBottom: 12,
-  },
-  selectedRow: {
-    flexDirection: 'row',
+  avatarCol: {
+    width: 40,
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
   },
-  faceBlob: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.md,
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  selectedScore: {
-    color: colors.ink,
-    fontWeight: '700',
+  avatarAccent: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accent,
+  },
+  avatarLetter: {
+    color: colors.accent,
+    fontWeight: '800',
     fontSize: 15,
   },
-  selectedPartner: {
+  rail: {
+    width: 2,
+    flex: 1,
+    marginTop: 4,
+    marginBottom: -4,
+    borderRadius: 1,
+    backgroundColor: colors.hairline,
+  },
+  tweetMain: {
+    flex: 1,
+    paddingBottom: 8,
+    gap: 4,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexWrap: 'nowrap',
+  },
+  displayName: {
+    color: colors.ink,
+    fontWeight: '800',
+    fontSize: 15,
+    maxWidth: '42%',
+  },
+  handle: {
+    color: colors.muted,
+    fontSize: 15,
+    flexShrink: 1,
+  },
+  dot: {
+    color: colors.muted,
+    fontSize: 15,
+  },
+  time: {
+    color: colors.muted,
+    fontSize: 15,
+  },
+  replyingTo: {
     color: colors.muted,
     fontSize: 13,
+    marginBottom: 2,
+  },
+  replyHandle: {
+    color: colors.accent,
+  },
+  vibeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tweetText: {
+    color: colors.ink,
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  hashtags: {
+    color: colors.accent,
+    fontSize: 15,
+    lineHeight: 21,
     marginTop: 2,
   },
-  emptyDay: {
+  waiting: {
     color: colors.muted,
-    marginBottom: 12,
+    fontSize: 13,
+    marginTop: 4,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingRight: 24,
+    marginTop: 8,
+    opacity: 0.55,
+  },
+  action: {
+    color: colors.muted,
+    fontSize: 14,
+    minWidth: 28,
+  },
+  empty: {
+    padding: 24,
+    gap: 8,
+  },
+  emptyTitle: {
+    color: colors.ink,
+    fontWeight: '800',
+    fontSize: 18,
+  },
+  emptyBody: {
+    color: colors.muted,
+    fontSize: 15,
+    lineHeight: 21,
+    marginBottom: 8,
+  },
+  footer: {
+    padding: 16,
   },
 })

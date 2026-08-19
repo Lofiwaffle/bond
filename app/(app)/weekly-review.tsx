@@ -134,7 +134,7 @@ export default function WeeklyReviewScreen() {
             Avg connection:{' '}
             {mySummary.avg != null
               ? `${mySummary.avg.toFixed(1)} · ${mySummary.label}`
-              : '—'}
+              : 'None'}
           </Text>
           <View style={styles.faces}>
             {weekCheckIns.map((day) =>
@@ -188,7 +188,7 @@ export default function WeeklyReviewScreen() {
           <Card>
             <Text style={styles.sectionTitle}>Check in with each other</Text>
             <Text style={styles.hint}>
-              Answer privately — you’ll see {partner.display_name}’s answers
+              Answer privately. You’ll see {partner.display_name}’s answers
               after they submit too.
             </Text>
             {prompts.map((prompt, index) => (
@@ -216,7 +216,7 @@ export default function WeeklyReviewScreen() {
 
         {mine && waitingForPartner ? (
           <Card>
-            <Text style={styles.sectionTitle}>Saved — waiting on partner</Text>
+            <Text style={styles.sectionTitle}>Saved. Waiting on partner</Text>
             {mine.answers.map((a) => (
               <View key={a.prompt_id} style={styles.promptBlock}>
                 <Text style={styles.promptText}>{a.prompt_text}</Text>
@@ -242,7 +242,7 @@ export default function WeeklyReviewScreen() {
                   <Text style={styles.answerText}>{a.answer}</Text>
                   <Text style={styles.metaLabel}>{partner.display_name}</Text>
                   <Text style={styles.answerText}>
-                    {theirs?.answer ?? '—'}
+                    {theirs?.answer ?? 'None'}
                   </Text>
                 </View>
               )

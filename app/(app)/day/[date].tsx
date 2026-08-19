@@ -114,7 +114,7 @@ export default function DayDetailScreen() {
       </ScrollView>
 
       <SecondaryButton label="Refresh" onPress={() => void refresh()} />
-      <SecondaryButton label="Back to calendar" onPress={() => router.back()} />
+      <SecondaryButton label="Back to feed" onPress={() => router.back()} />
     </Screen>
   )
 }

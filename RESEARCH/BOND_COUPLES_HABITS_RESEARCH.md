@@ -1,4 +1,4 @@
-# Research Brief: Evidence-Based Couples Habits → Touchbase App Features
+# Research Brief: Evidence-Based Couples Habits → Bond App Features
 
 **Prepared:** August 12, 2026
 **Sources:** Gottman Institute (40+ years longitudinal research), Canary & Stafford (relationship maintenance meta-analyses), Bowlby/Ainsworth/Johnson (attachment theory & EFT), Seligman (positive psychology), peer-reviewed relationship science
@@ -256,7 +256,7 @@ interface EmotionCheckIn { userId, week, primaryEmotion, secondaryEmotion, share
 
 ---
 
-## 7. Next Steps for Touchbase
+## 7. Next Steps for Bond
 
 1. **Prototype P0 trio** (Bid Log, Appreciation, Rituals) — 2 weeks
 2. **Usability test with 5 couples** — measure bid response rate, appreciation frequency

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router } from 'expo-router'
 
@@ -36,6 +36,10 @@ export default function WeeklyReviewScreen() {
     mySummary,
     partnerSummary,
     weekCheckIns,
+    aiSummary,
+    aiLoading,
+    aiError,
+    generateAiSummary,
     streak,
     isLoading,
     error,
@@ -59,6 +63,19 @@ export default function WeeklyReviewScreen() {
   useEffect(() => {
     setAnswers(initialAnswers)
   }, [initialAnswers])
+
+  useEffect(() => {
+    if (!unlocked || aiSummary || aiLoading) return
+    if (weekCheckIns.every((d) => !d.mine && !d.partner)) return
+    void generateAiSummary(false)
+  }, [aiLoading, aiSummary, generateAiSummary, unlocked, weekCheckIns])
+
+  const refreshedAfterBoth = useRef(false)
+  useEffect(() => {
+    if (!bothSubmitted || refreshedAfterBoth.current) return
+    refreshedAfterBoth.current = true
+    void generateAiSummary(true)
+  }, [bothSubmitted, generateAiSummary])
 
   if (authLoading || isLoading) return <LoadingScreen />
   if (!partner) return <Redirect href="/(app)/pair" />
@@ -140,6 +157,31 @@ export default function WeeklyReviewScreen() {
                   : 'Hidden until you both finish'}
             </Text>
           ) : null}
+        </Card>
+
+        <Card>
+          <Text style={styles.sectionTitle}>AI week summary</Text>
+          <Text style={styles.hint}>
+            A Bond summary of every daily check-in this week
+            {aiSummary?.source === 'ai' ? ' (AI)' : aiSummary ? ' (local)' : ''}.
+          </Text>
+          {aiLoading && !aiSummary ? (
+            <Text style={styles.hint}>Generating summary…</Text>
+          ) : null}
+          {aiSummary ? (
+            <Text style={styles.aiSummary}>{aiSummary.summary}</Text>
+          ) : (
+            <Text style={styles.hint}>
+              Check in during the week to unlock a narrative of your days
+              together.
+            </Text>
+          )}
+          <ErrorText message={aiError} />
+          <SecondaryButton
+            label={aiSummary ? 'Regenerate summary' : 'Generate summary'}
+            onPress={() => void generateAiSummary(true)}
+            disabled={aiLoading}
+          />
         </Card>
 
         {needsReview ? (
@@ -268,6 +310,12 @@ const styles = StyleSheet.create({
     color: colors.ink,
     lineHeight: 21,
     marginBottom: 6,
+  },
+  aiSummary: {
+    fontSize: 15,
+    color: colors.ink,
+    lineHeight: 22,
+    marginBottom: 12,
   },
   metaLabel: {
     fontSize: 11,

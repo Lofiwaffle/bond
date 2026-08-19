@@ -80,6 +80,18 @@ export type WeeklyReview = {
   created_at: string
 }
 
+export type WeeklyAiSummary = {
+  id: string
+  couple_id: string
+  week_start: string
+  week_end: string
+  summary: string
+  source: 'ai' | 'fallback'
+  model: string | null
+  created_at: string
+  updated_at: string
+}
+
 // Supabase row types
 export type Database = {
   public: {
@@ -209,6 +221,27 @@ export type Database = {
         }
         Update: {
           answers?: Json
+        }
+        Relationships: []
+      }
+      weekly_ai_summaries: {
+        Row: WeeklyAiSummary
+        Insert: {
+          id?: string
+          couple_id: string
+          week_start: string
+          week_end: string
+          summary: string
+          source?: 'ai' | 'fallback'
+          model?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          summary?: string
+          source?: 'ai' | 'fallback'
+          model?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

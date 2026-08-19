@@ -8,6 +8,7 @@ import {
   summarizeScores,
   type WeeklyAnswer,
 } from '../lib/weeklyPrompts'
+import { buildFallbackWeeklySummary } from '../lib/weeklyAiSummary'
 import type { DailyCheckIn } from '../types/database'
 import { computeStreak, useCheckInHistory } from './useCheckIn'
 
@@ -19,6 +20,13 @@ export type WeeklyReviewRow = {
   week_end: string
   answers: WeeklyAnswer[]
   created_at: string
+}
+
+export type WeeklyAiSummaryState = {
+  summary: string
+  source: 'ai' | 'fallback'
+  model: string | null
+  cached: boolean
 }
 
 function parseAnswers(raw: unknown): WeeklyAnswer[] {
@@ -41,6 +49,9 @@ export function useWeeklyReview() {
   const [partnerReview, setPartnerReview] = useState<WeeklyReviewRow | null>(
     null,
   )
+  const [aiSummary, setAiSummary] = useState<WeeklyAiSummaryState | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -91,16 +102,26 @@ export function useWeeklyReview() {
     if (!user?.id || !profile?.couple_id || !unlocked) {
       setMine(null)
       setPartnerReview(null)
+      setAiSummary(null)
       setIsLoading(false)
       return
     }
 
     setError(null)
-    const { data, error: fetchError } = await supabase
-      .from('weekly_reviews')
-      .select('*')
-      .eq('couple_id', profile.couple_id)
-      .eq('week_start', weekStart)
+    const [{ data, error: fetchError }, { data: summaryRow }] =
+      await Promise.all([
+        supabase
+          .from('weekly_reviews')
+          .select('*')
+          .eq('couple_id', profile.couple_id)
+          .eq('week_start', weekStart),
+        supabase
+          .from('weekly_ai_summaries')
+          .select('summary, source, model')
+          .eq('couple_id', profile.couple_id)
+          .eq('week_start', weekStart)
+          .maybeSingle(),
+      ])
 
     if (fetchError) {
       setError(fetchError.message)
@@ -115,8 +136,110 @@ export function useWeeklyReview() {
 
     setMine(rows.find((r) => r.user_id === user.id) ?? null)
     setPartnerReview(rows.find((r) => r.user_id !== user.id) ?? null)
+    if (summaryRow?.summary) {
+      setAiSummary({
+        summary: summaryRow.summary,
+        source: (summaryRow.source as 'ai' | 'fallback') ?? 'fallback',
+        model: summaryRow.model ?? null,
+        cached: true,
+      })
+    }
     setIsLoading(false)
   }, [profile?.couple_id, unlocked, user?.id, weekStart])
+
+  const generateAiSummary = useCallback(
+    async (force = false) => {
+      if (!user?.id || !profile?.couple_id || !unlocked) {
+        return { error: 'Weekly review is locked' }
+      }
+
+      setAiLoading(true)
+      setAiError(null)
+
+      const { data, error: fnError } = await supabase.functions.invoke(
+        'generate-weekly-summary',
+        {
+          body: {
+            week_start: weekStart,
+            week_end: weekEnd,
+            force,
+          },
+        },
+      )
+
+      if (fnError) {
+        // Local fallback so the screen still shows a full check-in walkthrough
+        const fallback = buildFallbackWeeklySummary({
+          weekStart,
+          weekEnd,
+          partnerName: partner?.display_name ?? 'Partner',
+          days: weekCheckIns.map((d) => ({
+            date: d.date,
+            mine: d.mine
+              ? {
+                  score: d.mine.score,
+                  note: d.mine.note,
+                  activities: d.mine.activities,
+                }
+              : null,
+            partner: d.partner
+              ? {
+                  score: d.partner.score,
+                  note: d.partner.note,
+                  activities: d.partner.activities,
+                }
+              : null,
+            revealed: d.revealed,
+          })),
+        })
+        setAiSummary({
+          summary: fallback,
+          source: 'fallback',
+          model: null,
+          cached: false,
+        })
+        await supabase.from('weekly_ai_summaries').upsert(
+          {
+            couple_id: profile.couple_id,
+            week_start: weekStart,
+            week_end: weekEnd,
+            summary: fallback,
+            source: 'fallback',
+            model: null,
+          },
+          { onConflict: 'couple_id,week_start' },
+        )
+        setAiError(fnError.message)
+        setAiLoading(false)
+        return { error: fnError.message }
+      }
+
+      const payload = data as WeeklyAiSummaryState | null
+      if (!payload?.summary) {
+        setAiLoading(false)
+        setAiError('No summary returned')
+        return { error: 'No summary returned' }
+      }
+
+      setAiSummary({
+        summary: payload.summary,
+        source: payload.source ?? 'ai',
+        model: payload.model ?? null,
+        cached: Boolean(payload.cached),
+      })
+      setAiLoading(false)
+      return { error: null }
+    },
+    [
+      partner?.display_name,
+      profile?.couple_id,
+      unlocked,
+      user?.id,
+      weekCheckIns,
+      weekEnd,
+      weekStart,
+    ],
+  )
 
   useEffect(() => {
     setIsLoading(true)
@@ -165,6 +288,10 @@ export function useWeeklyReview() {
     mySummary,
     partnerSummary,
     weekCheckIns,
+    aiSummary,
+    aiLoading,
+    aiError,
+    generateAiSummary,
     isLoading: isLoading || historyLoading,
     error,
     refresh: async () => {

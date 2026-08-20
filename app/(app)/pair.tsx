@@ -136,6 +136,7 @@ const styles = StyleSheet.create({
   heroEmoji: {
     fontSize: 48,
     marginBottom: 8,
+    color: colors.accent,
   },
   codeCard: {
     alignItems: 'center',

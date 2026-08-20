@@ -4,6 +4,7 @@ import { Link, Redirect } from 'expo-router'
 
 import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen, Subtitle, Title } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
+import { colors } from '../../lib/theme'
 
 export default function LoginScreen() {
   const { session, profile, isLoading, signIn } = useAuth()
@@ -39,7 +40,7 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ flexGrow: 1 }}
         >
-          <Text style={{ fontSize: 44, marginBottom: 4, color: '#7CFFB2' }}>◎</Text>
+          <Text style={{ fontSize: 44, marginBottom: 4, color: colors.accent }}>◎</Text>
           <Title>Bond</Title>
           <Subtitle>Sign in to check in with your partner.</Subtitle>
 
@@ -77,7 +78,7 @@ export default function LoginScreen() {
             style={{
               marginTop: 20,
               textAlign: 'center',
-              color: '#7CFFB2',
+              color: colors.accent,
               fontWeight: '700',
             }}
           >

@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   activeCard: {
-    borderColor: colors.accent,
+    backgroundColor: colors.accentSoft,
   },
   note: {
     minHeight: 72,

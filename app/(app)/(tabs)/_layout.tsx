@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { LoadingScreen } from '../../../components/ui'
 import { useAuth } from '../../../lib/auth'
-import { colors, radii } from '../../../lib/theme'
+import { colors, elevation, radii } from '../../../lib/theme'
 
 function CheckInFab() {
   return (
@@ -13,8 +13,7 @@ function CheckInFab() {
       onPress={() => router.push('/(app)/check-in')}
       style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
     >
-      <Text style={styles.fabEmoji}>◎</Text>
-      <Text style={styles.fabLabel}>Check in</Text>
+      <Text style={styles.fabPlus}>+</Text>
     </Pressable>
   )
 }
@@ -29,8 +28,8 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.muted,
+        tabBarActiveTintColor: colors.tabBarIcon,
+        tabBarInactiveTintColor: colors.tabBarIconMuted,
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabLabel,
       }}
@@ -39,8 +38,8 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Entries',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 18, color }}>▦</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <Text style={{ fontSize: focused ? 22 : 20, color }}>☺</Text>
           ),
         }}
       />
@@ -60,8 +59,8 @@ export default function TabsLayout() {
         name="stats"
         options={{
           title: 'Bond',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 18, color }}>◈</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <Text style={{ fontSize: focused ? 20 : 18, color }}>♥</Text>
           ),
         }}
       />
@@ -69,8 +68,8 @@ export default function TabsLayout() {
         name="more"
         options={{
           title: 'Us',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 18, color }}>◎</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <Text style={{ fontSize: focused ? 22 : 20, color }}>◎</Text>
           ),
         }}
       />
@@ -81,44 +80,38 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: colors.tabBar,
-    borderTopColor: colors.hairline,
-    borderTopWidth: 1,
-    height: 72,
-    paddingBottom: 10,
-    paddingTop: 8,
+    borderTopWidth: 0,
+    height: 78,
+    paddingBottom: 14,
+    paddingTop: 10,
+    overflow: 'visible' as const,
   },
   tabLabel: {
     fontSize: 11,
     fontWeight: '700',
   },
   fabSlot: {
-    top: -16,
+    top: -18,
     justifyContent: 'center',
     alignItems: 'center',
   },
   fab: {
-    width: 68,
-    height: 68,
-    borderRadius: radii.md,
-    backgroundColor: colors.accent,
-    borderWidth: 1,
-    borderColor: colors.accent,
+    width: 62,
+    height: 62,
+    borderRadius: radii.pill,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
+    ...elevation.fab,
   },
   fabPressed: {
-    backgroundColor: colors.accentPressed,
+    transform: [{ scale: 0.96 }],
   },
-  fabEmoji: {
-    fontSize: 20,
-    color: colors.black,
-    fontWeight: '800',
+  fabPlus: {
+    fontSize: 34,
+    color: colors.accent,
+    fontWeight: '400',
     marginTop: -2,
-  },
-  fabLabel: {
-    color: colors.black,
-    fontSize: 10,
-    fontWeight: '800',
-    marginTop: 2,
+    lineHeight: 36,
   },
 })

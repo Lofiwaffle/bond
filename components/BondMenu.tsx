@@ -68,7 +68,9 @@ export function BondMenu({
               }}
               style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
             >
-              <Text style={styles.glyph}>{option.glyph}</Text>
+              <View style={[styles.glyphBubble, { backgroundColor: colors.accentSoft }]}>
+                <Text style={styles.glyph}>{option.glyph}</Text>
+              </View>
               <View style={styles.copy}>
                 <Text style={styles.rowTitle}>{option.title}</Text>
                 <Text style={styles.rowBody}>{option.body}</Text>
@@ -98,19 +100,18 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: colors.card,
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.hairline,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    borderWidth: 0,
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 28,
   },
   handle: {
     alignSelf: 'center',
-    width: 36,
-    height: 4,
-    borderRadius: 2,
+    width: 40,
+    height: 5,
+    borderRadius: radii.pill,
     backgroundColor: colors.hairline,
     marginBottom: 14,
   },
@@ -129,21 +130,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderWidth: 1,
-    borderColor: colors.hairline,
+    borderWidth: 0,
     borderRadius: radii.md,
     backgroundColor: colors.bgSoft,
     padding: 14,
     marginBottom: 8,
   },
   rowPressed: {
-    borderColor: colors.accent,
+    backgroundColor: colors.accentSoft,
+  },
+  glyphBubble: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   glyph: {
-    width: 28,
     textAlign: 'center',
     color: colors.accent,
-    fontSize: 22,
+    fontSize: 20,
   },
   copy: {
     flex: 1,

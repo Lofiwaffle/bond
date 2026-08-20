@@ -23,28 +23,18 @@ import {
   formatDisplayDate,
   localDateString,
 } from '../../../lib/dates'
-import { colors, radii, scoreColors, scoreColorsSoft } from '../../../lib/theme'
+import { colors, elevation, radii, scoreColors, scoreColorsSoft } from '../../../lib/theme'
 import type { DailyCheckIn } from '../../../types/database'
 
-function handleize(name: string): string {
-  const raw = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, '')
-    .slice(0, 15)
-  return raw.length > 0 ? raw : 'you'
-}
-
 function relativeDay(date: string, today: string): string {
-  if (date === today) return 'now'
+  if (date === today) return 'Today'
   const [ty, tm, td] = today.split('-').map(Number)
   const [y, m, d] = date.split('-').map(Number)
   const a = Date.UTC(ty, tm - 1, td)
   const b = Date.UTC(y, m - 1, d)
   const days = Math.round((a - b) / 86400000)
-  if (days === 1) return '1d'
-  if (days < 7) return `${days}d`
-  if (days < 30) return `${Math.floor(days / 7)}w`
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return formatDisplayDate(date)
   return formatDisplayDate(date)
 }
 
@@ -68,9 +58,8 @@ export default function EntriesScreen() {
   if (!profile?.couple_id) return <Redirect href="/(app)/pair" />
 
   const myName = profile.display_name?.trim() || 'You'
-  const myHandle = handleize(myName === 'You' ? 'you' : myName)
   const partnerName = partner?.display_name ?? 'Partner'
-  const partnerHandle = handleize(partnerName)
+  const partnerHandle = partnerName
 
   return (
     <Screen style={styles.screen}>
@@ -79,51 +68,55 @@ export default function EntriesScreen() {
         <StreakChip streak={streak} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+      >
         {!todayMine ? (
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/(app)/check-in')}
-            style={styles.composer}
+            style={({ pressed }) => [
+              styles.composer,
+              pressed && styles.composerPressed,
+            ]}
           >
-            <View style={[styles.avatar, styles.avatarAccent]}>
-              <Text style={styles.avatarLetter}>
-                {myName.slice(0, 1).toUpperCase()}
-              </Text>
+            <View style={styles.composerFaces}>
+              <Text style={styles.composerFace}>🙂</Text>
+              <Text style={styles.composerFace}>😄</Text>
             </View>
-            <Text style={styles.composerPlaceholder}>
-              How connected do you feel?
-            </Text>
+            <View style={styles.composerCopy}>
+              <Text style={styles.composerTitle}>How connected do you feel?</Text>
+              <Text style={styles.composerHint}>Tap to check in for today</Text>
+            </View>
             <View style={styles.composerBtn}>
-              <Text style={styles.composerBtnText}>Post</Text>
+              <Text style={styles.composerBtnText}>Go</Text>
             </View>
           </Pressable>
         ) : null}
 
-        <View style={styles.divider} />
-
         {feed.length === 0 ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No posts yet</Text>
+            <Text style={styles.emptyGlyph}>☺</Text>
+            <Text style={styles.emptyTitle}>No entries yet</Text>
             <Text style={styles.emptyBody}>
-              Check-ins show up here as a shared timeline
-              {partner ? ` with @${partnerHandle}` : ''}.
+              Your check-ins will show up here as a shared timeline
+              {partner ? ` with ${partnerName}` : ''}.
             </Text>
             {!todayMine ? (
               <PrimaryButton
-                label="Post your first check-in"
+                label="Check in for the first time"
                 onPress={() => router.push('/(app)/check-in')}
               />
             ) : null}
           </View>
         ) : (
           feed.map((day) => (
-            <TweetThread
+            <EntryCard
               key={day.date}
               day={day}
               today={today}
               myName={myName}
-              myHandle={myHandle}
               partnerName={partnerName}
               partnerHandle={partnerHandle}
             />
@@ -138,161 +131,114 @@ export default function EntriesScreen() {
   )
 }
 
-function TweetThread({
+function EntryCard({
   day,
   today,
   myName,
-  myHandle,
   partnerName,
   partnerHandle,
 }: {
   day: HistoryDay
   today: string
   myName: string
-  myHandle: string
   partnerName: string
   partnerHandle: string
 }) {
   const time = relativeDay(day.date, today)
-  const showReply = Boolean(day.revealed && day.partner && day.mine)
 
   return (
-    <View>
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => router.push(`/(app)/day/${day.date}`)}
+      style={({ pressed }) => [styles.entryCard, pressed && styles.entryPressed]}
+    >
       {day.mine ? (
-        <Tweet
+        <EntryRow
           name={myName}
-          handle={myHandle}
           time={time}
           checkIn={day.mine}
-          accent={colors.accent}
-          soft={colors.accentSoft}
-          showRail={showReply}
           waiting={!day.revealed}
           partnerHandle={partnerHandle}
-          onPress={() => router.push(`/(app)/day/${day.date}`)}
         />
       ) : null}
 
       {day.revealed && day.partner ? (
-        <Tweet
-          name={partnerName}
-          handle={partnerHandle}
-          time={time}
-          checkIn={day.partner}
-          accent={scoreColors[day.partner.score]}
-          soft={scoreColorsSoft[day.partner.score]}
-          isReply={Boolean(day.mine)}
-          replyToHandle={day.mine ? myHandle : undefined}
-          onPress={() => router.push(`/(app)/day/${day.date}`)}
-        />
+        <View style={day.mine ? styles.partnerBlock : undefined}>
+          <EntryRow
+            name={partnerName}
+            time={time}
+            checkIn={day.partner}
+            isPartner
+          />
+        </View>
       ) : null}
-
-      <View style={styles.divider} />
-    </View>
+    </Pressable>
   )
 }
 
-function Tweet({
+function EntryRow({
   name,
-  handle,
   time,
   checkIn,
-  accent,
-  soft,
-  showRail = false,
-  isReply = false,
-  replyToHandle,
   waiting = false,
   partnerHandle,
-  onPress,
+  isPartner = false,
 }: {
   name: string
-  handle: string
   time: string
   checkIn: DailyCheckIn
-  accent: string
-  soft: string
-  showRail?: boolean
-  isReply?: boolean
-  replyToHandle?: string
   waiting?: boolean
   partnerHandle?: string
-  onPress: () => void
+  isPartner?: boolean
 }) {
   const note = checkIn.note?.trim()
   const activities = (checkIn.activities ?? [])
     .map((id) => activityById(id))
     .filter(Boolean)
+  const scoreColor = scoreColors[checkIn.score]
+  const scoreSoft = scoreColorsSoft[checkIn.score]
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.tweet, pressed && styles.tweetPressed]}
-    >
-      <View style={styles.avatarCol}>
-        <View style={[styles.avatar, { backgroundColor: soft, borderColor: accent }]}>
-          <Text style={[styles.avatarLetter, { color: accent }]}>
-            {name.slice(0, 1).toUpperCase()}
-          </Text>
-        </View>
-        {showRail ? <View style={styles.rail} /> : null}
+    <View style={styles.entryRow}>
+      <View style={[styles.moodBubble, { backgroundColor: scoreSoft }]}>
+        <ScoreEmoji score={checkIn.score} size={isPartner ? 28 : 34} />
       </View>
 
-      <View style={styles.tweetMain}>
-        <View style={styles.nameRow}>
-          <Text style={styles.displayName} numberOfLines={1}>
+      <View style={styles.entryMain}>
+        <View style={styles.entryMeta}>
+          <Text style={styles.entryName} numberOfLines={1}>
             {name}
           </Text>
-          <Text style={styles.handle} numberOfLines={1}>
-            @{handle}
-          </Text>
-          <Text style={styles.dot}>·</Text>
-          <Text style={styles.time}>{time}</Text>
+          <Text style={styles.entryTime}>{time}</Text>
         </View>
-
-        {isReply && replyToHandle ? (
-          <Text style={styles.replyingTo}>
-            Replying to <Text style={styles.replyHandle}>@{replyToHandle}</Text>
+        <Text style={styles.entryMood}>
+          Feeling{' '}
+          <Text style={{ color: scoreColor, fontWeight: '700' }}>
+            {SCORE_LABELS[checkIn.score].toLowerCase()}
           </Text>
-        ) : null}
-
-        <View style={styles.vibeRow}>
-          <ScoreEmoji score={checkIn.score} size={18} />
-          <Text style={styles.tweetText}>
-            Feeling{' '}
-            <Text style={{ color: accent, fontWeight: '700' }}>
-              {SCORE_LABELS[checkIn.score].toLowerCase()}
-            </Text>
-            {note ? '' : '.'}
-          </Text>
-        </View>
-
-        {note ? <Text style={styles.tweetText}>{note}</Text> : null}
-
+        </Text>
+        {note ? <Text style={styles.entryNote}>{note}</Text> : null}
         {activities.length > 0 ? (
-          <Text style={styles.hashtags}>
-            {activities
-              .map((a) => (a ? `#${a.id}` : null))
-              .filter(Boolean)
-              .join(' ')}
-          </Text>
+          <View style={styles.chipRow}>
+            {activities.map((activity) =>
+              activity ? (
+                <View
+                  key={activity.id}
+                  style={[styles.chip, { backgroundColor: activity.tint }]}
+                >
+                  <Text style={styles.chipText}>
+                    {activity.glyph} {activity.label}
+                  </Text>
+                </View>
+              ) : null,
+            )}
+          </View>
         ) : null}
-
         {waiting && partnerHandle ? (
-          <Text style={styles.waiting}>
-            Waiting for @{partnerHandle} to check in
-          </Text>
+          <Text style={styles.waiting}>Waiting for {partnerHandle} to check in</Text>
         ) : null}
-
-        <View style={styles.actions}>
-          <Text style={styles.action}>💬</Text>
-          <Text style={styles.action}>↻</Text>
-          <Text style={styles.action}>♡</Text>
-          <Text style={styles.action}>↗</Text>
-        </View>
       </View>
-    </Pressable>
+    </View>
   )
 }
 
@@ -305,27 +251,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.hairline,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
   },
   topTitle: {
     color: colors.ink,
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.6,
+  },
+  scroll: {
+    paddingHorizontal: 16,
+    paddingBottom: 28,
   },
   composer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
+    marginBottom: 14,
+    ...elevation.card,
   },
-  composerPlaceholder: {
+  composerPressed: {
+    transform: [{ scale: 0.99 }],
+  },
+  composerFaces: {
+    flexDirection: 'row',
+    marginLeft: -4,
+  },
+  composerFace: {
+    fontSize: 22,
+    marginLeft: -4,
+  },
+  composerCopy: {
     flex: 1,
+  },
+  composerTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  composerHint: {
     color: colors.muted,
-    fontSize: 17,
+    fontSize: 13,
+    marginTop: 2,
   },
   composerBtn: {
     backgroundColor: colors.accent,
@@ -334,140 +306,115 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   composerBtnText: {
-    color: colors.black,
-    fontWeight: '800',
+    color: colors.onAccent,
+    fontWeight: '700',
     fontSize: 14,
   },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.hairline,
+  entryCard: {
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    padding: 16,
+    marginBottom: 12,
+    ...elevation.card,
   },
-  tweet: {
+  entryPressed: {
+    opacity: 0.92,
+  },
+  partnerBlock: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+  },
+  entryRow: {
     flexDirection: 'row',
     gap: 12,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
   },
-  tweetPressed: {
-    backgroundColor: colors.bgSoft,
-  },
-  avatarCol: {
-    width: 40,
-    alignItems: 'center',
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
+  moodBubble: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarAccent: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accent,
-  },
-  avatarLetter: {
-    color: colors.accent,
-    fontWeight: '800',
-    fontSize: 15,
-  },
-  rail: {
-    width: 2,
+  entryMain: {
     flex: 1,
-    marginTop: 4,
-    marginBottom: -4,
-    borderRadius: 1,
-    backgroundColor: colors.hairline,
-  },
-  tweetMain: {
-    flex: 1,
-    paddingBottom: 8,
     gap: 4,
+    paddingTop: 2,
   },
-  nameRow: {
+  entryMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    flexWrap: 'nowrap',
+    justifyContent: 'space-between',
+    gap: 8,
   },
-  displayName: {
+  entryName: {
     color: colors.ink,
-    fontWeight: '800',
+    fontWeight: '700',
     fontSize: 15,
-    maxWidth: '42%',
+    flex: 1,
   },
-  handle: {
-    color: colors.muted,
-    fontSize: 15,
-    flexShrink: 1,
-  },
-  dot: {
-    color: colors.muted,
-    fontSize: 15,
-  },
-  time: {
-    color: colors.muted,
-    fontSize: 15,
-  },
-  replyingTo: {
+  entryTime: {
     color: colors.muted,
     fontSize: 13,
-    marginBottom: 2,
+    fontWeight: '600',
   },
-  replyHandle: {
-    color: colors.accent,
-  },
-  vibeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  tweetText: {
+  entryMood: {
     color: colors.ink,
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  hashtags: {
-    color: colors.accent,
     fontSize: 15,
     lineHeight: 21,
-    marginTop: 2,
+  },
+  entryNote: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+  },
+  chip: {
+    borderRadius: radii.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  chipText: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: '600',
   },
   waiting: {
     color: colors.muted,
-    fontSize: 13,
+    fontSize: 12,
     marginTop: 4,
   },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingRight: 24,
-    marginTop: 8,
-    opacity: 0.55,
-  },
-  action: {
-    color: colors.muted,
-    fontSize: 14,
-    minWidth: 28,
-  },
   empty: {
-    padding: 24,
-    gap: 8,
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    padding: 28,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  emptyGlyph: {
+    fontSize: 48,
+    marginBottom: 8,
   },
   emptyTitle: {
     color: colors.ink,
-    fontWeight: '800',
+    fontWeight: '700',
     fontSize: 18,
   },
   emptyBody: {
     color: colors.muted,
     fontSize: 15,
     lineHeight: 21,
-    marginBottom: 8,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 12,
   },
   footer: {
-    padding: 16,
+    paddingTop: 8,
   },
 })

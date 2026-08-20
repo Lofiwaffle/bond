@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
   hintBox: {
     flexDirection: 'row',
     gap: 10,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.hairline,
     borderRadius: radii.md,
     backgroundColor: colors.bgSoft,

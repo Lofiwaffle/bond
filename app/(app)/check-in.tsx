@@ -33,7 +33,7 @@ import {
   localDateString,
 } from '../../lib/dates'
 import { syncCheckInReminder } from '../../lib/notifications'
-import { colors } from '../../lib/theme'
+import { colors, radii } from '../../lib/theme'
 
 export default function CheckInScreen() {
   const { profile, partner, isLoading: authLoading } = useAuth()
@@ -265,7 +265,10 @@ function ActivityChips({ ids }: { ids: string[] }) {
         const activity = activityById(id)
         if (!activity) return null
         return (
-          <View key={id} style={styles.chip}>
+          <View
+            key={id}
+            style={[styles.chip, { backgroundColor: activity.tint }]}
+          >
             <Text style={styles.chipText}>
               {activity.glyph} {activity.label}
             </Text>
@@ -396,11 +399,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   chip: {
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    borderWidth: 0,
+    backgroundColor: colors.bgSoft,
+    borderRadius: radii.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   chipText: {
     color: colors.muted,

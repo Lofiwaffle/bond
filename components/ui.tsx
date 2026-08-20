@@ -26,6 +26,7 @@ import { localDateString } from '../lib/dates'
 import {
   SCORE_LABELS,
   colors,
+  elevation,
   radii,
   scoreColors,
   scoreColorsSoft,
@@ -90,7 +91,7 @@ export function PrimaryButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={colors.black} />
+        <ActivityIndicator color={colors.onAccent} />
       ) : (
         <Text style={styles.buttonLabel}>{label}</Text>
       )}
@@ -189,12 +190,13 @@ export function ScoreFacePicker({
               {
                 width: circle,
                 height: circle,
-                borderRadius: radii.md,
+                borderRadius: radii.pill,
                 backgroundColor: selected
                   ? scoreColors[score]
                   : scoreColorsSoft[score],
-                borderColor: selected ? colors.accent : colors.hairline,
-                borderWidth: selected ? 2 : 1,
+                borderColor: selected ? colors.white : 'transparent',
+                borderWidth: selected ? 3 : 0,
+                transform: [{ scale: selected ? 1.06 : 1 }],
               },
             ]}
           >
@@ -239,7 +241,10 @@ export function ActivityIconGrid({
             onPress={() => toggle(activity.id)}
             style={[
               styles.activityCell,
-              selected && styles.activityCellSelected,
+              selected && {
+                backgroundColor: activity.tint,
+                borderColor: colors.accent,
+              },
               blocked && styles.activityCellBlocked,
             ]}
           >
@@ -268,7 +273,7 @@ export function StreakChip({ streak }: { streak: number }) {
   )
 }
 
-const HABIT_EMPTY = '#1A1A1A'
+const HABIT_EMPTY = '#F3EBEF'
 const HABIT_CELL = 13
 const HABIT_GAP = 3
 
@@ -350,6 +355,7 @@ export function HabitCalendar({
                     {
                       backgroundColor: fill,
                       borderColor: border,
+                      borderWidth: date === today && !future ? 2 : 0,
                       opacity: future ? 0 : 1,
                     },
                   ]}
@@ -453,37 +459,34 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.ink,
     marginBottom: 6,
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 15,
-    lineHeight: 21,
+    lineHeight: 22,
     color: colors.muted,
     marginBottom: 22,
   },
   label: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.muted,
     marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
   },
   input: {
-    borderWidth: 1,
-    borderColor: colors.hairline,
+    borderWidth: 0,
     backgroundColor: colors.bgSoft,
     borderRadius: radii.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
     color: colors.ink,
     marginBottom: 16,
   },
   button: {
     backgroundColor: colors.accent,
-    borderRadius: radii.md,
-    paddingVertical: 15,
+    borderRadius: radii.pill,
+    paddingVertical: 16,
     alignItems: 'center',
     marginTop: 8,
   },
@@ -494,21 +497,20 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   buttonLabel: {
-    color: colors.black,
+    color: colors.onAccent,
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   secondaryButton: {
-    borderRadius: radii.md,
-    paddingVertical: 14,
+    borderRadius: radii.pill,
+    paddingVertical: 15,
     alignItems: 'center',
     marginTop: 8,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.hairline,
+    backgroundColor: colors.accentSoft,
+    borderWidth: 0,
   },
   secondaryPressed: {
-    borderColor: colors.accent,
+    backgroundColor: '#FFD6E5',
   },
   secondaryLabel: {
     color: colors.accent,
@@ -530,10 +532,10 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
     borderRadius: radii.lg,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.hairline,
+    padding: 18,
+    borderWidth: 0,
     marginBottom: 14,
+    ...elevation.card,
   },
   faceRow: {
     flexDirection: 'row',
@@ -558,17 +560,12 @@ const styles = StyleSheet.create({
     minWidth: 72,
     flexGrow: 1,
     aspectRatio: 1,
-    borderWidth: 1,
-    borderColor: colors.hairline,
+    borderWidth: 0,
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.bgSoft,
     padding: 6,
-  },
-  activityCellSelected: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentSoft,
   },
   activityCellBlocked: {
     opacity: 0.35,
@@ -589,11 +586,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 6,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    borderRadius: radii.md,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderWidth: 0,
+    backgroundColor: colors.accentSoft,
+    borderRadius: radii.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
   streakChipValue: {
     color: colors.accent,
@@ -614,8 +611,7 @@ const styles = StyleSheet.create({
     width: '30%',
     flexGrow: 1,
     minWidth: 88,
-    borderWidth: 1,
-    borderColor: colors.hairline,
+    borderWidth: 0,
     borderRadius: radii.md,
     paddingVertical: 12,
     paddingHorizontal: 4,
@@ -625,8 +621,8 @@ const styles = StyleSheet.create({
   badgeSquare: {
     width: 18,
     height: 18,
-    borderRadius: 3,
-    borderWidth: 1,
+    borderRadius: 9,
+    borderWidth: 0,
     marginBottom: 6,
   },
   badgeLabel: {
@@ -650,7 +646,7 @@ const styles = StyleSheet.create({
   habitCalSwatch: {
     width: 12,
     height: 12,
-    borderRadius: 2,
+    borderRadius: 6,
   },
   habitCalLabel: {
     color: colors.ink,
@@ -674,8 +670,8 @@ const styles = StyleSheet.create({
   habitCalCell: {
     width: HABIT_CELL,
     height: HABIT_CELL,
-    borderRadius: 2,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 5,
+    borderWidth: 0,
     borderColor: colors.hairline,
   },
   habitCalKeyTitle: {
@@ -695,8 +691,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderWidth: 1,
-    borderColor: colors.hairline,
+    borderWidth: 0,
     borderRadius: radii.md,
     backgroundColor: colors.bgSoft,
     paddingVertical: 8,

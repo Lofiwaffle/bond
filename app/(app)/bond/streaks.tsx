@@ -145,23 +145,25 @@ export default function BondStreaksScreen() {
           <View style={styles.matrix}>
             {grid.map((day, index) => {
               if (day == null) {
-                return <View key={`e-${index}`} style={styles.matrixCell} />
+                return <View key={`e-${index}`} style={styles.matrixSlot} />
               }
               const key = dateKey(year, month, day)
               const score = byDate[key]?.mine?.score
               const synced = byDate[key]?.revealed
               return (
-                <View
-                  key={key}
-                  style={[
-                    styles.matrixCell,
-                    {
-                      backgroundColor:
-                        score != null ? scoreColors[score] : colors.bgSoft,
-                      borderColor: synced ? colors.accent : colors.hairline,
-                    },
-                  ]}
-                />
+                <View key={key} style={styles.matrixSlot}>
+                  <View
+                    style={[
+                      styles.matrixDot,
+                      {
+                        backgroundColor:
+                          score != null ? scoreColors[score] : colors.bgSoft,
+                        borderWidth: synced ? 2 : 0,
+                        borderColor: colors.accent,
+                      },
+                    ]}
+                  />
+                </View>
               )
             })}
           </View>
@@ -239,7 +241,7 @@ function DistributionBars({
 
 const styles = StyleSheet.create({
   screen: { paddingBottom: 8 },
-  heroCard: { borderColor: colors.accent },
+  heroCard: { backgroundColor: colors.accentSoft },
   heroEyebrow: {
     color: colors.accent,
     fontSize: 12,
@@ -293,14 +295,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.hairline,
     borderRadius: radii.md,
     padding: 12,
     marginBottom: 8,
     backgroundColor: colors.bgSoft,
   },
-  questDone: { borderColor: colors.accentSoft },
+  questDone: { backgroundColor: colors.accentSoft },
   questGlyph: {
     fontSize: 22,
     color: colors.accent,
@@ -321,12 +323,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textTransform: 'uppercase',
   },
-  matrix: { flexDirection: 'row', flexWrap: 'wrap' },
-  matrixCell: {
+  matrix: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  matrixSlot: {
     width: `${100 / 7}%`,
-    aspectRatio: 1,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  matrixDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
   legendRow: {
     flexDirection: 'row',
@@ -334,7 +344,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendSwatch: { width: 10, height: 10, borderRadius: 2 },
+  legendSwatch: { width: 10, height: 10, borderRadius: 5 },
   legendText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   meta: {
     color: colors.muted,
@@ -355,10 +365,9 @@ const styles = StyleSheet.create({
   distTrack: {
     flex: 1,
     height: 10,
-    borderRadius: radii.sm,
+    borderRadius: radii.pill,
     backgroundColor: colors.bgSoft,
-    borderWidth: 1,
-    borderColor: colors.hairline,
+    borderWidth: 0,
     overflow: 'hidden',
   },
   distFill: { height: '100%' },

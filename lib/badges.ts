@@ -22,7 +22,7 @@ export const BADGES: Badge[] = [
     description: 'Trying something new that reignites excitement.',
     quest: 'Log a new experience or adventure you tried together',
     color: '#FF8B5C',
-    colorSoft: '#3D2218',
+    colorSoft: '#FFE4D6',
   },
   {
     id: 'glow',
@@ -31,7 +31,7 @@ export const BADGES: Badge[] = [
     description: 'Publicly celebrating or showing off the relationship.',
     quest: 'Log a time you celebrated or showed off your partner publicly',
     color: '#E8C547',
-    colorSoft: '#3A3010',
+    colorSoft: '#FFF4CC',
   },
   {
     id: 'forge',
@@ -41,7 +41,7 @@ export const BADGES: Badge[] = [
     quest:
       'Log a shared money move, project, or practical investment you made together',
     color: '#5BA3FF',
-    colorSoft: '#152438',
+    colorSoft: '#DCEBFF',
   },
   {
     id: 'bond',
@@ -49,8 +49,8 @@ export const BADGES: Badge[] = [
     glyph: '◎',
     description: 'Spending real shared quality time together.',
     quest: 'Log quality time: a meal, walk, hobby, or undistracted hang',
-    color: '#7CFFB2',
-    colorSoft: '#143D2A',
+    color: '#7ED9A8',
+    colorSoft: '#D4F5E8',
   },
   {
     id: 'sync',
@@ -60,7 +60,7 @@ export const BADGES: Badge[] = [
     quest:
       'Log a deliberate conversation about how the relationship is really going',
     color: '#FF7EB6',
-    colorSoft: '#3A1528',
+    colorSoft: '#FFE0EE',
   },
 ]
 

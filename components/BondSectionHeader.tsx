@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { router } from 'expo-router'
 
-import { Screen, Title } from './ui'
+import { Title } from './ui'
 import { colors, radii } from '../lib/theme'
 
 export function BondSectionHeader({
@@ -33,13 +33,12 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    borderRadius: radii.md,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderWidth: 0,
+    borderRadius: radii.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     marginBottom: 14,
-    backgroundColor: colors.bgSoft,
+    backgroundColor: colors.accentSoft,
   },
   backText: {
     color: colors.accent,

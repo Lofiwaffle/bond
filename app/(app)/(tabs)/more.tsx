@@ -189,6 +189,7 @@ export default function MoreScreen() {
               {
                 id: 'habits',
                 glyph: '✧',
+                tint: '#FFE4D6',
                 title: 'Habits',
                 body: 'Calendar and badge key',
                 href: '/(app)/bond/habits' as const,
@@ -196,6 +197,7 @@ export default function MoreScreen() {
               {
                 id: 'streaks',
                 glyph: '◈',
+                tint: '#FFF4CC',
                 title: 'Streaks',
                 body: 'Daily streak and rhythm',
                 href: '/(app)/bond/streaks' as const,
@@ -203,6 +205,7 @@ export default function MoreScreen() {
               {
                 id: 'goals',
                 glyph: '◎',
+                tint: '#DCEBFF',
                 title: 'Goals',
                 body: 'Shared targets',
                 href: '/(app)/bond/goals' as const,
@@ -210,6 +213,7 @@ export default function MoreScreen() {
               {
                 id: 'weekly',
                 glyph: '✦',
+                tint: '#FFE0EE',
                 title: 'Weekly review',
                 body: 'Look back on the week together',
                 href: '/(app)/weekly-review' as const,
@@ -225,7 +229,9 @@ export default function MoreScreen() {
                 pressed && styles.linkRowPressed,
               ]}
             >
-              <Text style={styles.linkGlyph}>{item.glyph}</Text>
+              <View style={[styles.linkGlyphBubble, { backgroundColor: item.tint }]}>
+                <Text style={styles.linkGlyph}>{item.glyph}</Text>
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.linkTitle}>{item.title}</Text>
                 <Text style={styles.linkBody}>{item.body}</Text>
@@ -269,10 +275,8 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     color: colors.accent,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
     marginBottom: 6,
   },
   heroTitle: {
@@ -309,7 +313,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.accent,
     backgroundColor: colors.accentSoft,
     color: colors.accent,
@@ -340,12 +344,17 @@ const styles = StyleSheet.create({
   statStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.hairline,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     backgroundColor: colors.card,
-    paddingVertical: 14,
+    paddingVertical: 16,
     marginBottom: 16,
+    shadowColor: '#C9A8B4',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 3,
   },
   stat: {
     flex: 1,
@@ -388,7 +397,7 @@ const styles = StyleSheet.create({
     width: '30%',
     flexGrow: 1,
     minWidth: 96,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.hairline,
     borderRadius: radii.md,
     backgroundColor: colors.bgSoft,
@@ -398,8 +407,8 @@ const styles = StyleSheet.create({
   badgeSquare: {
     width: 16,
     height: 16,
-    borderRadius: 3,
-    borderWidth: 1,
+    borderRadius: 8,
+    borderWidth: 0,
     marginBottom: 6,
   },
   badgeName: {
@@ -428,7 +437,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.hairline,
     borderRadius: radii.md,
     backgroundColor: colors.bgSoft,
@@ -436,12 +445,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   linkRowPressed: {
-    borderColor: colors.accent,
+    backgroundColor: colors.accentSoft,
+  },
+  linkGlyphBubble: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   linkGlyph: {
-    width: 26,
     textAlign: 'center',
-    color: colors.accent,
+    color: colors.ink,
     fontSize: 18,
   },
   linkTitle: {
@@ -459,7 +474,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   inviteCard: {
-    borderColor: colors.accent,
+    backgroundColor: colors.accentSoft,
   },
   code: {
     fontSize: 28,

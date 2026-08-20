@@ -82,7 +82,9 @@ export default function BondHubScreen() {
             onPress={() => openSection(option.id)}
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           >
-            <Text style={styles.glyph}>{option.glyph}</Text>
+            <View style={[styles.glyphBubble, { backgroundColor: colors.accentSoft }]}>
+              <Text style={styles.glyph}>{option.glyph}</Text>
+            </View>
             <View style={styles.copy}>
               <Text style={styles.rowTitle}>{option.title}</Text>
               <Text style={styles.rowBody}>{option.body}</Text>
@@ -104,11 +106,11 @@ export default function BondHubScreen() {
 const styles = StyleSheet.create({
   menuBtn: {
     alignSelf: 'flex-start',
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.accent,
     backgroundColor: colors.accentSoft,
-    borderRadius: radii.md,
-    paddingHorizontal: 14,
+    borderRadius: radii.pill,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     marginBottom: 18,
   },
@@ -124,21 +126,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.hairline,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     backgroundColor: colors.card,
-    padding: 14,
+    padding: 16,
+    shadowColor: '#C9A8B4',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 3,
   },
   rowPressed: {
-    borderColor: colors.accent,
-    backgroundColor: colors.bgSoft,
+    backgroundColor: colors.accentSoft,
+  },
+  glyphBubble: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   glyph: {
-    width: 28,
     textAlign: 'center',
     color: colors.accent,
-    fontSize: 22,
+    fontSize: 20,
   },
   copy: {
     flex: 1,

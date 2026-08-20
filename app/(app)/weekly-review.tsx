@@ -74,7 +74,7 @@ export default function WeeklyReviewScreen() {
   }, [bothSubmitted, generateAiSummary])
 
   if (authLoading || isLoading) return <LoadingScreen />
-  if (!partner) return <Redirect href="/(app)/pair" />
+  if (!partner) return <Redirect href="/(app)/setup" />
   if (!unlocked) {
     return (
       <Screen>

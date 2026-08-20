@@ -60,7 +60,7 @@ export default function BondHubScreen() {
   }, [navigation])
 
   if (isLoading) return <LoadingScreen />
-  if (!profile?.couple_id) return <Redirect href="/(app)/pair" />
+  if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
 
   const openSection = (section: BondSection) => {
     setMenuOpen(false)

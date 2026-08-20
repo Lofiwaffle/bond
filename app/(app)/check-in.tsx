@@ -69,7 +69,7 @@ export default function CheckInScreen() {
   }, [authLoading, isLoading, mine])
 
   if (authLoading || isLoading) return <LoadingScreen />
-  if (!profile?.couple_id) return <Redirect href="/(app)/pair" />
+  if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
 
   if (!partner) {
     return (

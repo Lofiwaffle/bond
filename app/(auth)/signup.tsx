@@ -19,7 +19,7 @@ export default function SignUpScreen() {
   if (session) {
     return (
       <Redirect
-        href={profile?.couple_id ? '/(app)/(tabs)' : '/(app)/pair'}
+        href={profile?.couple_id ? '/(app)/(tabs)' : '/(app)/setup'}
       />
     )
   }

@@ -73,7 +73,7 @@ export default function EntriesScreen() {
   )
 
   if (authLoading || isLoading) return <LoadingScreen />
-  if (!profile?.couple_id) return <Redirect href="/(app)/pair" />
+  if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
 
   const myName = profile.display_name?.trim() || 'You'
   const partnerName = partner?.display_name?.trim() || 'Partner'

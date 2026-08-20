@@ -34,7 +34,7 @@ export default function Index() {
   }
 
   if (!profile?.couple_id) {
-    return <Redirect href="/(app)/pair" />
+    return <Redirect href="/(app)/setup" />
   }
 
   return <Redirect href="/(app)/(tabs)" />

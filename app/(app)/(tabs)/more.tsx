@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import {
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,7 +10,9 @@ import {
 import { Redirect, router } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
 
+import { ConfirmDialog } from '../../../components/ConfirmDialog'
 import {
+  ErrorText,
   LoadingScreen,
   PrimaryButton,
   Screen,
@@ -102,6 +103,8 @@ export default function MoreScreen() {
   } = useHabitBadges()
   const [copied, setCopied] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const stats = useMemo(() => {
     const today = localDateString()
@@ -116,7 +119,7 @@ export default function MoreScreen() {
   }, [counts, days])
 
   if (isLoading || historyLoading || habitsLoading) return <LoadingScreen />
-  if (!profile?.couple_id) return <Redirect href="/(app)/pair" />
+  if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
 
   const myName = profile.display_name?.trim() || 'You'
   const partnerName = partner?.display_name?.trim() || null
@@ -136,28 +139,15 @@ export default function MoreScreen() {
     void refreshHabits()
   }
 
-  const confirmDeleteAccount = () => {
-    Alert.alert(
-      'Delete account?',
-      'This permanently removes your profile and sign-in. Shared couple data stays for your partner until they delete their account too.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              setDeleting(true)
-              const result = await deleteAccount()
-              setDeleting(false)
-              if (result.error) {
-                Alert.alert('Could not delete account', result.error)
-              }
-            })()
-          },
-        },
-      ],
-    )
+  const onDeleteAccount = async () => {
+    setDeleteError(null)
+    setDeleting(true)
+    const result = await deleteAccount()
+    setDeleting(false)
+    if (result.error) {
+      setConfirmDelete(false)
+      setDeleteError(result.error)
+    }
   }
 
   return (
@@ -298,10 +288,14 @@ export default function MoreScreen() {
             onPress={() => router.push('/privacy')}
           />
           <TextLink label="Sign out" onPress={() => void signOut()} />
+          {deleteError ? <ErrorText message={deleteError} /> : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Delete account"
-            onPress={confirmDeleteAccount}
+            onPress={() => {
+              setDeleteError(null)
+              setConfirmDelete(true)
+            }}
             disabled={deleting}
             hitSlop={8}
             style={({ pressed }) => [
@@ -316,6 +310,16 @@ export default function MoreScreen() {
           </Pressable>
         </View>
       </ScrollView>
+      <ConfirmDialog
+        visible={confirmDelete}
+        title="Delete account?"
+        body="This permanently removes your profile and sign-in. Shared couple data stays for your partner until they delete their account too."
+        confirmLabel="Delete account"
+        destructive
+        busy={deleting}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => void onDeleteAccount()}
+      />
     </Screen>
   )
 }

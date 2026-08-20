@@ -9,6 +9,7 @@ import {
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 
+import { clearOnboarding } from './onboarding'
 import { supabase, supabaseConfigured, supabaseConfigError } from './supabase'
 import type { Couple, Profile } from '../types/database'
 
@@ -35,6 +36,7 @@ type AuthContextValue = {
     inviteCode: string,
   ) => Promise<{ couple: Couple | null; error: string | null }>
   deleteAccount: () => Promise<{ error: string | null }>
+  updateDisplayName: (name: string) => Promise<{ error: string | null }>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -240,12 +242,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) {
       return { error: error.message }
     }
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut({ scope: 'local' })
+    } catch {
+      // User row is already gone; drop the local session anyway.
+    }
+    setSession(null)
     setProfile(null)
     setCouple(null)
     setPartner(null)
+    await clearOnboarding()
     return { error: null }
   }, [])
+
+  const updateDisplayName = useCallback(
+    async (name: string) => {
+      const trimmed = name.trim()
+      if (!trimmed) return { error: 'Enter a display name' }
+      const userId = session?.user?.id
+      if (!userId) return { error: 'Not signed in' }
+      const { error } = await supabase
+        .from('profiles')
+        .update({ display_name: trimmed })
+        .eq('id', userId)
+      if (error) return { error: error.message }
+      setProfile((current) =>
+        current ? { ...current, display_name: trimmed } : current,
+      )
+      return { error: null }
+    },
+    [session?.user?.id],
+  )
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -262,6 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       createCouple,
       joinCouple,
       deleteAccount,
+      updateDisplayName,
     }),
     [
       session,
@@ -276,6 +304,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       createCouple,
       joinCouple,
       deleteAccount,
+      updateDisplayName,
     ],
   )
 

@@ -359,7 +359,7 @@ export type Database = {
       }
       delete_own_account: {
         Args: Record<PropertyKey, never>
-        Returns: undefined
+        Returns: { ok: boolean }
       }
       has_own_check_in: {
         Args: { p_couple_id: string; p_date: string }

@@ -958,8 +958,10 @@ alter table public.couples
   add constraint couples_created_by_fkey
   foreign key (created_by) references auth.users (id) on delete set null;
 
-create or replace function public.delete_own_account()
-returns void
+drop function if exists public.delete_own_account();
+
+create function public.delete_own_account()
+returns json
 language plpgsql
 security definer
 set search_path = public
@@ -981,9 +983,15 @@ begin
     );
 
   delete from auth.users where id = uid;
+
+  return json_build_object('ok', true);
 end;
 $$;
 
+alter function public.delete_own_account() owner to postgres;
+
 revoke all on function public.delete_own_account() from public;
 grant execute on function public.delete_own_account() to authenticated;
+
+notify pgrst, 'reload schema';
 

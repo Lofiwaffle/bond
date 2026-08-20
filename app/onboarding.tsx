@@ -1,53 +1,58 @@
 import { useRef, useState } from 'react'
 import {
-  Dimensions,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native'
 import { router } from 'expo-router'
 
 import { PrimaryButton, TextLink } from '../components/ui'
-import { Icon, type IconName } from '../lib/icons'
+import { FaceIcon, Icon, type IconName } from '../lib/icons'
 import { markOnboardingSeen } from '../lib/onboarding'
 import { colors, radii, type } from '../lib/theme'
 
-const { width } = Dimensions.get('window')
-
 type Slide = {
-  icon: IconName
+  id: string
+  icon?: IconName
+  faces?: boolean
   title: string
   body: string
 }
 
 const SLIDES: Slide[] = [
   {
+    id: 'welcome',
     icon: 'heart',
-    title: 'Bond',
-    body: 'A shared daily check-in space for you and your partner.',
+    title: 'Welcome to Bond',
+    body: 'A private space for the two of you. No feed, no ads, no one else.',
   },
   {
-    icon: 'edit-3',
-    title: 'Check in, every day',
-    body: 'Log your mood and connection score in seconds, and see how your partner is feeling too.',
+    id: 'checkin',
+    faces: true,
+    title: 'Check in every day',
+    body: 'Save how connected you felt, answer a shared prompt, and tag what shaped the day.',
   },
   {
-    icon: 'calendar',
-    title: 'Grow habits together',
-    body: 'Track shared habits like Spark, Glow, Forge, and Sync, and watch your streak calendar fill in.',
+    id: 'reveal',
+    icon: 'eye-off',
+    title: 'Hidden until you both show up',
+    body: 'Your partner cannot see your entry until they check in too. Then the day opens for both of you.',
   },
   {
-    icon: 'bell',
-    title: 'Stay in sync',
-    body: 'Get gentle reminders so you never miss a check-in, and read weekly summaries of how you two are doing.',
+    id: 'pair',
+    icon: 'users',
+    title: 'Pair with a code',
+    body: 'Create an account, generate an invite, and share it with one person. Then habits, goals, and weekly reviews live here together.',
   },
 ]
 
 export default function OnboardingScreen() {
+  const { width } = useWindowDimensions()
   const [index, setIndex] = useState(0)
   const scrollRef = useRef<ScrollView>(null)
   const isLast = index === SLIDES.length - 1
@@ -58,7 +63,7 @@ export default function OnboardingScreen() {
   }
 
   const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const next = Math.round(e.nativeEvent.contentOffset.x / width)
+    const next = Math.round(e.nativeEvent.contentOffset.x / Math.max(width, 1))
     setIndex(next)
   }
 
@@ -73,7 +78,7 @@ export default function OnboardingScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Skip introduction"
-          onPress={() => finish('/(auth)/signup')}
+          onPress={() => void finish('/(auth)/signup')}
           hitSlop={12}
         >
           <Text style={styles.skipLabel}>Skip</Text>
@@ -89,8 +94,16 @@ export default function OnboardingScreen() {
         style={styles.carousel}
       >
         {SLIDES.map((slide) => (
-          <View key={slide.title} style={styles.slide}>
-            <Icon name={slide.icon} size={48} color={colors.ink} />
+          <View key={slide.id} style={[styles.slide, { width }]}>
+            {slide.faces ? (
+              <View style={styles.faces}>
+                {[1, 2, 3, 4, 5].map((score) => (
+                  <FaceIcon key={score} score={score} size={36} />
+                ))}
+              </View>
+            ) : (
+              <Icon name={slide.icon ?? 'heart'} size={48} color={colors.ink} />
+            )}
             <Text style={styles.title}>{slide.title}</Text>
             <Text style={styles.body}>{slide.body}</Text>
           </View>
@@ -100,7 +113,7 @@ export default function OnboardingScreen() {
       <View style={styles.dots}>
         {SLIDES.map((slide, i) => (
           <View
-            key={slide.title}
+            key={slide.id}
             style={[styles.dot, i === index && styles.dotActive]}
           />
         ))}
@@ -110,12 +123,12 @@ export default function OnboardingScreen() {
         {isLast ? (
           <>
             <PrimaryButton
-              label="Get started"
-              onPress={() => finish('/(auth)/signup')}
+              label="Create account"
+              onPress={() => void finish('/(auth)/signup')}
             />
             <TextLink
               label="I already have an account"
-              onPress={() => finish('/(auth)/login')}
+              onPress={() => void finish('/(auth)/login')}
             />
           </>
         ) : (
@@ -164,14 +177,19 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   carousel: {
-    flexGrow: 0,
+    flex: 1,
   },
   slide: {
-    width,
     paddingHorizontal: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 48,
+    paddingTop: 36,
+    flex: 1,
+    minHeight: 280,
+  },
+  faces: {
+    flexDirection: 'row',
+    gap: 8,
   },
   title: {
     ...type.heading,

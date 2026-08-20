@@ -31,6 +31,7 @@ export default function AppLayout() {
         />
         <Stack.Screen name="day/[date]" />
         <Stack.Screen name="pair" />
+        <Stack.Screen name="setup" />
         <Stack.Screen name="history" />
       </Stack>
     </CheckInProvider>

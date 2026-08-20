@@ -1,15 +1,18 @@
-import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { Redirect, router, useNavigation } from 'expo-router'
+import { Redirect, router } from 'expo-router'
 
-import {
-  BondMenu,
-  type BondSection,
-} from '../../../components/BondMenu'
 import { LoadingScreen, Screen } from '../../../components/ui'
+import { useCheckInHistory, computeStreak } from '../../../hooks/useCheckIn'
+import { useCoupleGoal } from '../../../hooks/useCoupleGoal'
+import { useHabitBadges } from '../../../hooks/useHabitBadges'
+import { useWeeklyReview, useWeeklyReviewHistory } from '../../../hooks/useWeeklyReview'
 import { useAuth } from '../../../lib/auth'
+import { badgesForProgress } from '../../../lib/badges'
+import { formatDisplayDate, localDateString } from '../../../lib/dates'
 import { Icon, type IconName } from '../../../lib/icons'
-import { colors, hairlineWidth, type } from '../../../lib/theme'
+import { colors, hairlineWidth, radii, type } from '../../../lib/theme'
+
+export type BondSection = 'habits' | 'goals' | 'streaks' | 'reviews'
 
 const HUB_OPTIONS: Array<{
   id: BondSection
@@ -43,27 +46,61 @@ const HUB_OPTIONS: Array<{
   },
 ]
 
+function useHubStatus(): Partial<Record<BondSection, string>> {
+  const { counts: habitCounts, isLoading: habitsLoading } = useHabitBadges()
+  const { activeGoals, isLoading: goalsLoading } = useCoupleGoal()
+  const { days, isLoading: checkInLoading } = useCheckInHistory()
+  const { needsReview } = useWeeklyReview()
+  const { weeks, isLoading: reviewsLoading } = useWeeklyReviewHistory()
+
+  const status: Partial<Record<BondSection, string>> = {}
+
+  if (!habitsLoading) {
+    const earned = badgesForProgress({ completions: habitCounts }).filter(
+      (b) => b.earned,
+    ).length
+    status.habits = `${earned}/5 unlocked`
+  }
+
+  if (!goalsLoading) {
+    status.goals =
+      activeGoals.length === 0
+        ? 'No active goals yet'
+        : activeGoals[0].deadline
+          ? `${activeGoals.length} active · next due ${formatDisplayDate(activeGoals[0].deadline)}`
+          : `${activeGoals.length} active`
+  }
+
+  if (!checkInLoading) {
+    const streak = computeStreak(
+      days.filter((d) => d.mine).map((d) => d.date),
+      localDateString(),
+    )
+    status.streaks = streak > 0 ? `${streak}-day streak` : 'No streak yet'
+  }
+
+  if (!reviewsLoading) {
+    const lastCompleted = weeks
+      .filter((w) => w.completed)
+      .sort((a, b) => b.weekStart.localeCompare(a.weekStart))[0]
+    status.reviews = needsReview
+      ? 'This week’s review is ready'
+      : lastCompleted
+        ? `Last reviewed ${formatDisplayDate(lastCompleted.weekEnd)}`
+        : 'None finished yet'
+  }
+
+  return status
+}
+
 export default function BondHubScreen() {
   const { profile, isLoading } = useAuth()
-  const navigation = useNavigation()
-  const [menuOpen, setMenuOpen] = useState(false)
-
-  useEffect(() => {
-    const unsub = (
-      navigation as {
-        addListener: (event: string, cb: () => void) => () => void
-      }
-    ).addListener('tabPress', () => {
-      setMenuOpen(true)
-    })
-    return unsub
-  }, [navigation])
+  const status = useHubStatus()
 
   if (isLoading) return <LoadingScreen />
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
 
   const openSection = (section: BondSection) => {
-    setMenuOpen(false)
     router.push(`/(app)/bond/${section}`)
   }
 
@@ -73,32 +110,32 @@ export default function BondHubScreen() {
       <Text style={styles.subtitle}>How are we growing together?</Text>
 
       <View>
-        {HUB_OPTIONS.map((option, index) => (
-          <Pressable
-            key={option.id}
-            accessibilityRole="button"
-            onPress={() => openSection(option.id)}
-            style={({ pressed }) => [
-              styles.row,
-              index === HUB_OPTIONS.length - 1 && styles.rowLast,
-              pressed && styles.rowPressed,
-            ]}
-          >
-            <Icon name={option.icon} size={18} color={colors.ink} />
-            <View style={styles.copy}>
-              <Text style={styles.rowTitle}>{option.title}</Text>
-              <Text style={styles.rowBody}>{option.body}</Text>
-            </View>
-            <Icon name="chevron-right" size={16} color={colors.muted} />
-          </Pressable>
-        ))}
+        {HUB_OPTIONS.map((option, index) => {
+          const body = status[option.id] ?? option.body
+          return (
+            <Pressable
+              key={option.id}
+              accessibilityRole="button"
+              accessibilityLabel={`${option.title}. ${body}`}
+              onPress={() => openSection(option.id)}
+              style={({ pressed }) => [
+                styles.row,
+                index === HUB_OPTIONS.length - 1 && styles.rowLast,
+                pressed && styles.rowPressed,
+              ]}
+            >
+              <View style={styles.iconBadge}>
+                <Icon name={option.icon} size={18} color={colors.accent} />
+              </View>
+              <View style={styles.copy}>
+                <Text style={styles.rowTitle}>{option.title}</Text>
+                <Text style={styles.rowBody}>{body}</Text>
+              </View>
+              <Icon name="chevron-right" size={16} color={colors.muted} />
+            </Pressable>
+          )
+        })}
       </View>
-
-      <BondMenu
-        visible={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        onSelect={openSection}
-      />
     </Screen>
   )
 }
@@ -126,6 +163,14 @@ const styles = StyleSheet.create({
   },
   rowPressed: {
     opacity: 0.7,
+  },
+  iconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   copy: {
     flex: 1,

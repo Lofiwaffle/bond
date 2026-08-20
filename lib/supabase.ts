@@ -16,6 +16,12 @@ const envKey =
   process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
 
+/** Public publishable key for the hosted Bond project (safe in the client). */
+const HOSTED_BOND: SupabaseAppConfig = {
+  url: 'https://melmzlgzfcysbnvtuksv.supabase.co',
+  key: 'sb_publishable_I3LAmPEB6tGY-1l2-_-9ng_xu-PRSGh',
+}
+
 function isLoopbackUrl(url: string): boolean {
   try {
     const { hostname } = new URL(url)
@@ -138,6 +144,8 @@ async function resolveConfig(): Promise<SupabaseAppConfig | null> {
 
   const hosted = await readHostedConfig()
   if (hosted && !configIssue(hosted.url, hosted.key)) return hosted
+
+  if (!configIssue(HOSTED_BOND.url, HOSTED_BOND.key)) return HOSTED_BOND
 
   return stored ?? (envUrl && envKey ? { url: envUrl, key: envKey } : hosted)
 }

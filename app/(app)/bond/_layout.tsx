@@ -6,6 +6,7 @@ export default function BondLayout() {
       <Stack.Screen name="habits" />
       <Stack.Screen name="goals" />
       <Stack.Screen name="streaks" />
+      <Stack.Screen name="reviews" />
     </Stack>
   )
 }

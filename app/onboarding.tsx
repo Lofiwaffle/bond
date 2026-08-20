@@ -11,42 +11,38 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 
-import { PrimaryButton, SecondaryButton } from '../components/ui'
+import { PrimaryButton, TextLink } from '../components/ui'
+import { Icon, type IconName } from '../lib/icons'
 import { markOnboardingSeen } from '../lib/onboarding'
-import { colors, radii } from '../lib/theme'
+import { colors, radii, type } from '../lib/theme'
 
 const { width } = Dimensions.get('window')
 
 type Slide = {
-  glyph: string
-  glyphColor: string
+  icon: IconName
   title: string
   body: string
 }
 
 const SLIDES: Slide[] = [
   {
-    glyph: '◎',
-    glyphColor: colors.accent,
+    icon: 'heart',
     title: 'Bond',
     body: 'A shared daily check-in space for you and your partner.',
   },
   {
-    glyph: '✦',
-    glyphColor: '#FF7EB6',
-    title: 'Check In, Every Day',
+    icon: 'edit-3',
+    title: 'Check in, every day',
     body: 'Log your mood and connection score in seconds, and see how your partner is feeling too.',
   },
   {
-    glyph: '✧',
-    glyphColor: '#FF8B5C',
-    title: 'Grow Habits Together',
+    icon: 'calendar',
+    title: 'Grow habits together',
     body: 'Track shared habits like Spark, Glow, Forge, and Sync, and watch your streak calendar fill in.',
   },
   {
-    glyph: '◈',
-    glyphColor: '#E8C547',
-    title: 'Stay in Sync',
+    icon: 'bell',
+    title: 'Stay in sync',
     body: 'Get gentle reminders so you never miss a check-in, and read weekly summaries of how you two are doing.',
   },
 ]
@@ -94,9 +90,7 @@ export default function OnboardingScreen() {
       >
         {SLIDES.map((slide) => (
           <View key={slide.title} style={styles.slide}>
-            <Text style={[styles.glyph, { color: slide.glyphColor }]}>
-              {slide.glyph}
-            </Text>
+            <Icon name={slide.icon} size={48} color={colors.ink} />
             <Text style={styles.title}>{slide.title}</Text>
             <Text style={styles.body}>{slide.body}</Text>
           </View>
@@ -119,7 +113,7 @@ export default function OnboardingScreen() {
               label="Get started"
               onPress={() => finish('/(auth)/signup')}
             />
-            <SecondaryButton
+            <TextLink
               label="I already have an account"
               onPress={() => finish('/(auth)/login')}
             />
@@ -166,9 +160,8 @@ const styles = StyleSheet.create({
     minHeight: 24,
   },
   skipLabel: {
+    ...type.body,
     color: colors.muted,
-    fontSize: 14,
-    fontWeight: '700',
   },
   carousel: {
     flexGrow: 0,
@@ -180,21 +173,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: 48,
   },
-  glyph: {
-    fontSize: 72,
-    marginBottom: 24,
-  },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: colors.ink,
+    ...type.heading,
+    marginTop: 24,
     marginBottom: 12,
-    letterSpacing: -0.4,
     textAlign: 'center',
   },
   body: {
-    fontSize: 16,
-    lineHeight: 22,
+    ...type.body,
     color: colors.muted,
     textAlign: 'center',
   },
@@ -236,13 +222,13 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   navLabel: {
+    ...type.body,
     color: colors.muted,
-    fontSize: 16,
-    fontWeight: '700',
   },
   navLabelPrimary: {
     color: colors.onAccent,
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '500',
   },
 })

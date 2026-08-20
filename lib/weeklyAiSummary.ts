@@ -5,6 +5,7 @@
 import { SCORE_LABELS } from './theme'
 import { activityById } from './activities'
 import { formatDisplayDate } from './dates'
+import type { WeeklyAnswer } from './weeklyPrompts'
 
 export type WeekCheckInSlice = {
   date: string
@@ -51,7 +52,7 @@ export function buildFallbackWeeklySummary(input: {
   if (myScores.length) {
     const avg = myScores.reduce((a, b) => a + b, 0) / myScores.length
     lines.push(
-      `Your average connection was ${avg.toFixed(1)} (${SCORE_LABELS[Math.round(avg)] ?? 'Okay'}) across ${myScores.length} check-in${myScores.length === 1 ? '' : 's'}.`,
+      `Your average connection was ${avg.toFixed(1)} (${SCORE_LABELS[Math.round(avg)] ?? 'Stagnant'}) across ${myScores.length} check-in${myScores.length === 1 ? '' : 's'}.`,
     )
   } else {
     lines.push('You have no daily check-ins logged for this week yet.')
@@ -60,7 +61,7 @@ export function buildFallbackWeeklySummary(input: {
   if (partnerScores.length) {
     const avg = partnerScores.reduce((a, b) => a + b, 0) / partnerScores.length
     lines.push(
-      `${partnerName}'s revealed average was ${avg.toFixed(1)} (${SCORE_LABELS[Math.round(avg)] ?? 'Okay'}).`,
+      `${partnerName}'s revealed average was ${avg.toFixed(1)} (${SCORE_LABELS[Math.round(avg)] ?? 'Stagnant'}).`,
     )
   }
 
@@ -98,5 +99,36 @@ export function buildFallbackWeeklySummary(input: {
   lines.push(
     'Keep showing up for each other. Small daily check-ins are how Bond grows.',
   )
+  return lines.join('\n')
+}
+
+/** Recap of a finished weekly reflection after both partners submitted. */
+export function buildCompletedReviewSummary(input: {
+  weekStart: string
+  weekEnd: string
+  myName: string
+  partnerName: string
+  mine: WeeklyAnswer[]
+  partner: WeeklyAnswer[]
+}): string {
+  const lines: string[] = [
+    `Weekly review (${formatDisplayDate(input.weekStart)} – ${formatDisplayDate(input.weekEnd)}).`,
+  ]
+
+  const prompts = input.mine.length ? input.mine : input.partner
+  for (let i = 0; i < prompts.length; i++) {
+    const prompt = prompts[i]?.prompt_text?.trim()
+    if (!prompt) continue
+    const yours = input.mine[i]?.answer?.trim()
+    const theirs = input.partner[i]?.answer?.trim()
+    lines.push(prompt)
+    if (yours) lines.push(`${input.myName}: ${yours}`)
+    if (theirs) lines.push(`${input.partnerName}: ${theirs}`)
+  }
+
+  if (lines.length === 1) {
+    lines.push('You finished this week’s review together.')
+  }
+
   return lines.join('\n')
 }

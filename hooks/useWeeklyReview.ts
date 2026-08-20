@@ -8,8 +8,7 @@ import {
   summarizeScores,
   type WeeklyAnswer,
 } from '../lib/weeklyPrompts'
-import { buildFallbackWeeklySummary } from '../lib/weeklyAiSummary'
-import type { DailyCheckIn } from '../types/database'
+import { buildCompletedReviewSummary, buildFallbackWeeklySummary } from '../lib/weeklyAiSummary'
 import { computeStreak, useCheckInHistory } from './useCheckIn'
 
 export type WeeklyReviewRow = {
@@ -302,55 +301,127 @@ export function useWeeklyReview() {
   }
 }
 
-export type DayDetail = {
-  date: string
-  mine: DailyCheckIn | null
-  partner: DailyCheckIn | null
-  revealed: boolean
+export type PastWeekReview = {
+  weekStart: string
+  weekEnd: string
+  completed: boolean
+  waiting: boolean
+  summary: string
+  source: 'ai' | 'fallback' | 'review'
+  mine: WeeklyReviewRow | null
+  partnerReview: WeeklyReviewRow | null
 }
 
-export function useDayDetail(date: string) {
-  const { user, profile } = useAuth()
-  const [detail, setDetail] = useState<DayDetail | null>(null)
+export function useWeeklyReviewHistory() {
+  const { user, profile, partner } = useAuth()
+  const [weeks, setWeeks] = useState<PastWeekReview[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
-    if (!user?.id || !profile?.couple_id || !date) {
-      setDetail(null)
+    if (!user?.id || !profile?.couple_id) {
+      setWeeks([])
       setIsLoading(false)
       return
     }
 
     setError(null)
-    const { data, error: fetchError } = await supabase
-      .from('daily_check_ins')
-      .select('*')
-      .eq('couple_id', profile.couple_id)
-      .eq('check_in_date', date)
+    const coupleId = profile.couple_id
+    const [{ data: reviewRows, error: reviewError }, { data: summaryRows }] =
+      await Promise.all([
+        supabase
+          .from('weekly_reviews')
+          .select('*')
+          .eq('couple_id', coupleId)
+          .order('week_start', { ascending: false }),
+        supabase
+          .from('weekly_ai_summaries')
+          .select('*')
+          .eq('couple_id', coupleId)
+          .order('week_start', { ascending: false }),
+      ])
 
-    if (fetchError) {
-      setError(fetchError.message)
+    if (reviewError) {
+      setError(reviewError.message)
       setIsLoading(false)
       return
     }
 
-    const rows = data ?? []
-    const mine = rows.find((r) => r.user_id === user.id) ?? null
-    const partnerRow = rows.find((r) => r.user_id !== user.id) ?? null
-    setDetail({
-      date,
-      mine,
-      partner: partnerRow,
-      revealed: Boolean(mine && partnerRow),
-    })
+    const myName = 'You'
+    const partnerName = partner?.display_name ?? 'Partner'
+    const byWeek = new Map<string, PastWeekReview>()
+
+    for (const raw of reviewRows ?? []) {
+      const row: WeeklyReviewRow = {
+        ...raw,
+        answers: parseAnswers(raw.answers),
+      }
+      const existing = byWeek.get(row.week_start) ?? {
+        weekStart: row.week_start,
+        weekEnd: row.week_end,
+        completed: false,
+        waiting: false,
+        summary: '',
+        source: 'review' as const,
+        mine: null,
+        partnerReview: null,
+      }
+      if (row.user_id === user.id) existing.mine = row
+      else existing.partnerReview = row
+      byWeek.set(row.week_start, existing)
+    }
+
+    for (const summary of summaryRows ?? []) {
+      const existing = byWeek.get(summary.week_start) ?? {
+        weekStart: summary.week_start,
+        weekEnd: summary.week_end,
+        completed: false,
+        waiting: false,
+        summary: '',
+        source: 'review' as const,
+        mine: null,
+        partnerReview: null,
+      }
+      if (summary.summary?.trim()) {
+        existing.summary = summary.summary
+        existing.source = (summary.source as 'ai' | 'fallback') ?? 'fallback'
+      }
+      if (!existing.weekEnd) existing.weekEnd = summary.week_end
+      byWeek.set(summary.week_start, existing)
+    }
+
+    const list: PastWeekReview[] = [...byWeek.values()]
+      .map((week) => {
+        const completed = Boolean(week.mine && week.partnerReview)
+        const waiting = Boolean(
+          week.mine && partner?.display_name && !week.partnerReview,
+        )
+        let summary = week.summary
+        let source = week.source
+        if (!summary && completed && week.mine && week.partnerReview) {
+          summary = buildCompletedReviewSummary({
+            weekStart: week.weekStart,
+            weekEnd: week.weekEnd,
+            myName,
+            partnerName,
+            mine: week.mine.answers,
+            partner: week.partnerReview.answers,
+          })
+          source = 'review'
+        }
+        return { ...week, completed, waiting, summary, source }
+      })
+      .filter((week) => week.completed || week.waiting)
+      .sort((a, b) => b.weekStart.localeCompare(a.weekStart))
+
+    setWeeks(list)
     setIsLoading(false)
-  }, [date, profile?.couple_id, user?.id])
+  }, [partner?.display_name, profile?.couple_id, user?.id])
 
   useEffect(() => {
     setIsLoading(true)
     void refresh()
   }, [refresh])
 
-  return { detail, isLoading, error, refresh }
+  return { weeks, isLoading, error, refresh }
 }

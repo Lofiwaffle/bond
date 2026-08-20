@@ -1,24 +1,29 @@
 import { useMemo, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import {
+  Alert,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import { Redirect, router } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
 
 import {
-  Card,
   LoadingScreen,
   PrimaryButton,
   Screen,
-  SecondaryButton,
+  TextLink,
 } from '../../../components/ui'
-import {
-  computeStreak,
-  useCheckInHistory,
-} from '../../../hooks/useCheckIn'
+import { computeStreak, useCheckInHistory } from '../../../hooks/useCheckIn'
 import { useHabitBadges } from '../../../hooks/useHabitBadges'
 import { useAuth } from '../../../lib/auth'
 import { BADGES, badgesForProgress } from '../../../lib/badges'
 import { localDateString } from '../../../lib/dates'
-import { colors, radii } from '../../../lib/theme'
+import { Icon, type IconName } from '../../../lib/icons'
+import { colors, hairlineWidth, type } from '../../../lib/theme'
 
 function initialOf(name: string): string {
   return name.trim().slice(0, 1).toUpperCase() || '?'
@@ -34,9 +39,60 @@ function togetherSinceLabel(iso: string | null | undefined): string {
   })}`
 }
 
+const LINKS: Array<{
+  id: string
+  icon: IconName
+  title: string
+  body: string
+  href: '/(app)/bond/habits' | '/(app)/bond/streaks' | '/(app)/bond/goals' | '/(app)/bond/reviews' | '/(app)/weekly-review'
+}> = [
+  {
+    id: 'habits',
+    icon: 'calendar',
+    title: 'Habits',
+    body: 'Calendar and badge key',
+    href: '/(app)/bond/habits',
+  },
+  {
+    id: 'streaks',
+    icon: 'trending-up',
+    title: 'Streaks',
+    body: 'Daily streak and rhythm',
+    href: '/(app)/bond/streaks',
+  },
+  {
+    id: 'goals',
+    icon: 'target',
+    title: 'Goals',
+    body: 'Shared SMART goals',
+    href: '/(app)/bond/goals',
+  },
+  {
+    id: 'reviews',
+    icon: 'book-open',
+    title: 'Reviews',
+    body: 'Past weekly review summaries',
+    href: '/(app)/bond/reviews',
+  },
+  {
+    id: 'weekly',
+    icon: 'edit-3',
+    title: 'Weekly review',
+    body: 'Look back on the week together',
+    href: '/(app)/weekly-review',
+  },
+]
+
 export default function MoreScreen() {
-  const { profile, couple, partner, isLoading, signOut, refreshProfile } =
-    useAuth()
+  const {
+    profile,
+    couple,
+    partner,
+    isLoading,
+    signOut,
+    refreshProfile,
+    deleteAccount,
+  } = useAuth()
   const { days, isLoading: historyLoading, refresh: refreshHistory } =
     useCheckInHistory()
   const {
@@ -45,6 +101,7 @@ export default function MoreScreen() {
     refresh: refreshHabits,
   } = useHabitBadges()
   const [copied, setCopied] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const stats = useMemo(() => {
     const today = localDateString()
@@ -79,35 +136,68 @@ export default function MoreScreen() {
     void refreshHabits()
   }
 
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      'This permanently removes your profile and sign-in. Shared couple data stays for your partner until they delete their account too.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setDeleting(true)
+              const result = await deleteAccount()
+              setDeleting(false)
+              if (result.error) {
+                Alert.alert('Could not delete account', result.error)
+              }
+            })()
+          },
+        },
+      ],
+    )
+  }
+
   return (
     <Screen style={styles.screen}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={styles.eyebrow}>Couple portfolio</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={false} onRefresh={refreshAll} />
+        }
+      >
+        <Text style={styles.label}>Couple portfolio</Text>
         <Text style={styles.heroTitle}>{coupleTitle}</Text>
         <Text style={styles.heroSub}>{since}</Text>
 
         <View style={styles.avatarRow}>
-          <View style={[styles.avatar, styles.avatarYou]}>
-            <Text style={styles.avatarLetter}>{initialOf(myName)}</Text>
+          <View style={styles.avatar}>
+            <View style={styles.avatarLetterWrap}>
+              <Text style={styles.avatarLetter}>{initialOf(myName)}</Text>
+            </View>
             <Text style={styles.avatarCaption}>{myName}</Text>
           </View>
-          <Text style={styles.ampersand}>◎</Text>
-          <View
-            style={[
-              styles.avatar,
-              partnerName ? styles.avatarPartner : styles.avatarEmpty,
-            ]}
-          >
-            <Text
+          <Text style={styles.ampersand}>&</Text>
+          <View style={[styles.avatar, !partnerName && styles.avatarEmpty]}>
+            <View
               style={[
-                styles.avatarLetter,
+                styles.avatarLetterWrap,
                 !partnerName && styles.avatarLetterMuted,
               ]}
             >
-              {partnerName ? initialOf(partnerName) : '?'}
-            </Text>
+              <Text
+                style={[
+                  styles.avatarLetter,
+                  !partnerName && styles.avatarLetterMutedText,
+                ]}
+              >
+                {partnerName ? initialOf(partnerName) : '?'}
+              </Text>
+            </View>
             <Text style={styles.avatarCaption}>
-              {partnerName ?? 'Waiting…'}
+              {partnerName ?? 'Waiting'}
             </Text>
           </View>
         </View>
@@ -129,12 +219,12 @@ export default function MoreScreen() {
           </View>
         </View>
 
-        <Card>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Highlights</Text>
           <Text style={styles.sectionHint}>
-            Habits you’ve unlocked together.
+            Habits you've unlocked together.
           </Text>
-          <View style={styles.badgeGrid}>
+          <View style={styles.chipWrap}>
             {BADGES.map((badge) => {
               const earned = stats.badges.find((b) => b.id === badge.id)
               const count = earned?.count ?? 0
@@ -142,127 +232,88 @@ export default function MoreScreen() {
               return (
                 <View
                   key={badge.id}
-                  style={[
-                    styles.badgeCell,
-                    on && { borderColor: badge.color },
-                  ]}
+                  style={[styles.chip, on && styles.chipOn]}
                 >
-                  <View
-                    style={[
-                      styles.badgeSquare,
-                      {
-                        backgroundColor: on ? badge.color : colors.bgSoft,
-                        borderColor: on ? badge.color : colors.hairline,
-                      },
-                    ]}
+                  <Icon
+                    name={badge.icon}
+                    size={14}
+                    color={on ? colors.onAccent : colors.ink}
                   />
-                  <Text
-                    style={[styles.badgeName, !on && styles.badgeNameMuted]}
-                  >
-                    {badge.glyph} {badge.label}
-                  </Text>
-                  <Text style={[styles.badgeCount, on && { color: badge.color }]}>
-                    {on ? `×${count}` : 'locked'}
+                  <Text style={[styles.chipName, on && styles.chipNameOn]}>
+                    {badge.label}
                   </Text>
                 </View>
               )
             })}
           </View>
-          {stats.habitLogs === 0 ? (
-            <Text style={styles.emptyHint}>
-              No habit logs yet. Open Habits to start filling your portfolio.
-            </Text>
-          ) : (
-            <Text style={styles.emptyHint}>
-              {stats.habitLogs} habit moment{stats.habitLogs === 1 ? '' : 's'}{' '}
-              logged · {stats.myCheckIns} check-in
-              {stats.myCheckIns === 1 ? '' : 's'}
-            </Text>
-          )}
-        </Card>
+          <Text style={styles.emptyHint}>
+            {stats.habitLogs === 0
+              ? 'No habit logs yet. Open Habits to start filling your portfolio.'
+              : `${stats.habitLogs} habit moment${stats.habitLogs === 1 ? '' : 's'} logged · ${stats.myCheckIns} check-in${stats.myCheckIns === 1 ? '' : 's'}`}
+          </Text>
+        </View>
 
-        <Card>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Together</Text>
-          <Text style={styles.sectionHint}>Jump into how you’re growing.</Text>
-          {(
-            [
-              {
-                id: 'habits',
-                glyph: '✧',
-                tint: '#FFE4D6',
-                title: 'Habits',
-                body: 'Calendar and badge key',
-                href: '/(app)/bond/habits' as const,
-              },
-              {
-                id: 'streaks',
-                glyph: '◈',
-                tint: '#FFF4CC',
-                title: 'Streaks',
-                body: 'Daily streak and rhythm',
-                href: '/(app)/bond/streaks' as const,
-              },
-              {
-                id: 'goals',
-                glyph: '◎',
-                tint: '#DCEBFF',
-                title: 'Goals',
-                body: 'Shared targets',
-                href: '/(app)/bond/goals' as const,
-              },
-              {
-                id: 'weekly',
-                glyph: '✦',
-                tint: '#FFE0EE',
-                title: 'Weekly review',
-                body: 'Look back on the week together',
-                href: '/(app)/weekly-review' as const,
-              },
-            ] as const
-          ).map((item) => (
+          <Text style={styles.sectionHint}>Jump into how you're growing.</Text>
+          {LINKS.map((item, index) => (
             <Pressable
               key={item.id}
               accessibilityRole="button"
               onPress={() => router.push(item.href)}
               style={({ pressed }) => [
                 styles.linkRow,
+                index === LINKS.length - 1 && styles.linkRowLast,
                 pressed && styles.linkRowPressed,
               ]}
             >
-              <View style={[styles.linkGlyphBubble, { backgroundColor: item.tint }]}>
-                <Text style={styles.linkGlyph}>{item.glyph}</Text>
-              </View>
+              <Icon name={item.icon} size={18} color={colors.ink} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.linkTitle}>{item.title}</Text>
                 <Text style={styles.linkBody}>{item.body}</Text>
               </View>
-              <Text style={styles.linkChevron}>›</Text>
+              <Icon name="chevron-right" size={16} color={colors.muted} />
             </Pressable>
           ))}
-        </Card>
+        </View>
 
         {!partner && couple?.invite_code ? (
-          <Card style={styles.inviteCard}>
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>Invite your partner</Text>
             <Text style={styles.sectionHint}>
               Share this code so your portfolio becomes a pair.
             </Text>
             <Text style={styles.code}>{couple.invite_code}</Text>
             <PrimaryButton
-              label={copied ? 'Copied!' : 'Copy invite code'}
+              label={copied ? 'Copied' : 'Copy invite code'}
               onPress={() => void copyInviteCode()}
             />
-          </Card>
+          </View>
         ) : null}
 
         <View style={styles.accountBlock}>
-          <Text style={styles.accountLabel}>Account</Text>
-          <SecondaryButton label="Refresh" onPress={refreshAll} />
-          <SecondaryButton label="Sign out" onPress={() => void signOut()} />
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Bond · made for two</Text>
+          <Text style={styles.label}>Account</Text>
+          <TextLink
+            label="Privacy"
+            onPress={() => router.push('/privacy')}
+          />
+          <TextLink label="Sign out" onPress={() => void signOut()} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Delete account"
+            onPress={confirmDeleteAccount}
+            disabled={deleting}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.deleteBtn,
+              pressed && styles.deleteBtnPressed,
+              deleting && styles.deleteBtnDisabled,
+            ]}
+          >
+            <Text style={styles.deleteLabel}>
+              {deleting ? 'Deleting...' : 'Delete account'}
+            </Text>
+          </Pressable>
         </View>
       </ScrollView>
     </Screen>
@@ -273,22 +324,16 @@ const styles = StyleSheet.create({
   screen: {
     paddingBottom: 8,
   },
-  eyebrow: {
-    color: colors.accent,
-    fontSize: 13,
-    fontWeight: '700',
+  label: {
+    ...type.label,
     marginBottom: 6,
   },
   heroTitle: {
-    color: colors.ink,
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    ...type.heading,
   },
   heroSub: {
+    ...type.body,
     color: colors.muted,
-    fontSize: 14,
-    fontWeight: '600',
     marginTop: 4,
     marginBottom: 20,
   },
@@ -304,209 +349,155 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  avatarYou: {},
-  avatarPartner: {},
   avatarEmpty: {
     opacity: 0.7,
   },
+  avatarLetterWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 0.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   avatarLetter: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 0,
-    borderColor: colors.accent,
-    backgroundColor: colors.accentSoft,
-    color: colors.accent,
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    fontSize: 28,
-    fontWeight: '800',
-    lineHeight: 70,
-    overflow: 'hidden',
+    ...type.heading,
+    marginBottom: 0,
   },
   avatarLetterMuted: {
-    borderColor: colors.hairline,
     backgroundColor: colors.bgSoft,
+  },
+  avatarLetterMutedText: {
     color: colors.muted,
   },
   avatarCaption: {
+    ...type.label,
     color: colors.ink,
-    fontWeight: '700',
-    fontSize: 13,
+    marginBottom: 0,
     textAlign: 'center',
   },
   ampersand: {
-    color: colors.accent,
-    fontSize: 22,
-    fontWeight: '800',
-    marginBottom: 22,
+    ...type.body,
+    color: colors.muted,
+    marginBottom: 20,
   },
   statStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 0,
-    borderColor: colors.hairline,
-    borderRadius: radii.lg,
-    backgroundColor: colors.card,
     paddingVertical: 16,
-    marginBottom: 16,
-    shadowColor: '#C9A8B4',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 3,
+    borderTopWidth: hairlineWidth,
+    borderBottomWidth: hairlineWidth,
+    borderColor: colors.hairline,
   },
   stat: {
     flex: 1,
     alignItems: 'center',
   },
   statValue: {
-    color: colors.ink,
-    fontSize: 20,
-    fontWeight: '800',
+    ...type.heading,
   },
   statLabel: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '600',
+    ...type.label,
     marginTop: 2,
+    marginBottom: 0,
   },
   statDivider: {
-    width: 1,
+    width: 0.5,
     height: 28,
     backgroundColor: colors.hairline,
   },
+  section: {
+    paddingVertical: 20,
+    borderBottomWidth: hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
   sectionTitle: {
-    color: colors.ink,
-    fontWeight: '700',
-    fontSize: 15,
+    ...type.heading,
     marginBottom: 4,
   },
   sectionHint: {
+    ...type.body,
     color: colors.muted,
-    fontSize: 13,
     marginBottom: 12,
-    lineHeight: 18,
   },
-  badgeGrid: {
+  chipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  badgeCell: {
-    width: '30%',
-    flexGrow: 1,
-    minWidth: 96,
-    borderWidth: 0,
-    borderColor: colors.hairline,
-    borderRadius: radii.md,
-    backgroundColor: colors.bgSoft,
-    padding: 10,
+  chip: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    borderWidth: 0.5,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  badgeSquare: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 0,
-    marginBottom: 6,
+  chipOn: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
-  badgeName: {
+  chipName: {
+    ...type.label,
     color: colors.ink,
-    fontWeight: '700',
-    fontSize: 12,
-    textAlign: 'center',
+    marginBottom: 0,
   },
-  badgeNameMuted: {
-    color: colors.muted,
-    opacity: 0.7,
-  },
-  badgeCount: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 2,
+  chipNameOn: {
+    color: colors.onAccent,
   },
   emptyHint: {
-    color: colors.muted,
-    fontSize: 12,
+    ...type.label,
     marginTop: 12,
-    lineHeight: 17,
+    marginBottom: 0,
   },
   linkRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderWidth: 0,
-    borderColor: colors.hairline,
-    borderRadius: radii.md,
-    backgroundColor: colors.bgSoft,
-    padding: 12,
-    marginBottom: 8,
+    paddingVertical: 14,
+    borderBottomWidth: hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  linkRowLast: {
+    borderBottomWidth: 0,
   },
   linkRowPressed: {
-    backgroundColor: colors.accentSoft,
-  },
-  linkGlyphBubble: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  linkGlyph: {
-    textAlign: 'center',
-    color: colors.ink,
-    fontSize: 18,
+    opacity: 0.7,
   },
   linkTitle: {
-    color: colors.ink,
-    fontWeight: '800',
-    fontSize: 15,
+    ...type.body,
+    fontWeight: '500',
   },
   linkBody: {
-    color: colors.muted,
-    fontSize: 12,
+    ...type.label,
     marginTop: 2,
-  },
-  linkChevron: {
-    color: colors.muted,
-    fontSize: 20,
-  },
-  inviteCard: {
-    backgroundColor: colors.accentSoft,
+    marginBottom: 0,
   },
   code: {
-    fontSize: 28,
-    fontWeight: '800',
+    ...type.heading,
     letterSpacing: 4,
-    color: colors.accent,
     marginBottom: 12,
   },
   accountBlock: {
     marginTop: 8,
-    gap: 0,
+    paddingBottom: 24,
+    gap: 8,
   },
-  accountLabel: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 8,
+  deleteBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
   },
-  footer: {
-    marginTop: 20,
-    marginBottom: 12,
-    alignItems: 'center',
+  deleteBtnPressed: {
+    opacity: 0.6,
   },
-  footerText: {
-    color: colors.muted,
-    fontWeight: '600',
-    backgroundColor: colors.bgSoft,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radii.pill,
-    overflow: 'hidden',
+  deleteBtnDisabled: {
+    opacity: 0.5,
+  },
+  deleteLabel: {
+    ...type.body,
+    color: colors.danger,
   },
 })

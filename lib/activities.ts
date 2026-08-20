@@ -1,3 +1,5 @@
+import type { IconName } from './icons'
+
 export type ActivityId =
   | 'sports'
   | 'work'
@@ -11,19 +13,18 @@ export type ActivityId =
 export type Activity = {
   id: ActivityId
   label: string
-  glyph: string
-  tint: string
+  icon: IconName
 }
 
 export const ACTIVITIES: Activity[] = [
-  { id: 'sports', label: 'Sports', glyph: '🏃', tint: '#FFE0D4' },
-  { id: 'work', label: 'Work', glyph: '💼', tint: '#DCE6FF' },
-  { id: 'food', label: 'Food', glyph: '🍽', tint: '#FFF0C4' },
-  { id: 'home', label: 'Home', glyph: '🏠', tint: '#E8D9F5' },
-  { id: 'social', label: 'Social', glyph: '💬', tint: '#FFD6E5' },
-  { id: 'rest', label: 'Rest', glyph: '🌙', tint: '#D5F1EC' },
-  { id: 'travel', label: 'Travel', glyph: '✈', tint: '#D4ECF8' },
-  { id: 'other', label: 'Other', glyph: '✦', tint: '#FFE4D1' },
+  { id: 'sports', label: 'Sports', icon: 'activity' },
+  { id: 'work', label: 'Work', icon: 'briefcase' },
+  { id: 'food', label: 'Food', icon: 'coffee' },
+  { id: 'home', label: 'Home', icon: 'home' },
+  { id: 'social', label: 'Social', icon: 'message-circle' },
+  { id: 'rest', label: 'Rest', icon: 'moon' },
+  { id: 'travel', label: 'Travel', icon: 'navigation' },
+  { id: 'other', label: 'Other', icon: 'more-horizontal' },
 ]
 
 export const ACTIVITY_IDS = ACTIVITIES.map((a) => a.id) as ActivityId[]

@@ -1,8 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { router } from 'expo-router'
 
-import { Title } from './ui'
-import { colors, radii } from '../lib/theme'
+import { Icon } from '../lib/icons'
+import { colors, type } from '../lib/theme'
 
 export function BondSectionHeader({
   title,
@@ -17,11 +17,13 @@ export function BondSectionHeader({
         accessibilityRole="button"
         accessibilityLabel="Back to Bond"
         onPress={() => router.back()}
+        hitSlop={8}
         style={styles.backBtn}
       >
-        <Text style={styles.backText}>‹ Bond</Text>
+        <Icon name="chevron-left" size={16} color={colors.muted} />
+        <Text style={styles.backText}>Bond</Text>
       </Pressable>
-      <Title>{title}</Title>
+      <Text style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
   )
@@ -33,23 +35,23 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     alignSelf: 'flex-start',
-    borderWidth: 0,
-    borderRadius: radii.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    marginBottom: 14,
-    backgroundColor: colors.accentSoft,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: 8,
+    marginBottom: 8,
   },
   backText: {
-    color: colors.accent,
-    fontWeight: '700',
-    fontSize: 14,
+    ...type.label,
+    marginBottom: 0,
+  },
+  title: {
+    ...type.heading,
   },
   subtitle: {
+    ...type.body,
     color: colors.muted,
-    fontSize: 15,
-    lineHeight: 21,
-    marginTop: -4,
+    marginTop: 4,
     marginBottom: 16,
   },
 })

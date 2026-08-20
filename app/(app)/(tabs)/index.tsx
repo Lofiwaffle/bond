@@ -1,13 +1,19 @@
-import { useMemo } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { Redirect, router } from 'expo-router'
+import { useCallback, useMemo } from 'react'
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
+import { Redirect, router, useFocusEffect } from 'expo-router'
+import Svg, { Circle } from 'react-native-svg'
 
 import {
   LoadingScreen,
-  PrimaryButton,
-  ScoreEmoji,
+  ScoreMark,
   Screen,
-  SecondaryButton,
   StreakChip,
 } from '../../../components/ui'
 import {
@@ -16,15 +22,22 @@ import {
   useTodayCheckIn,
   type HistoryDay,
 } from '../../../hooks/useCheckIn'
-import { activityById } from '../../../lib/activities'
+import { ACTIVITIES } from '../../../lib/activities'
 import { useAuth } from '../../../lib/auth'
+import { promptForDate } from '../../../lib/dailyPrompts'
 import {
   SCORE_LABELS,
   formatDisplayDate,
   localDateString,
 } from '../../../lib/dates'
-import { colors, elevation, radii, scoreColors, scoreColorsSoft } from '../../../lib/theme'
+import { colors, hairlineWidth, radii, type } from '../../../lib/theme'
 import type { DailyCheckIn } from '../../../types/database'
+
+const AVATAR = 32
+
+function initialOf(name: string): string {
+  return name.trim().slice(0, 1).toUpperCase() || '?'
+}
 
 function relativeDay(date: string, today: string): string {
   if (date === today) return 'Today'
@@ -34,7 +47,6 @@ function relativeDay(date: string, today: string): string {
   const b = Date.UTC(y, m - 1, d)
   const days = Math.round((a - b) / 86400000)
   if (days === 1) return 'Yesterday'
-  if (days < 7) return formatDisplayDate(date)
   return formatDisplayDate(date)
 }
 
@@ -43,6 +55,12 @@ export default function EntriesScreen() {
   const today = localDateString()
   const { days, isLoading, refresh } = useCheckInHistory()
   const { mine: todayMine } = useTodayCheckIn()
+
+  useFocusEffect(
+    useCallback(() => {
+      void refresh()
+    }, [refresh]),
+  )
 
   const streak = useMemo(() => {
     const myDates = days.filter((d) => d.mine).map((d) => d.date)
@@ -58,8 +76,8 @@ export default function EntriesScreen() {
   if (!profile?.couple_id) return <Redirect href="/(app)/pair" />
 
   const myName = profile.display_name?.trim() || 'You'
-  const partnerName = partner?.display_name ?? 'Partner'
-  const partnerHandle = partnerName
+  const partnerName = partner?.display_name?.trim() || 'Partner'
+  const todayPrompt = promptForDate(profile.couple_id, today)
 
   return (
     <Screen style={styles.screen}>
@@ -71,173 +89,242 @@ export default function EntriesScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl refreshing={false} onRefresh={() => void refresh()} />
+        }
       >
         {!todayMine ? (
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Check in with today's prompt"
             onPress={() => router.push('/(app)/check-in')}
             style={({ pressed }) => [
               styles.composer,
-              pressed && styles.composerPressed,
+              pressed && styles.pressed,
             ]}
           >
-            <View style={styles.composerFaces}>
-              <Text style={styles.composerFace}>🙂</Text>
-              <Text style={styles.composerFace}>😄</Text>
-            </View>
-            <View style={styles.composerCopy}>
-              <Text style={styles.composerTitle}>How connected do you feel?</Text>
-              <Text style={styles.composerHint}>Tap to check in for today</Text>
-            </View>
-            <View style={styles.composerBtn}>
-              <Text style={styles.composerBtnText}>Go</Text>
-            </View>
+            <Text style={styles.composerTitle}>{todayPrompt.text}</Text>
+            <Text style={styles.composerHint}>
+              Today's prompt · tap to check in
+            </Text>
           </Pressable>
         ) : null}
 
-        {feed.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyGlyph}>☺</Text>
-            <Text style={styles.emptyTitle}>No entries yet</Text>
-            <Text style={styles.emptyBody}>
-              Your check-ins will show up here as a shared timeline
-              {partner ? ` with ${partnerName}` : ''}.
-            </Text>
-            {!todayMine ? (
-              <PrimaryButton
-                label="Check in for the first time"
-                onPress={() => router.push('/(app)/check-in')}
-              />
-            ) : null}
-          </View>
-        ) : (
-          feed.map((day) => (
-            <EntryCard
-              key={day.date}
-              day={day}
-              today={today}
-              myName={myName}
-              partnerName={partnerName}
-              partnerHandle={partnerHandle}
-            />
-          ))
-        )}
-
-        <View style={styles.footer}>
-          <SecondaryButton label="Refresh" onPress={() => void refresh()} />
-        </View>
+        {feed.map((day) => (
+          <DayGroup
+            key={day.date}
+            day={day}
+            today={today}
+            myName={myName}
+            partnerName={partner ? partnerName : null}
+            myInitial={initialOf(myName)}
+            partnerInitial={initialOf(partnerName)}
+          />
+        ))}
       </ScrollView>
     </Screen>
   )
 }
 
-function EntryCard({
+function DayGroup({
   day,
   today,
   myName,
   partnerName,
-  partnerHandle,
+  myInitial,
+  partnerInitial,
 }: {
   day: HistoryDay
   today: string
   myName: string
-  partnerName: string
-  partnerHandle: string
+  partnerName: string | null
+  myInitial: string
+  partnerInitial: string
 }) {
-  const time = relativeDay(day.date, today)
+  const rows: TimelineItem[] = []
+
+  if (day.mine) {
+    rows.push({
+      key: 'mine',
+      tone: 'self',
+      name: myName,
+      initial: myInitial,
+      checkIn: day.mine,
+    })
+  }
+
+  if (day.revealed && day.partner) {
+    rows.push({
+      key: 'partner',
+      tone: 'partner',
+      name: partnerName ?? 'Partner',
+      initial: partnerInitial,
+      checkIn: day.partner,
+    })
+  } else if (day.mine && partnerName) {
+    rows.push({
+      key: 'waiting',
+      tone: 'waiting',
+      name: partnerName,
+      initial: partnerInitial,
+    })
+  } else if (!day.mine && day.revealed && day.partner) {
+    rows.push({
+      key: 'partner',
+      tone: 'partner',
+      name: partnerName ?? 'Partner',
+      initial: partnerInitial,
+      checkIn: day.partner,
+    })
+  }
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => router.push(`/(app)/day/${day.date}`)}
-      style={({ pressed }) => [styles.entryCard, pressed && styles.entryPressed]}
-    >
-      {day.mine ? (
-        <EntryRow
-          name={myName}
-          time={time}
-          checkIn={day.mine}
-          waiting={!day.revealed}
-          partnerHandle={partnerHandle}
-        />
-      ) : null}
-
-      {day.revealed && day.partner ? (
-        <View style={day.mine ? styles.partnerBlock : undefined}>
-          <EntryRow
-            name={partnerName}
-            time={time}
-            checkIn={day.partner}
-            isPartner
+    <View>
+      <DateRule label={relativeDay(day.date, today)} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${relativeDay(day.date, today)} entries`}
+        onPress={() => router.push(`/(app)/day/${day.date}`)}
+        style={({ pressed }) => pressed && styles.pressed}
+      >
+        {rows.map((row, index) => (
+          <TimelineRow
+            key={row.key}
+            item={row}
+            connect={index < rows.length - 1}
           />
-        </View>
-      ) : null}
-    </Pressable>
+        ))}
+      </Pressable>
+    </View>
   )
 }
 
-function EntryRow({
+type TimelineItem = {
+  key: string
+  tone: 'self' | 'partner' | 'waiting'
+  name: string
+  initial: string
+  checkIn?: DailyCheckIn
+}
+
+function TimelineRow({
+  item,
+  connect,
+}: {
+  item: TimelineItem
+  connect: boolean
+}) {
+  return (
+    <View style={styles.timelineRow}>
+      <View style={styles.rail}>
+        <TimelineAvatar initial={item.initial} tone={item.tone} />
+        {connect ? <View style={styles.connector} /> : null}
+      </View>
+      <View style={styles.entryBody}>
+        {item.tone === 'waiting' || !item.checkIn ? (
+          <Text style={styles.waiting}>Waiting for {item.name} to check in</Text>
+        ) : (
+          <EntryCopy name={item.name} checkIn={item.checkIn} />
+        )}
+      </View>
+    </View>
+  )
+}
+
+function EntryCopy({
   name,
-  time,
   checkIn,
-  waiting = false,
-  partnerHandle,
-  isPartner = false,
 }: {
   name: string
-  time: string
   checkIn: DailyCheckIn
-  waiting?: boolean
-  partnerHandle?: string
-  isPartner?: boolean
 }) {
-  const note = checkIn.note?.trim()
-  const activities = (checkIn.activities ?? [])
-    .map((id) => activityById(id))
-    .filter(Boolean)
-  const scoreColor = scoreColors[checkIn.score]
-  const scoreSoft = scoreColorsSoft[checkIn.score]
+  const note = checkIn.prompt_answer?.trim() || checkIn.note?.trim() || ''
+  const activities = checkIn.activities ?? []
+  const feeling = SCORE_LABELS[checkIn.score] ?? 'connected'
 
   return (
-    <View style={styles.entryRow}>
-      <View style={[styles.moodBubble, { backgroundColor: scoreSoft }]}>
-        <ScoreEmoji score={checkIn.score} size={isPartner ? 28 : 34} />
-      </View>
-
-      <View style={styles.entryMain}>
-        <View style={styles.entryMeta}>
-          <Text style={styles.entryName} numberOfLines={1}>
-            {name}
-          </Text>
-          <Text style={styles.entryTime}>{time}</Text>
-        </View>
+    <View style={styles.entryCopy}>
+      <View
+        accessible
+        accessibilityLabel={`${name} feels ${feeling.toLowerCase()}`}
+        style={styles.entryLine}
+      >
         <Text style={styles.entryMood}>
-          Feeling{' '}
-          <Text style={{ color: scoreColor, fontWeight: '700' }}>
-            {SCORE_LABELS[checkIn.score].toLowerCase()}
-          </Text>
+          <Text style={styles.entryName}>{name}</Text>
+          {' feels '}
         </Text>
-        {note ? <Text style={styles.entryNote}>{note}</Text> : null}
-        {activities.length > 0 ? (
-          <View style={styles.chipRow}>
-            {activities.map((activity) =>
-              activity ? (
-                <View
-                  key={activity.id}
-                  style={[styles.chip, { backgroundColor: activity.tint }]}
-                >
-                  <Text style={styles.chipText}>
-                    {activity.glyph} {activity.label}
-                  </Text>
-                </View>
-              ) : null,
-            )}
-          </View>
-        ) : null}
-        {waiting && partnerHandle ? (
-          <Text style={styles.waiting}>Waiting for {partnerHandle} to check in</Text>
-        ) : null}
+        <ScoreMark score={checkIn.score} size={22} />
       </View>
+      {note ? <Text style={styles.entryNote}>{note}</Text> : null}
+      <EntryChips ids={activities} />
+    </View>
+  )
+}
+
+function EntryChips({ ids }: { ids: string[] }) {
+  if (!ids.length) return null
+  return (
+    <View style={styles.chipWrap}>
+      {ids.map((id) => {
+        const activity = ACTIVITIES.find((item) => item.id === id)
+        if (!activity) return null
+        return (
+          <View key={id} style={styles.chip}>
+            <Text style={styles.chipLabel}>{activity.label}</Text>
+          </View>
+        )
+      })}
+    </View>
+  )
+}
+
+function DateRule({ label }: { label: string }) {
+  return (
+    <View style={styles.dateRule}>
+      <View style={styles.dateLine} />
+      <Text style={styles.dateLabel}>{label}</Text>
+      <View style={styles.dateLine} />
+    </View>
+  )
+}
+
+function TimelineAvatar({
+  initial,
+  tone,
+}: {
+  initial: string
+  tone: 'self' | 'partner' | 'waiting'
+}) {
+  if (tone === 'waiting') {
+    const r = AVATAR / 2 - 1
+    return (
+      <View style={styles.avatarSlot}>
+        <Svg width={AVATAR} height={AVATAR}>
+          <Circle
+            cx={AVATAR / 2}
+            cy={AVATAR / 2}
+            r={r}
+            stroke={colors.muted}
+            strokeWidth={1}
+            strokeDasharray="3 2.5"
+            fill="none"
+          />
+        </Svg>
+        <View style={styles.waitingLetterWrap}>
+          <Text style={styles.waitingLetter}>{initial}</Text>
+        </View>
+      </View>
+    )
+  }
+
+  return (
+    <View
+      style={[
+        styles.avatar,
+        tone === 'self' ? styles.avatarSelf : styles.avatarPartner,
+      ]}
+    >
+      <Text style={styles.avatarLetter}>{initial}</Text>
     </View>
   )
 }
@@ -252,169 +339,148 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingBottom: 8,
   },
   topTitle: {
-    color: colors.ink,
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.6,
+    ...type.heading,
   },
   scroll: {
-    paddingHorizontal: 16,
     paddingBottom: 28,
   },
   composer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  composerTitle: {
+    ...type.body,
+  },
+  composerHint: {
+    ...type.label,
+    marginTop: 4,
+    marginBottom: 0,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  dateRule: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: colors.card,
-    borderRadius: radii.lg,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    marginBottom: 14,
-    ...elevation.card,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 14,
   },
-  composerPressed: {
-    transform: [{ scale: 0.99 }],
-  },
-  composerFaces: {
-    flexDirection: 'row',
-    marginLeft: -4,
-  },
-  composerFace: {
-    fontSize: 22,
-    marginLeft: -4,
-  },
-  composerCopy: {
+  dateLine: {
     flex: 1,
+    height: hairlineWidth,
+    backgroundColor: colors.hairline,
   },
-  composerTitle: {
-    color: colors.ink,
-    fontSize: 15,
-    fontWeight: '700',
+  dateLabel: {
+    ...type.label,
+    marginBottom: 0,
   },
-  composerHint: {
-    color: colors.muted,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  composerBtn: {
-    backgroundColor: colors.accent,
-    borderRadius: radii.pill,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  composerBtnText: {
-    color: colors.onAccent,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  entryCard: {
-    backgroundColor: colors.card,
-    borderRadius: radii.lg,
-    padding: 16,
-    marginBottom: 12,
-    ...elevation.card,
-  },
-  entryPressed: {
-    opacity: 0.92,
-  },
-  partnerBlock: {
-    marginTop: 14,
-    paddingTop: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-  },
-  entryRow: {
+  timelineRow: {
     flexDirection: 'row',
+    alignItems: 'stretch',
+    paddingHorizontal: 20,
     gap: 12,
   },
-  moodBubble: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  rail: {
+    width: AVATAR,
+    alignItems: 'center',
+  },
+  connector: {
+    width: hairlineWidth,
+    flex: 1,
+    backgroundColor: colors.hairline,
+    marginTop: 4,
+    minHeight: 16,
+  },
+  avatarSlot: {
+    width: AVATAR,
+    height: AVATAR,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  entryMain: {
-    flex: 1,
-    gap: 4,
-    paddingTop: 2,
+  avatar: {
+    width: AVATAR,
+    height: AVATAR,
+    borderRadius: AVATAR / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  entryMeta: {
+  avatarSelf: {
+    backgroundColor: colors.accent,
+  },
+  avatarPartner: {
+    backgroundColor: colors.success,
+  },
+  avatarLetter: {
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '500',
+    color: colors.ink,
+  },
+  waitingLetterWrap: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  waitingLetter: {
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '500',
+    color: colors.muted,
+  },
+  entryBody: {
+    flex: 1,
+    paddingBottom: 16,
+  },
+  entryCopy: {
+    gap: 6,
+  },
+  entryLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
+    gap: 6,
   },
   entryName: {
-    color: colors.ink,
-    fontWeight: '700',
-    fontSize: 15,
-    flex: 1,
-  },
-  entryTime: {
-    color: colors.muted,
-    fontSize: 13,
-    fontWeight: '600',
+    ...type.body,
+    fontWeight: '500',
   },
   entryMood: {
-    color: colors.ink,
-    fontSize: 15,
-    lineHeight: 21,
+    ...type.body,
   },
   entryNote: {
-    color: colors.muted,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 6,
-  },
-  chip: {
-    borderRadius: radii.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  chipText: {
-    color: colors.ink,
-    fontSize: 12,
-    fontWeight: '600',
+    ...type.body,
   },
   waiting: {
+    ...type.body,
     color: colors.muted,
-    fontSize: 12,
+    paddingTop: 6,
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
     marginTop: 4,
   },
-  empty: {
-    backgroundColor: colors.card,
-    borderRadius: radii.lg,
-    padding: 28,
-    alignItems: 'center',
-    marginTop: 4,
+  chip: {
+    borderWidth: hairlineWidth,
+    borderColor: colors.border,
+    borderRadius: radii.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
-  emptyGlyph: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  emptyTitle: {
+  chipLabel: {
+    ...type.label,
     color: colors.ink,
-    fontWeight: '700',
-    fontSize: 18,
-  },
-  emptyBody: {
-    color: colors.muted,
-    fontSize: 15,
-    lineHeight: 21,
-    textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 12,
-  },
-  footer: {
-    paddingTop: 8,
+    marginBottom: 0,
   },
 })

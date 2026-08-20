@@ -1,9 +1,11 @@
+import type { IconName } from './icons'
+
 export type BadgeId = 'spark' | 'glow' | 'forge' | 'bond' | 'sync'
 
 export type Badge = {
   id: BadgeId
   label: string
-  glyph: string
+  icon: IconName
   /** What this badge means, shown once earned */
   description: string
   /** Call to action shown to encourage logging, locked or unlocked */
@@ -18,49 +20,49 @@ export const BADGES: Badge[] = [
   {
     id: 'spark',
     label: 'Spark',
-    glyph: '✧',
+    icon: 'zap',
     description: 'Trying something new that reignites excitement.',
     quest: 'Log a new experience or adventure you tried together',
-    color: '#FF8B5C',
-    colorSoft: '#FFE4D6',
+    color: '#C9B8BE',
+    colorSoft: '#EDE6E8',
   },
   {
     id: 'glow',
     label: 'Glow',
-    glyph: '◈',
+    icon: 'sun',
     description: 'Publicly celebrating or showing off the relationship.',
-    quest: 'Log a time you celebrated or showed off your partner publicly',
-    color: '#E8C547',
-    colorSoft: '#FFF4CC',
+    quest: 'Log a time you celebrated together',
+    color: '#A8989E',
+    colorSoft: '#E4DCDF',
   },
   {
     id: 'forge',
     label: 'Forge',
-    glyph: '◉',
+    icon: 'tool',
     description: 'Strengthening the relationship materially or financially.',
-    quest:
-      'Log a shared money move, project, or practical investment you made together',
-    color: '#5BA3FF',
-    colorSoft: '#DCEBFF',
+    quest: "Log something you've built or created together.",
+    color: '#8A7C82',
+    colorSoft: '#D8CFD3',
   },
   {
     id: 'bond',
     label: 'Bond',
-    glyph: '◎',
+    icon: 'heart',
     description: 'Spending real shared quality time together.',
-    quest: 'Log quality time: a meal, walk, hobby, or undistracted hang',
-    color: '#7ED9A8',
-    colorSoft: '#D4F5E8',
+    quest:
+      'Log a quality bonding moment: a meal, walk, undistracted time, or an adventure',
+    color: '#6E6167',
+    colorSoft: '#C9B8BE',
   },
   {
     id: 'sync',
     label: 'Sync',
-    glyph: '✦',
+    icon: 'refresh-cw',
     description: 'A State of the Union talk, deeper than the daily check-in.',
     quest:
       'Log a deliberate conversation about how the relationship is really going',
-    color: '#FF7EB6',
-    colorSoft: '#FFE0EE',
+    color: '#3D2C33',
+    colorSoft: '#B9AEB3',
   },
 ]
 

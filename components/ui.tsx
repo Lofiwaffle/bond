@@ -23,14 +23,14 @@ import {
   type BadgeProgress,
 } from '../lib/badges'
 import { localDateString } from '../lib/dates'
+import { FaceIcon, Icon, type IconName } from '../lib/icons'
 import {
+  SCORE_HINTS,
   SCORE_LABELS,
   colors,
-  elevation,
+  hairlineWidth,
   radii,
-  scoreColors,
-  scoreColorsSoft,
-  scoreEmojis,
+  type,
 } from '../lib/theme'
 
 export function Screen({
@@ -99,7 +99,7 @@ export function PrimaryButton({
   )
 }
 
-export function SecondaryButton({
+export function TextLink({
   label,
   onPress,
   disabled,
@@ -114,13 +114,47 @@ export function SecondaryButton({
       accessibilityLabel={label}
       onPress={onPress}
       disabled={disabled}
+      hitSlop={8}
       style={({ pressed }) => [
-        styles.secondaryButton,
+        styles.textLink,
         disabled && styles.buttonDisabled,
-        pressed && !disabled && styles.secondaryPressed,
+        pressed && !disabled && styles.textLinkPressed,
       ]}
     >
-      <Text style={styles.secondaryLabel}>{label}</Text>
+      <Text style={styles.textLinkLabel}>{label}</Text>
+    </Pressable>
+  )
+}
+
+/** Low-emphasis text action. Kept as an alias so existing screens stay in sync. */
+export function SecondaryButton(props: {
+  label: string
+  onPress: () => void
+  disabled?: boolean
+}) {
+  return <TextLink {...props} />
+}
+
+export function IconButton({
+  name,
+  onPress,
+  accessibilityLabel,
+  color = colors.muted,
+}: {
+  name: IconName
+  onPress: () => void
+  accessibilityLabel: string
+  color?: string
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      hitSlop={12}
+      style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.6 }]}
+    >
+      <Icon name={name} size={18} color={color} />
     </Pressable>
   )
 }
@@ -133,11 +167,32 @@ export function ErrorText({ message }: { message: string | null }) {
 export function LoadingScreen() {
   return (
     <View style={styles.loading}>
-      <ActivityIndicator size="large" color={colors.accent} />
+      <ActivityIndicator size="large" color={colors.muted} />
     </View>
   )
 }
 
+export function Divider() {
+  return <View style={styles.divider} />
+}
+
+export function Section({
+  children,
+  last = false,
+  style,
+}: {
+  children: ReactNode
+  last?: boolean
+  style?: ViewStyle
+}) {
+  return (
+    <View style={[styles.section, !last && styles.sectionRule, style]}>
+      {children}
+    </View>
+  )
+}
+
+/** Flattened section wrapper. No filled surface, no shadow. */
 export function Card({
   children,
   style,
@@ -148,67 +203,103 @@ export function Card({
   return <View style={[styles.card, style]}>{children}</View>
 }
 
+export function ProgressBar({
+  value,
+  max,
+  label,
+}: {
+  value: number
+  max: number
+  label?: string
+}) {
+  const pct = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0
+  return (
+    <View style={styles.progressRow}>
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${pct * 100}%` }]} />
+      </View>
+      {label ? <Text style={styles.progressLabel}>{label}</Text> : null}
+    </View>
+  )
+}
+
+export function ScoreMark({
+  score,
+  size = 28,
+  color = colors.ink,
+}: {
+  score: number
+  size?: number
+  color?: string
+}) {
+  return <FaceIcon score={score} size={size} color={color} />
+}
+
 export function ScoreEmoji({
   score,
-  size = 40,
+  size = 28,
 }: {
   score: number
   size?: number
 }) {
+  return <ScoreMark score={score} size={size} />
+}
+
+export function ScoreScale({
+  value,
+  onChange,
+}: {
+  value: number | null
+  onChange: (score: number) => void
+}) {
   return (
-    <Text style={{ fontSize: size, lineHeight: size + 4 }}>
-      {scoreEmojis[score] ?? '😐'}
-    </Text>
+    <View>
+      <View style={styles.scaleRow}>
+        {[1, 2, 3, 4, 5].map((score) => {
+          const selected = value === score
+          return (
+            <Pressable
+              key={score}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`${score}, ${SCORE_LABELS[score]}`}
+              onPress={() => onChange(score)}
+              style={({ pressed }) => [
+                styles.scaleCell,
+                selected && styles.scaleCellSelected,
+                pressed && styles.scaleCellPressed,
+              ]}
+            >
+              <FaceIcon score={score} size={52} />
+            </Pressable>
+          )
+        })}
+      </View>
+      <View style={styles.scaleCaptions}>
+        <Text style={styles.label}>{SCORE_LABELS[1]}</Text>
+        <Text style={styles.label}>{SCORE_LABELS[5]}</Text>
+      </View>
+      {value != null ? (
+        <Text style={styles.scaleHint}>
+          {SCORE_LABELS[value]} · {SCORE_HINTS[value]}
+        </Text>
+      ) : null}
+    </View>
   )
 }
 
 export function ScoreFacePicker({
   value,
   onChange,
-  size = 'large',
 }: {
   value: number | null
   onChange: (score: number) => void
   size?: 'large' | 'compact'
 }) {
-  const faceSize = size === 'large' ? 44 : 30
-  const circle = size === 'large' ? 64 : 48
-
-  return (
-    <View style={styles.faceRow}>
-      {[1, 2, 3, 4, 5].map((score) => {
-        const selected = value === score
-        return (
-          <Pressable
-            key={score}
-            accessibilityRole="button"
-            accessibilityState={{ selected }}
-            accessibilityLabel={`${score}, ${SCORE_LABELS[score]}`}
-            onPress={() => onChange(score)}
-            style={[
-              styles.faceButton,
-              {
-                width: circle,
-                height: circle,
-                borderRadius: radii.pill,
-                backgroundColor: selected
-                  ? scoreColors[score]
-                  : scoreColorsSoft[score],
-                borderColor: selected ? colors.white : 'transparent',
-                borderWidth: selected ? 3 : 0,
-                transform: [{ scale: selected ? 1.06 : 1 }],
-              },
-            ]}
-          >
-            <Text style={{ fontSize: faceSize }}>{scoreEmojis[score]}</Text>
-          </Pressable>
-        )
-      })}
-    </View>
-  )
+  return <ScoreScale value={value} onChange={onChange} />
 }
 
-export function ActivityIconGrid({
+export function ActivityChips({
   value,
   onChange,
   max = 5,
@@ -227,7 +318,7 @@ export function ActivityIconGrid({
   }
 
   return (
-    <View style={styles.activityGrid}>
+    <View style={styles.chipWrap}>
       {ACTIVITIES.map((activity) => {
         const selected = value.includes(activity.id)
         const blocked = !selected && value.length >= max
@@ -240,20 +331,18 @@ export function ActivityIconGrid({
             disabled={blocked}
             onPress={() => toggle(activity.id)}
             style={[
-              styles.activityCell,
-              selected && {
-                backgroundColor: activity.tint,
-                borderColor: colors.accent,
-              },
-              blocked && styles.activityCellBlocked,
+              styles.chip,
+              selected && styles.chipSelected,
+              blocked && styles.chipBlocked,
             ]}
           >
-            <Text style={styles.activityGlyph}>{activity.glyph}</Text>
+            <Icon
+              name={activity.icon}
+              size={14}
+              color={selected ? colors.onAccent : colors.ink}
+            />
             <Text
-              style={[
-                styles.activityLabel,
-                selected && styles.activityLabelSelected,
-              ]}
+              style={[styles.chipLabel, selected && styles.chipLabelSelected]}
             >
               {activity.label}
             </Text>
@@ -264,16 +353,41 @@ export function ActivityIconGrid({
   )
 }
 
-export function StreakChip({ streak }: { streak: number }) {
+export function ActivityIconGrid(props: {
+  value: ActivityId[]
+  onChange: (next: ActivityId[]) => void
+  max?: number
+}) {
+  return <ActivityChips {...props} />
+}
+
+export function ReadOnlyChips({ ids }: { ids: string[] }) {
+  if (!ids.length) return null
   return (
-    <View style={styles.streakChip}>
-      <Text style={styles.streakChipValue}>{streak}</Text>
-      <Text style={styles.streakChipLabel}>day streak</Text>
+    <View style={styles.chipWrap}>
+      {ids.map((id) => {
+        const activity = ACTIVITIES.find((item) => item.id === id)
+        if (!activity) return null
+        return (
+          <View key={id} style={styles.chip}>
+            <Icon name={activity.icon} size={14} color={colors.ink} />
+            <Text style={styles.chipLabel}>{activity.label}</Text>
+          </View>
+        )
+      })}
     </View>
   )
 }
 
-const HABIT_EMPTY = '#F3EBEF'
+export function StreakChip({ streak }: { streak: number }) {
+  return (
+    <Text style={styles.streakLabel}>
+      {streak} day streak
+    </Text>
+  )
+}
+
+const HABIT_EMPTY = '#EDE6E8'
 const HABIT_CELL = 13
 const HABIT_GAP = 3
 
@@ -322,23 +436,13 @@ export function HabitCalendar({
               const badge = summary.primary
                 ? badgeById[summary.primary]
                 : null
-              const multi = summary.habits.length > 1
               const fill = future
                 ? 'transparent'
                 : !badge
                   ? HABIT_EMPTY
                   : summary.total === 1
-                    ? badge.colorSoft
-                    : badge.color
-              const border = future
-                ? 'transparent'
-                : date === today
-                  ? colors.accent
-                  : multi
-                    ? colors.ink
-                    : badge
-                      ? badge.color
-                      : colors.hairline
+                    ? colors.hairline
+                    : colors.ink
 
               return (
                 <View
@@ -354,8 +458,8 @@ export function HabitCalendar({
                     styles.habitCalCell,
                     {
                       backgroundColor: fill,
-                      borderColor: border,
-                      borderWidth: date === today && !future ? 2 : 0,
+                      borderColor: date === today ? colors.accent : 'transparent',
+                      borderWidth: date === today && !future ? 1.5 : 0,
                       opacity: future ? 0 : 1,
                     },
                   ]}
@@ -366,7 +470,7 @@ export function HabitCalendar({
         ))}
       </ScrollView>
 
-      <Text style={styles.habitCalKeyTitle}>Key</Text>
+      <Text style={styles.label}>Key</Text>
       <View style={styles.habitCalKey}>
         {progress.map((badge) => (
           <Pressable
@@ -375,19 +479,14 @@ export function HabitCalendar({
             accessibilityLabel={`${badge.label}, ${badge.count} logged. Tap to log.`}
             disabled={!onPressHabit}
             onPress={() => onPressHabit?.(badge.id)}
-            style={[
-              styles.habitCalKeyItem,
-              badge.earned && { borderColor: badge.color },
-            ]}
+            style={styles.habitCalKeyItem}
           >
-            <View
-              style={[styles.habitCalSwatch, { backgroundColor: badge.color }]}
-            />
+            <Icon name={badge.icon} size={16} color={colors.ink} />
             <View style={styles.habitCalKeyCopy}>
-              <Text style={styles.habitCalLabel} numberOfLines={1}>
-                {badge.glyph} {badge.label}
+              <Text style={styles.body} numberOfLines={1}>
+                {badge.label}
               </Text>
-              <Text style={styles.habitCalCount}>
+              <Text style={styles.label}>
                 {badge.count > 0 ? `×${badge.count}` : 'tap to log'}
               </Text>
             </View>
@@ -408,7 +507,7 @@ export function BadgeRow({
 }) {
   const badges = badgesForProgress(progress)
   return (
-    <View style={styles.badgeRow}>
+    <View style={styles.chipWrap}>
       {badges.map((badge) => (
         <Pressable
           key={badge.id}
@@ -416,30 +515,21 @@ export function BadgeRow({
           accessibilityLabel={`${badge.label}${badge.count > 0 ? `, logged ${badge.count} times` : ', not logged yet'}`}
           disabled={!onPress}
           onPress={() => onPress?.(badge.id)}
-          style={[
-            styles.badgeCell,
-            badge.earned && { borderColor: badge.color },
-          ]}
+          style={[styles.chip, badge.earned && styles.chipSelected]}
         >
-          <View
-            style={[
-              styles.badgeSquare,
-              {
-                backgroundColor: badge.earned ? badge.color : HABIT_EMPTY,
-                borderColor: badge.earned ? badge.color : colors.hairline,
-              },
-            ]}
+          <Icon
+            name={badge.icon}
+            size={14}
+            color={badge.earned ? colors.onAccent : colors.ink}
           />
           <Text
-            style={[styles.badgeLabel, !badge.earned && styles.badgeMuted]}
+            style={[
+              styles.chipLabel,
+              badge.earned && styles.chipLabelSelected,
+            ]}
           >
-            {badge.glyph} {badge.label}
+            {badge.label}
           </Text>
-          {badge.count > 0 ? (
-            <Text style={[styles.badgeCount, { color: badge.color }]}>
-              ×{badge.count}
-            </Text>
-          ) : null}
         </Pressable>
       ))}
     </View>
@@ -455,38 +545,36 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.ink,
-    marginBottom: 6,
-    letterSpacing: -0.5,
+    ...type.heading,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
+    ...type.body,
     color: colors.muted,
-    marginBottom: 22,
+    marginBottom: 20,
   },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.muted,
+    ...type.label,
     marginBottom: 8,
   },
+  body: {
+    ...type.body,
+  },
   input: {
-    borderWidth: 0,
     backgroundColor: colors.bgSoft,
     borderRadius: radii.md,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '400',
     color: colors.ink,
     marginBottom: 16,
   },
   button: {
     backgroundColor: colors.accent,
     borderRadius: radii.pill,
-    paddingVertical: 16,
+    paddingVertical: 15,
     alignItems: 'center',
     marginTop: 8,
   },
@@ -498,30 +586,33 @@ const styles = StyleSheet.create({
   },
   buttonLabel: {
     color: colors.onAccent,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '500',
   },
-  secondaryButton: {
-    borderRadius: radii.pill,
-    paddingVertical: 15,
+  textLink: {
     alignItems: 'center',
-    marginTop: 8,
-    backgroundColor: colors.accentSoft,
-    borderWidth: 0,
+    paddingVertical: 14,
   },
-  secondaryPressed: {
-    backgroundColor: '#FFD6E5',
+  textLinkPressed: {
+    opacity: 0.6,
   },
-  secondaryLabel: {
-    color: colors.accent,
-    fontSize: 16,
-    fontWeight: '700',
+  textLinkLabel: {
+    ...type.body,
+    color: colors.muted,
+  },
+  iconButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   error: {
     color: colors.danger,
     marginBottom: 8,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '400',
   },
   loading: {
     flex: 1,
@@ -529,135 +620,112 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.bg,
   },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: radii.lg,
-    padding: 18,
-    borderWidth: 0,
-    marginBottom: 14,
-    ...elevation.card,
+  divider: {
+    height: hairlineWidth,
+    backgroundColor: colors.hairline,
   },
-  faceRow: {
+  section: {
+    paddingVertical: 20,
+  },
+  sectionRule: {
+    borderBottomWidth: hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  card: {
+    paddingVertical: 20,
+    borderBottomWidth: hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  progressTrack: {
+    flex: 1,
+    height: 4,
+    borderRadius: radii.pill,
+    backgroundColor: colors.bgSoft,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.ink,
+    borderRadius: radii.pill,
+  },
+  progressLabel: {
+    ...type.label,
+    marginBottom: 0,
+  },
+  scaleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  scaleCell: {
+    flex: 1,
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  scaleCellSelected: {
+    borderColor: colors.accent,
+  },
+  scaleCellPressed: {
+    opacity: 0.75,
+  },
+  scaleCaptions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
+    marginTop: 8,
   },
-  faceButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 1,
+  scaleHint: {
+    ...type.label,
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 0,
   },
-  activityGrid: {
+  chipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 12,
   },
-  activityCell: {
-    width: '23%',
-    minWidth: 72,
-    flexGrow: 1,
-    aspectRatio: 1,
-    borderWidth: 0,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgSoft,
-    padding: 6,
-  },
-  activityCellBlocked: {
-    opacity: 0.35,
-  },
-  activityGlyph: {
-    fontSize: 22,
-    marginBottom: 4,
-  },
-  activityLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.muted,
-  },
-  activityLabelSelected: {
-    color: colors.accent,
-  },
-  streakChip: {
+  chip: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     gap: 6,
-    borderWidth: 0,
-    backgroundColor: colors.accentSoft,
+    borderWidth: hairlineWidth,
+    borderColor: colors.border,
     borderRadius: radii.pill,
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 8,
+    backgroundColor: 'transparent',
   },
-  streakChipValue: {
-    color: colors.accent,
-    fontWeight: '800',
-    fontSize: 16,
+  chipSelected: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
-  streakChipLabel: {
-    color: colors.muted,
+  chipBlocked: {
+    opacity: 0.35,
+  },
+  chipLabel: {
     fontSize: 12,
-    fontWeight: '600',
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  badgeCell: {
-    width: '30%',
-    flexGrow: 1,
-    minWidth: 88,
-    borderWidth: 0,
-    borderRadius: radii.md,
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    alignItems: 'center',
-    backgroundColor: colors.bgSoft,
-  },
-  badgeSquare: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 0,
-    marginBottom: 6,
-  },
-  badgeLabel: {
-    fontSize: 12,
-    fontWeight: '700',
+    lineHeight: 16,
+    fontWeight: '400',
     color: colors.ink,
   },
-  badgeMuted: {
-    color: colors.muted,
-    opacity: 0.55,
+  chipLabelSelected: {
+    color: colors.onAccent,
   },
-  badgeCount: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.accent,
-    marginTop: 2,
+  streakLabel: {
+    ...type.label,
+    marginBottom: 0,
   },
   habitCal: {
     gap: 12,
-  },
-  habitCalSwatch: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  habitCalLabel: {
-    color: colors.ink,
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  habitCalCount: {
-    color: colors.muted,
-    fontWeight: '600',
-    fontSize: 11,
-    marginTop: 1,
   },
   habitCalGrid: {
     flexDirection: 'row',
@@ -670,17 +738,7 @@ const styles = StyleSheet.create({
   habitCalCell: {
     width: HABIT_CELL,
     height: HABIT_CELL,
-    borderRadius: 5,
-    borderWidth: 0,
-    borderColor: colors.hairline,
-  },
-  habitCalKeyTitle: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginTop: 4,
+    borderRadius: 4,
   },
   habitCalKey: {
     flexDirection: 'row',
@@ -691,11 +749,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderWidth: 0,
-    borderRadius: radii.md,
-    backgroundColor: colors.bgSoft,
     paddingVertical: 8,
-    paddingHorizontal: 10,
     minWidth: '45%',
     flexGrow: 1,
   },

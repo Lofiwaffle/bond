@@ -2,6 +2,9 @@ import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 
 import { AuthProvider } from '../lib/auth'
+import { registerWebInstall } from '../lib/pwa'
+
+registerWebInstall()
 
 export default function RootLayout() {
   return (

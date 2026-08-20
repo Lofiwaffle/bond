@@ -79,6 +79,6 @@ export function summarizeScores(scores: number[]): {
   const rounded = Math.round(avg)
   return {
     avg,
-    label: SCORE_LABELS[rounded] ?? 'Okay',
+    label: SCORE_LABELS[rounded] ?? 'Stagnant',
   }
 }

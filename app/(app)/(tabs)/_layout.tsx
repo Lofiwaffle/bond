@@ -1,5 +1,6 @@
+import { Feather } from '@expo/vector-icons'
 import { Redirect, Tabs, router } from 'expo-router'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
 
 import { LoadingScreen } from '../../../components/ui'
 import { useAuth } from '../../../lib/auth'
@@ -13,7 +14,7 @@ function CheckInFab() {
       onPress={() => router.push('/(app)/check-in')}
       style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
     >
-      <Text style={styles.fabPlus}>+</Text>
+      <Feather name="plus" size={26} color={colors.onAccent} />
     </Pressable>
   )
 }
@@ -28,7 +29,7 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.tabBarIcon,
+        tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.tabBarIconMuted,
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabLabel,
@@ -38,8 +39,8 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Entries',
-          tabBarIcon: ({ color, focused }) => (
-            <Text style={{ fontSize: focused ? 22 : 20, color }}>☺</Text>
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="align-left" size={size} color={color} />
           ),
         }}
       />
@@ -59,8 +60,8 @@ export default function TabsLayout() {
         name="stats"
         options={{
           title: 'Bond',
-          tabBarIcon: ({ color, focused }) => (
-            <Text style={{ fontSize: focused ? 20 : 18, color }}>♥</Text>
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="heart" size={size} color={color} />
           ),
         }}
       />
@@ -68,8 +69,8 @@ export default function TabsLayout() {
         name="more"
         options={{
           title: 'Us',
-          tabBarIcon: ({ color, focused }) => (
-            <Text style={{ fontSize: focused ? 22 : 20, color }}>◎</Text>
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="users" size={size} color={color} />
           ),
         }}
       />
@@ -80,15 +81,16 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: colors.tabBar,
-    borderTopWidth: 0,
+    borderTopWidth: 0.5,
+    borderTopColor: colors.hairline,
     height: 78,
     paddingBottom: 14,
     paddingTop: 10,
     overflow: 'visible' as const,
   },
   tabLabel: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '400',
   },
   fabSlot: {
     top: -18,
@@ -96,22 +98,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fab: {
-    width: 62,
-    height: 62,
+    width: 56,
+    height: 56,
     borderRadius: radii.pill,
-    backgroundColor: colors.white,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
     ...elevation.fab,
   },
   fabPressed: {
     transform: [{ scale: 0.96 }],
-  },
-  fabPlus: {
-    fontSize: 34,
-    color: colors.accent,
-    fontWeight: '400',
-    marginTop: -2,
-    lineHeight: 36,
   },
 })

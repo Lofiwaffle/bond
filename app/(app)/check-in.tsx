@@ -3,22 +3,22 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router } from 'expo-router'
 
 import {
-  ActivityIconGrid,
-  Card,
+  ActivityChips,
+  Divider,
   ErrorText,
   Field,
+  IconButton,
   LoadingScreen,
   PrimaryButton,
-  ScoreEmoji,
-  ScoreFacePicker,
+  ProgressBar,
+  ReadOnlyChips,
+  ScoreMark,
+  ScoreScale,
   Screen,
-  SecondaryButton,
   StreakChip,
-  Subtitle,
-  Title,
+  TextLink,
 } from '../../components/ui'
 import type { ActivityId } from '../../lib/activities'
-import { activityById } from '../../lib/activities'
 import {
   computeStreak,
   useCheckInHistory,
@@ -26,14 +26,14 @@ import {
 } from '../../hooks/useCheckIn'
 import { useWeeklyReview } from '../../hooks/useWeeklyReview'
 import { useAuth } from '../../lib/auth'
+import { promptForDate } from '../../lib/dailyPrompts'
 import {
-  DAILY_PROMPT,
   SCORE_LABELS,
   formatDisplayDate,
   localDateString,
 } from '../../lib/dates'
 import { syncCheckInReminder } from '../../lib/notifications'
-import { colors, radii } from '../../lib/theme'
+import { colors, type } from '../../lib/theme'
 
 export default function CheckInScreen() {
   const { profile, partner, isLoading: authLoading } = useAuth()
@@ -44,22 +44,13 @@ export default function CheckInScreen() {
     waitingForPartner,
     isLoading,
     error,
-    refresh,
     submit,
   } = useTodayCheckIn()
   const { days } = useCheckInHistory()
-  const {
-    streak: weeklyStreak,
-    unlocked,
-    needsReview,
-    bothSubmitted: weeklyBoth,
-    waitingForPartner: weeklyWaiting,
-    refresh: refreshWeekly,
-  } = useWeeklyReview()
+  const { streak: weeklyStreak, unlocked, needsReview } = useWeeklyReview()
   const [score, setScore] = useState<number | null>(null)
   const [activities, setActivities] = useState<ActivityId[]>([])
-  const [note, setNote] = useState('')
-  const [showNote, setShowNote] = useState(false)
+  const [promptAnswer, setPromptAnswer] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -68,6 +59,9 @@ export default function CheckInScreen() {
     const myDates = days.filter((d) => d.mine).map((d) => d.date)
     return computeStreak(myDates, today)
   }, [days])
+
+  const towardReview = weeklyStreak === 0 ? 0 : ((weeklyStreak - 1) % 7) + 1
+  const hasDraft = score != null || activities.length > 0 || promptAnswer.trim().length > 0
 
   useEffect(() => {
     if (isLoading || authLoading) return
@@ -80,201 +74,205 @@ export default function CheckInScreen() {
   if (!partner) {
     return (
       <Screen>
-        <Title>Check in</Title>
-        <Subtitle>
+        <Text style={styles.heading}>Check-in</Text>
+        <Text style={styles.mutedBody}>
           Waiting for your partner to join before check-ins unlock.
-        </Subtitle>
-        <SecondaryButton label="Close" onPress={() => router.back()} />
+        </Text>
+        <TextLink label="Close" onPress={() => router.back()} />
       </Screen>
     )
   }
 
+  const todayPrompt = promptForDate(profile.couple_id, localDateString())
+
+  const resetForm = () => {
+    setScore(null)
+    setActivities([])
+    setPromptAnswer('')
+    setSubmitError(null)
+  }
+
   const onSubmit = async () => {
     if (score == null) {
-      setSubmitError('Pick a face that fits today')
+      setSubmitError('Choose how connected you feel')
       return
     }
     setSubmitError(null)
     setSubmitting(true)
-    const result = await submit(score, note, activities)
+    const result = await submit(score, '', activities, {
+      id: todayPrompt.id,
+      text: todayPrompt.text,
+      answer: promptAnswer,
+    })
     setSubmitting(false)
-    if (result.error) setSubmitError(result.error)
+    if (result.error) {
+      setSubmitError(result.error)
+      return
+    }
+    router.dismissTo('/(app)/(tabs)')
   }
+
+  const openWeekly = () => router.push('/(app)/weekly-review')
 
   return (
     <Screen style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.headerRow}>
-          <Title>Check in</Title>
-          <StreakChip streak={streak} />
+          <View style={styles.headerCopy}>
+            <Text style={styles.heading}>Check-in</Text>
+            <Text style={styles.date}>{formatDisplayDate(localDateString())}</Text>
+          </View>
+          <View style={styles.headerMeta}>
+            {hasDraft && !mine ? (
+              <IconButton
+                name="rotate-ccw"
+                accessibilityLabel="Reset form"
+                onPress={resetForm}
+              />
+            ) : null}
+            <StreakChip streak={streak} />
+          </View>
         </View>
-        <Subtitle>
-          {DAILY_PROMPT} · {formatDisplayDate(localDateString())}
-        </Subtitle>
+
+        <Pressable
+          accessibilityRole={unlocked ? 'button' : undefined}
+          accessibilityLabel={
+            unlocked
+              ? needsReview
+                ? 'Weekly review unlocked'
+                : 'Open weekly review'
+              : `${towardReview} of 7 days to weekly reflection`
+          }
+          onPress={unlocked ? openWeekly : undefined}
+          disabled={!unlocked}
+          style={styles.progressBlock}
+        >
+          <ProgressBar
+            value={towardReview}
+            max={7}
+            label={`${towardReview}/7 to reflection`}
+          />
+        </Pressable>
+
+        <Divider />
 
         <ErrorText message={error} />
 
-        {unlocked ? (
-          <Card>
-            <Text style={styles.weeklyTitle}>
-              {needsReview
-                ? 'Weekly review unlocked'
-                : weeklyWaiting
-                  ? 'Weekly review waiting on partner'
-                  : weeklyBoth
-                    ? 'Weekly review complete'
-                    : 'Weekly review'}
-            </Text>
-            <Text style={styles.weeklyBody}>
-              {weeklyStreak}-day streak · reflect together with private prompts
-              that reveal when you both finish.
-            </Text>
-            <PrimaryButton
-              label={
-                needsReview
-                  ? 'Start weekly check-in'
-                  : weeklyBoth
-                    ? 'View weekly review'
-                    : 'Open weekly review'
-              }
-              onPress={() => router.push('/(app)/weekly-review')}
-            />
-          </Card>
-        ) : (
-          <Card>
-            <Text style={styles.weeklyTitle}>Weekly review</Text>
-            <Text style={styles.weeklyBody}>
-              Check in {7 - weeklyStreak} more day
-              {7 - weeklyStreak === 1 ? '' : 's'} in a row to unlock your weekly
-              reflection together ({weeklyStreak}/7).
-            </Text>
-          </Card>
-        )}
-
         {!mine ? (
-          <Card>
-            <Text style={styles.heroPrompt}>How connected do you feel?</Text>
-            <ScoreFacePicker value={score} onChange={setScore} />
-            {score != null ? (
-              <Text style={styles.scoreLabel}>
-                {score} · {SCORE_LABELS[score]}
-              </Text>
-            ) : (
-              <Text style={styles.scoreHint}>Tap a face</Text>
-            )}
-
-            <Text style={styles.sectionLabel}>Activities</Text>
-            <Text style={styles.sectionHint}>
-              Tap tags that shaped today. No typing required.
-            </Text>
-            <ActivityIconGrid value={activities} onChange={setActivities} />
-
-            {showNote ? (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Today's prompt</Text>
+              <Text style={styles.prompt}>{todayPrompt.text}</Text>
               <Field
-                value={note}
-                onChangeText={setNote}
-                placeholder="Optional note…"
+                value={promptAnswer}
+                onChangeText={setPromptAnswer}
+                placeholder="Answer in a few sentences"
                 autoCapitalize="sentences"
                 multiline
+                maxLength={500}
                 style={styles.note}
               />
-            ) : (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setShowNote(true)}
-                style={styles.noteToggle}
-              >
-                <Text style={styles.noteToggleText}>+ Add a note</Text>
-              </Pressable>
-            )}
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>
+                How connected do you feel today?
+              </Text>
+              <ScoreScale value={score} onChange={setScore} />
+            </View>
+
+            <View style={[styles.section, styles.sectionLast]}>
+              <Text style={styles.sectionLabel}>Tap what shaped today</Text>
+              <ActivityChips value={activities} onChange={setActivities} />
+            </View>
 
             <ErrorText message={submitError} />
             <PrimaryButton
-              label="Save"
+              label="Save check-in"
               onPress={onSubmit}
               loading={submitting}
               disabled={score == null}
             />
-          </Card>
+            <TextLink label="Skip for today" onPress={() => router.back()} />
+          </>
         ) : null}
 
         {mine && waitingForPartner ? (
-          <Card>
-            <Text style={styles.waitingTitle}>Saved. Waiting on partner</Text>
-            <View style={styles.scoreLine}>
-              <ScoreEmoji score={mine.score} size={44} />
-              <View>
-                <Text style={styles.scoreText}>
-                  {mine.score} · {SCORE_LABELS[mine.score]}
-                </Text>
-                <Text style={styles.waitingBody}>
-                  {partner.display_name} can’t see this until they check in too.
-                </Text>
-              </View>
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Saved</Text>
+              <Text style={styles.prompt}>
+                Waiting on {partner.display_name}. They can't see this until they
+                check in too.
+              </Text>
+              <ScoreLine score={mine.score} />
+              <ReadOnlyChips ids={mine.activities ?? []} />
             </View>
-            <ActivityChips ids={mine.activities ?? []} />
-            {mine.note ? <Text style={styles.noteText}>{mine.note}</Text> : null}
-          </Card>
+            <View style={[styles.section, styles.sectionLast]}>
+              <PromptAnswer
+                promptText={mine.prompt_text ?? todayPrompt.text}
+                answer={mine.prompt_answer}
+              />
+            </View>
+            <TextLink label="Done" onPress={() => router.back()} />
+          </>
         ) : null}
 
         {bothSubmitted && mine && partnerCheckIn ? (
-          <Card>
-            <Text style={styles.revealTitle}>Both checked in</Text>
-            <Text style={styles.metaLabel}>You</Text>
-            <View style={styles.scoreLine}>
-              <ScoreEmoji score={mine.score} size={40} />
-              <Text style={styles.scoreText}>
-                {mine.score} · {SCORE_LABELS[mine.score]}
-              </Text>
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>You</Text>
+              <ScoreLine score={mine.score} />
+              <ReadOnlyChips ids={mine.activities ?? []} />
+              <PromptAnswer
+                promptText={mine.prompt_text ?? todayPrompt.text}
+                answer={mine.prompt_answer}
+              />
             </View>
-            <ActivityChips ids={mine.activities ?? []} />
-            {mine.note ? <Text style={styles.noteText}>{mine.note}</Text> : null}
-
-            <Text style={styles.metaLabel}>{partner.display_name}</Text>
-            <View style={styles.scoreLine}>
-              <ScoreEmoji score={partnerCheckIn.score} size={40} />
-              <Text style={styles.scoreText}>
-                {partnerCheckIn.score} · {SCORE_LABELS[partnerCheckIn.score]}
-              </Text>
+            <View style={[styles.section, styles.sectionLast]}>
+              <Text style={styles.sectionLabel}>{partner.display_name}</Text>
+              <ScoreLine score={partnerCheckIn.score} />
+              <ReadOnlyChips ids={partnerCheckIn.activities ?? []} />
+              <PromptAnswer
+                promptText={partnerCheckIn.prompt_text ?? todayPrompt.text}
+                answer={partnerCheckIn.prompt_answer}
+              />
             </View>
-            <ActivityChips ids={partnerCheckIn.activities ?? []} />
-            {partnerCheckIn.note ? (
-              <Text style={styles.noteText}>{partnerCheckIn.note}</Text>
-            ) : null}
-          </Card>
+            <TextLink label="Done" onPress={() => router.back()} />
+          </>
         ) : null}
-
-        <SecondaryButton
-          label="Refresh"
-          onPress={() => {
-            void refresh()
-            void refreshWeekly()
-          }}
-        />
-        <SecondaryButton label="Done" onPress={() => router.back()} />
       </ScrollView>
     </Screen>
   )
 }
 
-function ActivityChips({ ids }: { ids: string[] }) {
-  if (!ids.length) return null
+function ScoreLine({ score }: { score: number }) {
   return (
-    <View style={styles.chipRow}>
-      {ids.map((id) => {
-        const activity = activityById(id)
-        if (!activity) return null
-        return (
-          <View
-            key={id}
-            style={[styles.chip, { backgroundColor: activity.tint }]}
-          >
-            <Text style={styles.chipText}>
-              {activity.glyph} {activity.label}
-            </Text>
-          </View>
-        )
-      })}
+    <View style={styles.scoreLine}>
+      <ScoreMark score={score} size={28} />
+      <Text style={styles.body}>
+        {score} · {SCORE_LABELS[score]}
+      </Text>
+    </View>
+  )
+}
+
+function PromptAnswer({
+  promptText,
+  answer,
+}: {
+  promptText: string
+  answer: string | null
+}) {
+  return (
+    <View style={styles.promptBlock}>
+      <Text style={styles.sectionLabel}>{promptText}</Text>
+      <Text style={styles.body}>
+        {answer?.trim() ? answer : 'No answer written.'}
+      </Text>
     </View>
   )
 }
@@ -290,124 +288,67 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 12,
   },
-  weeklyTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.ink,
-    marginBottom: 6,
+  headerCopy: {
+    flex: 1,
   },
-  weeklyBody: {
+  headerMeta: {
+    alignItems: 'flex-end',
+    gap: 4,
+    paddingTop: 4,
+  },
+  heading: {
+    ...type.heading,
+  },
+  date: {
+    ...type.body,
     color: colors.muted,
-    lineHeight: 20,
-    marginBottom: 10,
+    marginTop: 2,
   },
-  heroPrompt: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.ink,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  scoreLabel: {
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.ink,
-    marginBottom: 16,
-  },
-  scoreHint: {
-    textAlign: 'center',
+  mutedBody: {
+    ...type.body,
     color: colors.muted,
-    marginBottom: 16,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 4,
-  },
-  sectionHint: {
-    color: colors.muted,
-    fontSize: 13,
-    marginBottom: 10,
-  },
-  noteToggle: {
-    alignItems: 'center',
-    paddingVertical: 10,
-    marginBottom: 4,
-  },
-  noteToggleText: {
-    color: colors.accent,
-    fontWeight: '700',
-  },
-  note: {
-    minHeight: 72,
-    textAlignVertical: 'top',
-  },
-  waitingTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.ink,
     marginBottom: 12,
   },
-  waitingBody: {
-    color: colors.muted,
-    fontSize: 13,
-    marginTop: 2,
-    maxWidth: 220,
+  body: {
+    ...type.body,
   },
-  revealTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.accent,
+  progressBlock: {
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  section: {
+    paddingVertical: 20,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.hairline,
+  },
+  sectionLast: {
+    borderBottomWidth: 0,
     marginBottom: 8,
   },
-  metaLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.muted,
-    marginTop: 12,
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
+  sectionLabel: {
+    ...type.label,
+    marginBottom: 8,
+  },
+  prompt: {
+    ...type.body,
+    marginBottom: 12,
+  },
+  note: {
+    minHeight: 88,
+    textAlignVertical: 'top',
+    marginBottom: 0,
   },
   scoreLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+    marginBottom: 10,
   },
-  scoreText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.ink,
-  },
-  noteText: {
-    marginTop: 8,
-    color: colors.ink,
-    lineHeight: 20,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  promptBlock: {
     gap: 6,
-    marginTop: 10,
-  },
-  chip: {
-    borderWidth: 0,
-    backgroundColor: colors.bgSoft,
-    borderRadius: radii.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  chipText: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '600',
   },
 })

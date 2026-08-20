@@ -4,19 +4,17 @@ import { StyleSheet, Text, View } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 
 import {
-  Card,
   ErrorText,
   Field,
   Label,
   LoadingScreen,
   PrimaryButton,
   Screen,
-  SecondaryButton,
-  Subtitle,
-  Title,
+  TextLink,
 } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
-import { colors, radii } from '../../lib/theme'
+import { Icon } from '../../lib/icons'
+import { colors, type } from '../../lib/theme'
 
 export default function PairScreen() {
   const {
@@ -72,34 +70,32 @@ export default function PairScreen() {
   if (profile?.couple_id && couple && !partner) {
     return (
       <Screen>
-        <Text style={styles.heroEmoji}>◎</Text>
-        <Title>Share your code</Title>
-        <Subtitle>
+        <Icon name="heart" size={28} color={colors.ink} />
+        <Text style={styles.title}>Share your code</Text>
+        <Text style={styles.subtitle}>
           Give this invite to your partner so you can check in together.
-        </Subtitle>
-        <Card style={styles.codeCard}>
-          <Text style={styles.code}>{couple.invite_code}</Text>
-        </Card>
+        </Text>
+        <Text style={styles.code}>{couple.invite_code}</Text>
         <PrimaryButton
-          label={copied ? 'Copied!' : 'Copy invite code'}
+          label={copied ? 'Copied' : 'Copy invite code'}
           onPress={() => void copyCode(couple.invite_code)}
         />
-        <SecondaryButton
+        <TextLink
           label="Continue"
           onPress={() => router.replace('/(app)/(tabs)')}
         />
-        <SecondaryButton label="Sign out" onPress={() => void signOut()} />
+        <TextLink label="Sign out" onPress={() => void signOut()} />
       </Screen>
     )
   }
 
   return (
     <Screen>
-      <Text style={styles.heroEmoji}>◎</Text>
-      <Title>Pair with partner</Title>
-      <Subtitle>
+      <Icon name="heart" size={28} color={colors.ink} />
+      <Text style={styles.title}>Pair with partner</Text>
+      <Text style={styles.subtitle}>
         Generate an invite code, or enter the one your partner shared.
-      </Subtitle>
+      </Text>
 
       <PrimaryButton
         label="Generate invite code"
@@ -127,40 +123,34 @@ export default function PairScreen() {
         loading={joining}
         disabled={inviteCode.trim().length !== 6}
       />
-      <SecondaryButton label="Sign out" onPress={() => void signOut()} />
+      <TextLink label="Sign out" onPress={() => void signOut()} />
     </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  heroEmoji: {
-    fontSize: 48,
-    marginBottom: 8,
-    color: colors.accent,
+  title: {
+    ...type.heading,
+    marginTop: 12,
+    marginBottom: 4,
   },
-  codeCard: {
-    alignItems: 'center',
-    paddingVertical: 28,
-    backgroundColor: colors.accentSoft,
+  subtitle: {
+    ...type.body,
+    color: colors.muted,
+    marginBottom: 20,
   },
   code: {
-    fontSize: 36,
-    fontWeight: '800',
+    ...type.heading,
     letterSpacing: 6,
-    color: colors.accent,
+    textAlign: 'center',
+    marginVertical: 20,
   },
   divider: {
     alignItems: 'center',
     marginVertical: 20,
   },
   dividerText: {
-    color: colors.muted,
-    fontSize: 14,
-    fontWeight: '600',
-    backgroundColor: colors.bgSoft,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: radii.pill,
-    overflow: 'hidden',
+    ...type.label,
+    marginBottom: 0,
   },
 })

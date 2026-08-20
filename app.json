@@ -7,35 +7,88 @@
   "scheme": "bond",
   "userInterfaceStyle": "light",
   "newArchEnabled": true,
+  "primaryColor": "#FF6B9D",
   "ios": {
     "supportsTablet": true,
-    "bundleIdentifier": "com.bond.app"
+    "bundleIdentifier": "com.bond.app",
+    "infoPlist": {
+      "NSUserNotificationUsageDescription": "Bond reminds you to check in with your partner."
+    }
   },
   "android": {
+    "package": "com.bond.app",
+    "versionCode": 1,
+    "softwareKeyboardLayoutMode": "resize",
+    "predictiveBackGestureEnabled": false,
     "adaptiveIcon": {
-      "backgroundColor": "#E6F4FE",
+      "backgroundColor": "#F7F2EF",
       "foregroundImage": "./assets/android-icon-foreground.png",
       "backgroundImage": "./assets/android-icon-background.png",
       "monochromeImage": "./assets/android-icon-monochrome.png"
     },
-    "predictiveBackGestureEnabled": false,
-    "package": "com.bond.app"
+    "permissions": [
+      "POST_NOTIFICATIONS",
+      "RECEIVE_BOOT_COMPLETED",
+      "VIBRATE"
+    ],
+    "blockedPermissions": [
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+      "android.permission.READ_MEDIA_IMAGES",
+      "android.permission.READ_MEDIA_VIDEO",
+      "android.permission.READ_MEDIA_AUDIO",
+      "android.permission.SYSTEM_ALERT_WINDOW",
+      "android.permission.CAMERA",
+      "android.permission.RECORD_AUDIO",
+      "android.permission.ACCESS_FINE_LOCATION",
+      "android.permission.ACCESS_COARSE_LOCATION"
+    ]
   },
   "web": {
     "favicon": "./assets/favicon.png",
-    "bundler": "metro"
+    "bundler": "metro",
+    "output": "single",
+    "name": "Bond",
+    "shortName": "Bond",
+    "lang": "en",
+    "themeColor": "#FF6B9D",
+    "backgroundColor": "#F7F2EF"
   },
   "plugins": [
     "expo-router",
     [
+      "expo-splash-screen",
+      {
+        "backgroundColor": "#F7F2EF",
+        "image": "./assets/splash-icon.png",
+        "imageWidth": 180
+      }
+    ],
+    [
       "expo-notifications",
       {
-        "icon": "./assets/icon.png",
-        "color": "#FF6B9D"
+        "icon": "./assets/android-icon-monochrome.png",
+        "color": "#FF6B9D",
+        "defaultChannel": "bond-reminders"
       }
-    ]
+    ],
+    [
+      "expo-build-properties",
+      {
+        "android": {
+          "compileSdkVersion": 36,
+          "targetSdkVersion": 36,
+          "buildToolsVersion": "36.0.0",
+          "minSdkVersion": 24,
+          "enableMinifyInReleaseBuilds": true,
+          "enableShrinkResourcesInReleaseBuilds": true
+        }
+      }
+    ],
+    "./plugins/withAndroidBackupDisabled"
   ],
   "experiments": {
-    "typedRoutes": true
+    "typedRoutes": true,
+    "baseUrl": "/bond"
   }
 }

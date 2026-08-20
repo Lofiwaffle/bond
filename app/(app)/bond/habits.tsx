@@ -1,31 +1,25 @@
 import { useState } from 'react'
-import { ScrollView, StyleSheet, Text } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { BondSectionHeader } from '../../../components/BondSectionHeader'
 import {
-  Card,
   ErrorText,
   Field,
   HabitCalendar,
   LoadingScreen,
   PrimaryButton,
   Screen,
-  SecondaryButton,
+  TextLink,
 } from '../../../components/ui'
 import { useHabitBadges } from '../../../hooks/useHabitBadges'
 import { useAuth } from '../../../lib/auth'
 import { badgesForProgress, type BadgeId } from '../../../lib/badges'
-import { colors, radii } from '../../../lib/theme'
+import { Icon } from '../../../lib/icons'
+import { colors, hairlineWidth, radii, type } from '../../../lib/theme'
 
 export default function BondHabitsScreen() {
   const { partner, isLoading: authLoading } = useAuth()
-  const {
-    counts,
-    completions,
-    isLoading,
-    logHabit,
-    refresh,
-  } = useHabitBadges()
+  const { counts, completions, isLoading, logHabit } = useHabitBadges()
 
   const [activeHabitId, setActiveHabitId] = useState<BadgeId | null>(null)
   const [habitNote, setHabitNote] = useState('')
@@ -74,28 +68,25 @@ export default function BondHabitsScreen() {
           }
         />
 
-        <Card>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Habit calendar</Text>
           <Text style={styles.sectionHint}>
-            One chart for every habit. Color matches the key. Tap a habit to
-            log it.
+            One chart for every habit. Tap a habit to log it.
           </Text>
           <HabitCalendar completions={completions} onPressHabit={openHabit} />
-        </Card>
+        </View>
 
         {activeBadge ? (
-          <Card style={styles.activeCard}>
-            <Text style={styles.sectionTitle}>
-              <Text style={{ color: activeBadge.color }}>
-                {activeBadge.glyph}{' '}
-              </Text>
-              {activeBadge.label}
-            </Text>
+          <View style={styles.sectionLast}>
+            <View style={styles.activeTitle}>
+              <Icon name={activeBadge.icon} size={18} color={colors.ink} />
+              <Text style={styles.sectionTitle}>{activeBadge.label}</Text>
+            </View>
             <Text style={styles.sectionHint}>{activeBadge.quest}</Text>
             <Field
               value={habitNote}
               onChangeText={setHabitNote}
-              placeholder="Optional note…"
+              placeholder="Optional note"
               autoCapitalize="sentences"
               multiline
               style={styles.note}
@@ -106,11 +97,9 @@ export default function BondHabitsScreen() {
               onPress={onLogHabit}
               loading={submitting}
             />
-            <SecondaryButton label="Cancel" onPress={closeHabit} />
-          </Card>
+            <TextLink label="Cancel" onPress={closeHabit} />
+          </View>
         ) : null}
-
-        <SecondaryButton label="Refresh" onPress={() => void refresh()} />
       </ScrollView>
     </Screen>
   )
@@ -120,20 +109,29 @@ const styles = StyleSheet.create({
   screen: {
     paddingBottom: 8,
   },
+  section: {
+    paddingVertical: 8,
+    borderBottomWidth: hairlineWidth,
+    borderBottomColor: colors.hairline,
+    marginBottom: 8,
+  },
+  sectionLast: {
+    paddingVertical: 16,
+  },
   sectionTitle: {
-    color: colors.ink,
-    fontWeight: '700',
-    fontSize: 15,
+    ...type.heading,
+    marginBottom: 4,
+  },
+  activeTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 4,
   },
   sectionHint: {
+    ...type.body,
     color: colors.muted,
-    fontSize: 13,
     marginBottom: 12,
-    lineHeight: 18,
-  },
-  activeCard: {
-    backgroundColor: colors.accentSoft,
   },
   note: {
     minHeight: 72,

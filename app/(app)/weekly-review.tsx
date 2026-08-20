@@ -3,22 +3,19 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router } from 'expo-router'
 
 import {
-  Card,
   ErrorText,
   Field,
   Label,
   LoadingScreen,
   PrimaryButton,
-  ScoreEmoji,
+  ScoreMark,
   Screen,
-  SecondaryButton,
-  Subtitle,
-  Title,
+  TextLink,
 } from '../../components/ui'
 import { useWeeklyReview } from '../../hooks/useWeeklyReview'
 import { useAuth } from '../../lib/auth'
 import { formatDisplayDate } from '../../lib/dates'
-import { colors, scoreColorsSoft } from '../../lib/theme'
+import { colors, hairlineWidth, type } from '../../lib/theme'
 import type { WeeklyAnswer } from '../../lib/weeklyPrompts'
 
 export default function WeeklyReviewScreen() {
@@ -43,7 +40,6 @@ export default function WeeklyReviewScreen() {
     streak,
     isLoading,
     error,
-    refresh,
     submit,
   } = useWeeklyReview()
 
@@ -82,12 +78,12 @@ export default function WeeklyReviewScreen() {
   if (!unlocked) {
     return (
       <Screen>
-        <Title>Weekly review</Title>
-        <Subtitle>
+        <Text style={styles.title}>Weekly review</Text>
+        <Text style={styles.subtitle}>
           Keep a 7-day check-in streak to unlock your weekly reflection (
           {streak}/7).
-        </Subtitle>
-        <SecondaryButton label="Back" onPress={() => router.back()} />
+        </Text>
+        <TextLink label="Back" onPress={() => router.back()} />
       </Screen>
     )
   }
@@ -119,16 +115,16 @@ export default function WeeklyReviewScreen() {
 
   return (
     <Screen style={styles.screen}>
-      <Title>Weekly review</Title>
-      <Subtitle>
+      <Text style={styles.title}>Weekly review</Text>
+      <Text style={styles.subtitle}>
         {formatDisplayDate(weekStart)} – {formatDisplayDate(weekEnd)} · streak{' '}
         {streak}
-      </Subtitle>
+      </Text>
 
       <ErrorText message={error} />
 
-      <ScrollView contentContainerStyle={styles.body}>
-        <Card style={{ backgroundColor: scoreColorsSoft[4] }}>
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Your week at a glance</Text>
           <Text style={styles.summaryLine}>
             Avg connection:{' '}
@@ -139,11 +135,9 @@ export default function WeeklyReviewScreen() {
           <View style={styles.faces}>
             {weekCheckIns.map((day) =>
               day.mine ? (
-                <ScoreEmoji key={day.date} score={day.mine.score} size={28} />
+                <ScoreMark key={day.date} score={day.mine.score} size={24} />
               ) : (
-                <Text key={day.date} style={styles.missing}>
-                  ·
-                </Text>
+                <View key={day.date} style={styles.missing} />
               ),
             )}
           </View>
@@ -153,14 +147,14 @@ export default function WeeklyReviewScreen() {
               {partnerSummary.avg != null
                 ? `${partnerSummary.avg.toFixed(1)} · ${partnerSummary.label}`
                 : waitingForPartner
-                  ? 'Waiting for their review…'
+                  ? 'Waiting for their review'
                   : 'Hidden until you both finish'}
             </Text>
           ) : null}
-        </Card>
+        </View>
 
-        <Card>
-          <Text style={styles.sectionTitle}>AI week summary</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Week summary</Text>
           <Text style={styles.hint}>
             A Bond summary of every daily check-in this week
             {aiSummary?.source === 'ai' ? ' (AI)' : aiSummary ? ' (local)' : ''}.
@@ -177,18 +171,18 @@ export default function WeeklyReviewScreen() {
             </Text>
           )}
           <ErrorText message={aiError} />
-          <SecondaryButton
+          <TextLink
             label={aiSummary ? 'Regenerate summary' : 'Generate summary'}
             onPress={() => void generateAiSummary(true)}
             disabled={aiLoading}
           />
-        </Card>
+        </View>
 
         {needsReview ? (
-          <Card>
+          <View style={styles.sectionLast}>
             <Text style={styles.sectionTitle}>Check in with each other</Text>
             <Text style={styles.hint}>
-              Answer privately. You’ll see {partner.display_name}’s answers
+              Answer privately. You'll see {partner.display_name}'s answers
               after they submit too.
             </Text>
             {prompts.map((prompt, index) => (
@@ -198,7 +192,7 @@ export default function WeeklyReviewScreen() {
                 <Field
                   value={answers[index]?.answer ?? ''}
                   onChangeText={(text) => onChangeAnswer(index, text)}
-                  placeholder="Your answer…"
+                  placeholder="Your answer"
                   autoCapitalize="sentences"
                   multiline
                   style={styles.answer}
@@ -211,11 +205,12 @@ export default function WeeklyReviewScreen() {
               onPress={onSubmit}
               loading={submitting}
             />
-          </Card>
+            <TextLink label="Done" onPress={() => router.back()} />
+          </View>
         ) : null}
 
         {mine && waitingForPartner ? (
-          <Card>
+          <View style={styles.sectionLast}>
             <Text style={styles.sectionTitle}>Saved. Waiting on partner</Text>
             {mine.answers.map((a) => (
               <View key={a.prompt_id} style={styles.promptBlock}>
@@ -224,15 +219,16 @@ export default function WeeklyReviewScreen() {
               </View>
             ))}
             <Text style={styles.hint}>
-              {partner.display_name}’s answers unlock when they finish this
-              week’s review.
+              {partner.display_name}'s answers unlock when they finish this
+              week's review.
             </Text>
-          </Card>
+            <TextLink label="Done" onPress={() => router.back()} />
+          </View>
         ) : null}
 
         {bothSubmitted && mine && partnerReview ? (
-          <Card>
-            <Text style={styles.sectionTitle}>Revealed together ✨</Text>
+          <View style={styles.sectionLast}>
+            <Text style={styles.sectionTitle}>Revealed together</Text>
             {mine.answers.map((a, index) => {
               const theirs = partnerReview.answers[index]
               return (
@@ -247,12 +243,14 @@ export default function WeeklyReviewScreen() {
                 </View>
               )
             })}
-          </Card>
+            <TextLink label="Done" onPress={() => router.back()} />
+          </View>
+        ) : null}
+
+        {!needsReview && !mine ? (
+          <TextLink label="Done" onPress={() => router.back()} />
         ) : null}
       </ScrollView>
-
-      <SecondaryButton label="Refresh" onPress={() => void refresh()} />
-      <SecondaryButton label="Done" onPress={() => router.back()} />
     </Screen>
   )
 }
@@ -261,18 +259,31 @@ const styles = StyleSheet.create({
   screen: {
     paddingBottom: 8,
   },
+  title: {
+    ...type.heading,
+  },
+  subtitle: {
+    ...type.body,
+    color: colors.muted,
+    marginBottom: 8,
+  },
   body: {
     paddingBottom: 16,
   },
+  section: {
+    paddingVertical: 20,
+    borderBottomWidth: hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  sectionLast: {
+    paddingVertical: 20,
+  },
   sectionTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: colors.ink,
+    ...type.heading,
     marginBottom: 8,
   },
   summaryLine: {
-    color: colors.ink,
-    fontWeight: '600',
+    ...type.body,
     marginBottom: 8,
   },
   faces: {
@@ -281,47 +292,38 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   missing: {
-    width: 28,
-    textAlign: 'center',
-    color: colors.muted,
-    fontSize: 22,
+    width: 18,
+    height: 18,
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: colors.border,
   },
   hint: {
+    ...type.body,
     color: colors.muted,
     marginBottom: 12,
-    lineHeight: 20,
   },
   promptBlock: {
     marginBottom: 14,
   },
   promptText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.ink,
+    ...type.body,
     marginBottom: 8,
-    lineHeight: 21,
   },
   answer: {
     minHeight: 72,
     textAlignVertical: 'top',
   },
   answerText: {
-    fontSize: 15,
-    color: colors.ink,
-    lineHeight: 21,
+    ...type.body,
     marginBottom: 6,
   },
   aiSummary: {
-    fontSize: 15,
-    color: colors.ink,
-    lineHeight: 22,
+    ...type.body,
     marginBottom: 12,
   },
   metaLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.muted,
-    textTransform: 'uppercase',
+    ...type.label,
     marginTop: 4,
   },
 })

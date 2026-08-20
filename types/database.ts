@@ -29,6 +29,32 @@ export type DailyCheckIn = {
   score: number
   note: string | null
   activities: string[]
+  prompt_id: string | null
+  prompt_text: string | null
+  prompt_answer: string | null
+  created_at: string
+}
+
+export type CoupleGoal = {
+  id: string
+  couple_id: string
+  created_by: string
+  outcome: string
+  success_criteria: string | null
+  realistic_plan: string | null
+  why: string | null
+  deadline: string | null
+  status: 'active' | 'completed'
+  created_at: string
+  completed_at: string | null
+}
+
+export type CoupleGoalReview = {
+  id: string
+  goal_id: string
+  couple_id: string
+  user_id: string
+  note: string
   created_at: string
 }
 
@@ -142,12 +168,18 @@ export type Database = {
           score: number
           note?: string | null
           activities?: string[]
+          prompt_id?: string | null
+          prompt_text?: string | null
+          prompt_answer?: string | null
           created_at?: string
         }
         Update: {
           score?: number
           note?: string | null
           activities?: string[]
+          prompt_id?: string | null
+          prompt_text?: string | null
+          prompt_answer?: string | null
         }
         Relationships: []
       }
@@ -232,6 +264,47 @@ export type Database = {
         }
         Relationships: []
       }
+      couple_goals: {
+        Row: CoupleGoal
+        Insert: {
+          id?: string
+          couple_id: string
+          created_by: string
+          outcome: string
+          success_criteria?: string | null
+          realistic_plan?: string | null
+          why?: string | null
+          deadline?: string | null
+          status?: 'active' | 'completed'
+          created_at?: string
+          completed_at?: string | null
+        }
+        Update: {
+          outcome?: string
+          success_criteria?: string | null
+          realistic_plan?: string | null
+          why?: string | null
+          deadline?: string | null
+          status?: 'active' | 'completed'
+          completed_at?: string | null
+        }
+        Relationships: []
+      }
+      couple_goal_reviews: {
+        Row: CoupleGoalReview
+        Insert: {
+          id?: string
+          goal_id: string
+          couple_id: string
+          user_id: string
+          note: string
+          created_at?: string
+        }
+        Update: {
+          note?: string
+        }
+        Relationships: []
+      }
       weekly_reviews: {
         Row: WeeklyReview
         Insert: {
@@ -283,6 +356,10 @@ export type Database = {
       current_couple_id: {
         Args: Record<PropertyKey, never>
         Returns: string | null
+      }
+      delete_own_account: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       has_own_check_in: {
         Args: { p_couple_id: string; p_date: string }

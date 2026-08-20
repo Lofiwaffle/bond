@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native'
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native'
 import { Link, Redirect } from 'expo-router'
 
-import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen, Subtitle, Title } from '../../components/ui'
+import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
-import { colors } from '../../lib/theme'
+import { Icon } from '../../lib/icons'
+import { colors, type } from '../../lib/theme'
 
 export default function SignUpScreen() {
   const { session, profile, isLoading, signUp } = useAuth()
@@ -45,9 +46,9 @@ export default function SignUpScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ flexGrow: 1 }}
         >
-          <Text style={{ fontSize: 44, marginBottom: 4, color: colors.accent }}>◎</Text>
-          <Title>Create account</Title>
-          <Subtitle>Start pairing with your partner in Bond.</Subtitle>
+          <Icon name="heart" size={28} color={colors.ink} />
+          <Text style={styles.title}>Create account</Text>
+          <Text style={styles.subtitle}>Start pairing with your partner in Bond.</Text>
 
           <Label>Display name</Label>
           <Field
@@ -87,19 +88,39 @@ export default function SignUpScreen() {
             disabled={!email || !password || !displayName}
           />
 
-          <Link
-            href="/(auth)/login"
-            style={{
-              marginTop: 20,
-              textAlign: 'center',
-              color: colors.accent,
-              fontWeight: '700',
-            }}
-          >
+          <Link href="/(auth)/login" style={styles.link}>
             Already have an account? Sign in
+          </Link>
+          <Link href="/privacy" style={styles.privacy}>
+            Privacy
           </Link>
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
   )
 }
+
+const styles = StyleSheet.create({
+  title: {
+    ...type.heading,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  subtitle: {
+    ...type.body,
+    color: colors.muted,
+    marginBottom: 22,
+  },
+  link: {
+    marginTop: 20,
+    textAlign: 'center',
+    ...type.body,
+    color: colors.muted,
+  },
+  privacy: {
+    marginTop: 12,
+    textAlign: 'center',
+    ...type.label,
+    color: colors.muted,
+  },
+})

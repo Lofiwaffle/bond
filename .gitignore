@@ -40,3 +40,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Play / EAS secrets (never commit)
+google-services.json
+play-service-account.json
+pc-api-*.json
+*.keystore
+credentials/

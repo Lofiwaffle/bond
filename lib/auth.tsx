@@ -34,6 +34,7 @@ type AuthContextValue = {
   joinCouple: (
     inviteCode: string,
   ) => Promise<{ couple: Couple | null; error: string | null }>
+  deleteAccount: () => Promise<{ error: string | null }>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -209,6 +210,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [refreshProfile],
   )
 
+  const deleteAccount = useCallback(async () => {
+    const { error } = await supabase.rpc('delete_own_account')
+    if (error) {
+      return { error: error.message }
+    }
+    await supabase.auth.signOut()
+    setProfile(null)
+    setCouple(null)
+    setPartner(null)
+    return { error: null }
+  }, [])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
@@ -223,6 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshProfile,
       createCouple,
       joinCouple,
+      deleteAccount,
     }),
     [
       session,
@@ -236,6 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshProfile,
       createCouple,
       joinCouple,
+      deleteAccount,
     ],
   )
 

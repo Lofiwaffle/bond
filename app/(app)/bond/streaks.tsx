@@ -4,11 +4,9 @@ import { router } from 'expo-router'
 
 import { BondSectionHeader } from '../../../components/BondSectionHeader'
 import {
-  Card,
   LoadingScreen,
   PrimaryButton,
   Screen,
-  SecondaryButton,
 } from '../../../components/ui'
 import {
   computeStreak,
@@ -23,11 +21,12 @@ import {
   dateKey,
   localDateString,
 } from '../../../lib/dates'
-import { SCORE_LABELS, colors, radii, scoreColors } from '../../../lib/theme'
+import { Icon } from '../../../lib/icons'
+import { SCORE_LABELS, colors, hairlineWidth, radii, scoreColors, type } from '../../../lib/theme'
 
 export default function BondStreaksScreen() {
   const { profile, partner, isLoading: authLoading } = useAuth()
-  const { days, isLoading, refresh } = useCheckInHistory()
+  const { days, isLoading } = useCheckInHistory()
   const { mine: todayMine } = useTodayCheckIn()
   const now = useMemo(() => new Date(), [])
   const year = now.getFullYear()
@@ -75,7 +74,7 @@ export default function BondStreaksScreen() {
           subtitle="Keep showing up. The streak is its own game."
         />
 
-        <Card style={styles.heroCard}>
+        <View style={styles.section}>
           <Text style={styles.heroEyebrow}>Together streak</Text>
           <Text style={styles.heroStreak}>{stats.streak}</Text>
           <Text style={styles.heroUnit}>days showing up</Text>
@@ -90,9 +89,9 @@ export default function BondStreaksScreen() {
               <Text style={styles.heroStatLabel}>{year} yours</Text>
             </View>
           </View>
-        </Card>
+        </View>
 
-        <Card>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Today</Text>
           <Text style={styles.sectionHint}>
             Protect the streak that keeps you both showing up.
@@ -103,7 +102,7 @@ export default function BondStreaksScreen() {
               onPress={() => router.push('/(app)/check-in')}
               style={styles.questRow}
             >
-              <Text style={styles.questGlyph}>◎</Text>
+              <Icon name="edit-3" size={18} color={colors.ink} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.questTitle}>Check in today</Text>
                 <Text style={styles.questBody}>
@@ -113,17 +112,16 @@ export default function BondStreaksScreen() {
               <Text style={styles.questCta}>Go</Text>
             </Pressable>
           ) : (
-            <View style={[styles.questRow, styles.questDone]}>
-              <Text style={styles.questGlyph}>◎</Text>
+            <View style={styles.questRow}>
+              <Icon name="check" size={18} color={colors.ink} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.questTitle}>Today’s check-in saved</Text>
+                <Text style={styles.questTitle}>Today's check-in saved</Text>
                 <Text style={styles.questBody}>
                   {partner
                     ? `Waiting on ${partnerName} to reveal today.`
                     : 'Come back tomorrow to keep growing.'}
                 </Text>
               </View>
-              <Text style={styles.questDoneLabel}>Done</Text>
             </View>
           )}
 
@@ -133,14 +131,14 @@ export default function BondStreaksScreen() {
               onPress={() => router.push('/(app)/check-in')}
             />
           ) : null}
-        </Card>
+        </View>
 
-        <Card>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>
             {formatMonthTitle(year, month)} rhythm
           </Text>
           <Text style={styles.sectionHint}>
-            Your connection colors this month. Fill more cells together.
+            Your connection this month. Fill more cells together.
           </Text>
           <View style={styles.matrix}>
             {grid.map((day, index) => {
@@ -158,7 +156,7 @@ export default function BondStreaksScreen() {
                       {
                         backgroundColor:
                           score != null ? scoreColors[score] : colors.bgSoft,
-                        borderWidth: synced ? 2 : 0,
+                        borderWidth: synced ? 1.5 : 0,
                         borderColor: colors.accent,
                       },
                     ]}
@@ -180,9 +178,9 @@ export default function BondStreaksScreen() {
               </View>
             ))}
           </View>
-        </Card>
+        </View>
 
-        <Card>
+        <View style={styles.sectionLast}>
           <Text style={styles.sectionTitle}>{year} connection mix</Text>
           <Text style={styles.meta}>You · {stats.mineTotal} check-ins</Text>
           <DistributionBars counts={stats.yearMine} total={stats.mineTotal} />
@@ -197,9 +195,7 @@ export default function BondStreaksScreen() {
               />
             </>
           ) : null}
-        </Card>
-
-        <SecondaryButton label="Refresh" onPress={() => void refresh()} />
+        </View>
       </ScrollView>
     </Screen>
   )
@@ -241,88 +237,63 @@ function DistributionBars({
 
 const styles = StyleSheet.create({
   screen: { paddingBottom: 8 },
-  heroCard: { backgroundColor: colors.accentSoft },
+  section: {
+    paddingVertical: 16,
+    borderBottomWidth: hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  sectionLast: {
+    paddingVertical: 16,
+  },
   heroEyebrow: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    ...type.label,
     marginBottom: 4,
   },
   heroStreak: {
-    color: colors.accent,
-    fontSize: 56,
-    fontWeight: '800',
-    letterSpacing: -2,
-    lineHeight: 60,
+    ...type.heading,
+    fontSize: 48,
+    lineHeight: 52,
+    fontWeight: '500',
   },
   heroUnit: {
+    ...type.body,
     color: colors.muted,
-    fontSize: 14,
-    fontWeight: '600',
     marginBottom: 16,
   },
   heroStats: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: colors.hairline,
-    paddingTop: 14,
   },
   heroStat: { flex: 1, alignItems: 'center' },
-  heroStatValue: { color: colors.ink, fontSize: 18, fontWeight: '800' },
+  heroStatValue: { ...type.heading },
   heroStatLabel: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: '600',
+    ...type.label,
     marginTop: 2,
+    marginBottom: 0,
   },
-  heroDivider: { width: 1, height: 28, backgroundColor: colors.hairline },
+  heroDivider: { width: 0.5, height: 28, backgroundColor: colors.hairline },
   sectionTitle: {
-    color: colors.ink,
-    fontWeight: '700',
-    fontSize: 15,
+    ...type.heading,
     marginBottom: 4,
   },
   sectionHint: {
+    ...type.body,
     color: colors.muted,
-    fontSize: 13,
     marginBottom: 12,
-    lineHeight: 18,
   },
   questRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderWidth: 0,
-    borderColor: colors.hairline,
-    borderRadius: radii.md,
-    padding: 12,
-    marginBottom: 8,
-    backgroundColor: colors.bgSoft,
+    paddingVertical: 12,
   },
-  questDone: { backgroundColor: colors.accentSoft },
-  questGlyph: {
-    fontSize: 22,
-    color: colors.accent,
-    width: 28,
-    textAlign: 'center',
-  },
-  questTitle: { color: colors.ink, fontWeight: '700', fontSize: 14 },
+  questTitle: { ...type.body, fontWeight: '500' },
   questBody: {
-    color: colors.muted,
-    fontSize: 12,
+    ...type.label,
     marginTop: 2,
-    lineHeight: 16,
+    marginBottom: 0,
   },
-  questCta: { color: colors.accent, fontWeight: '800', fontSize: 13 },
-  questDoneLabel: {
-    color: colors.accent,
-    fontWeight: '700',
-    fontSize: 11,
-    textTransform: 'uppercase',
-  },
+  questCta: { ...type.label, color: colors.accent, marginBottom: 0 },
   matrix: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -345,37 +316,31 @@ const styles = StyleSheet.create({
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendSwatch: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  legendText: { ...type.label, marginBottom: 0 },
   meta: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '600',
+    ...type.label,
     marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   distList: { gap: 8 },
   distRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   distLabel: {
-    width: 96,
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '600',
+    width: 108,
+    ...type.label,
+    marginBottom: 0,
   },
   distTrack: {
     flex: 1,
-    height: 10,
+    height: 8,
     borderRadius: radii.pill,
     backgroundColor: colors.bgSoft,
-    borderWidth: 0,
     overflow: 'hidden',
   },
-  distFill: { height: '100%' },
+  distFill: { height: '100%', backgroundColor: colors.ink },
   distCount: {
     width: 28,
     textAlign: 'right',
+    ...type.label,
     color: colors.ink,
-    fontSize: 12,
-    fontWeight: '700',
+    marginBottom: 0,
   },
 })

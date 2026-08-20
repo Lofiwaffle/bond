@@ -6,33 +6,40 @@ import {
   BondMenu,
   type BondSection,
 } from '../../../components/BondMenu'
-import { LoadingScreen, Screen, Subtitle, Title } from '../../../components/ui'
+import { LoadingScreen, Screen } from '../../../components/ui'
 import { useAuth } from '../../../lib/auth'
-import { colors, radii } from '../../../lib/theme'
+import { Icon, type IconName } from '../../../lib/icons'
+import { colors, hairlineWidth, type } from '../../../lib/theme'
 
 const HUB_OPTIONS: Array<{
   id: BondSection
-  glyph: string
+  icon: IconName
   title: string
   body: string
 }> = [
   {
     id: 'habits',
-    glyph: '✧',
+    icon: 'calendar',
     title: 'Habits',
-    body: 'Calendar + badge key for Spark through Sync',
+    body: 'Calendar and key for Spark through Sync',
   },
   {
     id: 'goals',
-    glyph: '◎',
+    icon: 'target',
     title: 'Goals',
-    body: 'Shared targets you’re building toward',
+    body: 'SMART goals you set, review, and put on the calendar',
   },
   {
     id: 'streaks',
-    glyph: '◈',
+    icon: 'trending-up',
     title: 'Streaks',
     body: 'Daily streak, month rhythm, connection mix',
+  },
+  {
+    id: 'reviews',
+    icon: 'book-open',
+    title: 'Reviews',
+    body: 'Summaries of weekly reviews you finish together',
   },
 ]
 
@@ -42,13 +49,13 @@ export default function BondHubScreen() {
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
-    // Tab screens receive tabPress from the bottom-tabs navigator.
-    const unsub = (navigation as { addListener: (event: string, cb: () => void) => () => void }).addListener(
-      'tabPress',
-      () => {
-        setMenuOpen(true)
-      },
-    )
+    const unsub = (
+      navigation as {
+        addListener: (event: string, cb: () => void) => () => void
+      }
+    ).addListener('tabPress', () => {
+      setMenuOpen(true)
+    })
     return unsub
   }, [navigation])
 
@@ -62,34 +69,27 @@ export default function BondHubScreen() {
 
   return (
     <Screen>
-      <Title>Bond</Title>
-      <Subtitle>How are we growing together?</Subtitle>
+      <Text style={styles.title}>Bond</Text>
+      <Text style={styles.subtitle}>How are we growing together?</Text>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Open Bond menu"
-        onPress={() => setMenuOpen(true)}
-        style={styles.menuBtn}
-      >
-        <Text style={styles.menuBtnText}>Open menu</Text>
-      </Pressable>
-
-      <View style={styles.list}>
-        {HUB_OPTIONS.map((option) => (
+      <View>
+        {HUB_OPTIONS.map((option, index) => (
           <Pressable
             key={option.id}
             accessibilityRole="button"
             onPress={() => openSection(option.id)}
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            style={({ pressed }) => [
+              styles.row,
+              index === HUB_OPTIONS.length - 1 && styles.rowLast,
+              pressed && styles.rowPressed,
+            ]}
           >
-            <View style={[styles.glyphBubble, { backgroundColor: colors.accentSoft }]}>
-              <Text style={styles.glyph}>{option.glyph}</Text>
-            </View>
+            <Icon name={option.icon} size={18} color={colors.ink} />
             <View style={styles.copy}>
               <Text style={styles.rowTitle}>{option.title}</Text>
               <Text style={styles.rowBody}>{option.body}</Text>
             </View>
-            <Text style={styles.chevron}>›</Text>
+            <Icon name="chevron-right" size={16} color={colors.muted} />
           </Pressable>
         ))}
       </View>
@@ -104,71 +104,39 @@ export default function BondHubScreen() {
 }
 
 const styles = StyleSheet.create({
-  menuBtn: {
-    alignSelf: 'flex-start',
-    borderWidth: 0,
-    borderColor: colors.accent,
-    backgroundColor: colors.accentSoft,
-    borderRadius: radii.pill,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginBottom: 18,
+  title: {
+    ...type.heading,
+    marginBottom: 4,
   },
-  menuBtnText: {
-    color: colors.accent,
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  list: {
-    gap: 10,
+  subtitle: {
+    ...type.body,
+    color: colors.muted,
+    marginBottom: 20,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderWidth: 0,
-    borderColor: colors.hairline,
-    borderRadius: radii.lg,
-    backgroundColor: colors.card,
-    padding: 16,
-    shadowColor: '#C9A8B4',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 3,
+    paddingVertical: 16,
+    borderBottomWidth: hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  rowLast: {
+    borderBottomWidth: 0,
   },
   rowPressed: {
-    backgroundColor: colors.accentSoft,
-  },
-  glyphBubble: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  glyph: {
-    textAlign: 'center',
-    color: colors.accent,
-    fontSize: 20,
+    opacity: 0.7,
   },
   copy: {
     flex: 1,
   },
   rowTitle: {
-    color: colors.ink,
-    fontWeight: '800',
-    fontSize: 16,
+    ...type.body,
+    fontWeight: '500',
   },
   rowBody: {
-    color: colors.muted,
-    fontSize: 13,
-    lineHeight: 18,
+    ...type.label,
     marginTop: 2,
-  },
-  chevron: {
-    color: colors.muted,
-    fontSize: 22,
-    fontWeight: '300',
+    marginBottom: 0,
   },
 })

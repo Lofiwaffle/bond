@@ -1,79 +1,94 @@
 export const colors = {
   bg: '#F7F2EF',
-  bgSoft: '#FFF8F5',
+  bgSoft: '#F1EAEB',
   ink: '#3D2C33',
   muted: '#9A8690',
   accent: '#FF6B9D',
   accentPressed: '#F0558A',
   accentSoft: '#FFE4EE',
   onAccent: '#FFFFFF',
-  border: '#F0E4E9',
-  hairline: '#EDE0E6',
+  border: '#E8DDE2',
+  hairline: '#E4D8DE',
   danger: '#FF6B7A',
   success: '#7ED9A8',
   card: '#FFFFFF',
-  tabBar: '#FF6B9D',
-  tabBarIcon: '#FFFFFF',
-  tabBarIconMuted: 'rgba(255, 255, 255, 0.62)',
+  tabBar: '#FFFFFF',
+  tabBarIcon: '#3D2C33',
+  tabBarIconMuted: '#9A8690',
   white: '#FFFFFF',
   black: '#3D2C33',
   overlay: 'rgba(61, 44, 51, 0.38)',
 }
 
-/** Soft, candy-like connection scores 1–5 */
+/** Grayscale connection scores 1–5. Accent is reserved for selected states. */
 export const scoreColors: Record<number, string> = {
-  1: '#FF7A88',
-  2: '#FFB347',
-  3: '#FFE066',
-  4: '#7ED9A8',
-  5: '#7EDDD3',
+  1: '#EDE6E8',
+  2: '#D8CFD3',
+  3: '#B9AEB3',
+  4: '#8A7C82',
+  5: '#3D2C33',
 }
 
 export const scoreColorsSoft: Record<number, string> = {
-  1: '#FFE8EB',
-  2: '#FFF1DC',
-  3: '#FFF8D9',
-  4: '#E4F8EE',
-  5: '#E2F7F5',
-}
-
-export const scoreEmojis: Record<number, string> = {
-  1: '😞',
-  2: '😕',
-  3: '😐',
-  4: '🙂',
-  5: '😄',
+  1: '#F7F2EF',
+  2: '#F3ECEE',
+  3: '#EDE6E8',
+  4: '#E4DCDF',
+  5: '#D8CFD3',
 }
 
 export const SCORE_LABELS: Record<number, string> = {
-  1: 'Distant',
-  2: 'A little',
-  3: 'Okay',
-  4: 'Close',
-  5: 'Very connected',
+  1: 'Disconnected',
+  2: 'Uneasy & aloof',
+  3: 'Stagnant',
+  4: 'Connected',
+  5: 'Proud & united',
 }
 
-/** Soft, bubbly geometry */
+export const SCORE_HINTS: Record<number, string> = {
+  1: 'Distant & hurt',
+  2: 'Communication breakdown',
+  3: 'Roommates, not partners',
+  4: 'Supporting each other',
+  5: 'A formidable team',
+}
+
 export const radii = {
-  sm: 14,
-  md: 20,
-  lg: 26,
-  xl: 32,
+  sm: 10,
+  md: 14,
+  lg: 20,
+  xl: 28,
   pill: 999,
 }
 
 export const hit = 44
 
+export const hairlineWidth = 0.5
+
+export const weights = {
+  regular: '400' as const,
+  medium: '500' as const,
+}
+
 export const type = {
-  largeTitle: 34,
-  title: 28,
-  title2: 22,
-  headline: 17,
-  body: 16,
-  callout: 15,
-  subhead: 14,
-  footnote: 13,
-  caption: 12,
+  label: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '400' as const,
+    color: colors.muted,
+  },
+  body: {
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '400' as const,
+    color: colors.ink,
+  },
+  heading: {
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '500' as const,
+    color: colors.ink,
+  },
 }
 
 const cardShadow = {
@@ -85,11 +100,11 @@ const cardShadow = {
 }
 
 const fabShadow = {
-  shadowColor: '#FF6B9D',
-  shadowOffset: { width: 0, height: 8 },
-  shadowOpacity: 0.28,
-  shadowRadius: 14,
-  elevation: 8,
+  shadowColor: '#3D2C33',
+  shadowOffset: { width: 0, height: 6 },
+  shadowOpacity: 0.16,
+  shadowRadius: 10,
+  elevation: 6,
 }
 
 export const elevation = {
@@ -99,7 +114,7 @@ export const elevation = {
   },
   android: {
     card: { elevation: 4 },
-    fab: { elevation: 8 },
+    fab: { elevation: 6 },
   },
   default: {
     card: cardShadow,

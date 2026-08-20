@@ -1,32 +1,39 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { colors, radii } from '../lib/theme'
+import { Icon, type IconName } from '../lib/icons'
+import { colors, hairlineWidth, radii, type } from '../lib/theme'
 
-export type BondSection = 'habits' | 'goals' | 'streaks'
+export type BondSection = 'habits' | 'goals' | 'streaks' | 'reviews'
 
 const OPTIONS: Array<{
   id: BondSection
-  glyph: string
+  icon: IconName
   title: string
   body: string
 }> = [
   {
     id: 'habits',
-    glyph: '✧',
+    icon: 'calendar',
     title: 'Habits',
     body: 'Spark, Glow, Forge, Bond, Sync. Log moments together',
   },
   {
     id: 'goals',
-    glyph: '◎',
+    icon: 'target',
     title: 'Goals',
-    body: 'Shared targets you’re building toward as a couple',
+    body: 'SMART goals you set, review, and put on the calendar',
   },
   {
     id: 'streaks',
-    glyph: '◈',
+    icon: 'trending-up',
     title: 'Streaks',
     body: 'Daily check-in streak, rhythm, and connection mix',
+  },
+  {
+    id: 'reviews',
+    icon: 'book-open',
+    title: 'Reviews',
+    body: 'Summaries of weekly reviews you finish together',
   },
 ]
 
@@ -46,18 +53,19 @@ export function BondMenu({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Dismiss Bond menu"
-        style={styles.backdrop}
-        onPress={onClose}
-      >
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+      <View style={styles.backdrop}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss Bond menu"
+          onPress={onClose}
+          style={styles.backdropHit}
+        />
+        <View style={styles.sheet}>
           <View style={styles.handle} />
           <Text style={styles.title}>Bond</Text>
           <Text style={styles.subtitle}>What do you want to open?</Text>
 
-          {OPTIONS.map((option) => (
+          {OPTIONS.map((option, index) => (
             <Pressable
               key={option.id}
               accessibilityRole="button"
@@ -66,16 +74,18 @@ export function BondMenu({
                 onClose()
                 onSelect(option.id)
               }}
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+              style={({ pressed }) => [
+                styles.row,
+                index === OPTIONS.length - 1 && styles.rowLast,
+                pressed && styles.rowPressed,
+              ]}
             >
-              <View style={[styles.glyphBubble, { backgroundColor: colors.accentSoft }]}>
-                <Text style={styles.glyph}>{option.glyph}</Text>
-              </View>
+              <Icon name={option.icon} size={18} color={colors.ink} />
               <View style={styles.copy}>
                 <Text style={styles.rowTitle}>{option.title}</Text>
                 <Text style={styles.rowBody}>{option.body}</Text>
               </View>
-              <Text style={styles.chevron}>›</Text>
+              <Icon name="chevron-right" size={16} color={colors.muted} />
             </Pressable>
           ))}
 
@@ -86,8 +96,8 @@ export function BondMenu({
           >
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   )
 }
@@ -98,86 +108,72 @@ const styles = StyleSheet.create({
     backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
+  backdropHit: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
   sheet: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.bg,
     borderTopLeftRadius: radii.xl,
     borderTopRightRadius: radii.xl,
-    borderWidth: 0,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 28,
+    zIndex: 1,
   },
   handle: {
     alignSelf: 'center',
     width: 40,
-    height: 5,
+    height: 4,
     borderRadius: radii.pill,
     backgroundColor: colors.hairline,
     marginBottom: 14,
   },
   title: {
-    color: colors.ink,
-    fontSize: 22,
-    fontWeight: '800',
+    ...type.heading,
   },
   subtitle: {
+    ...type.body,
     color: colors.muted,
-    fontSize: 14,
     marginTop: 4,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderWidth: 0,
-    borderRadius: radii.md,
-    backgroundColor: colors.bgSoft,
-    padding: 14,
-    marginBottom: 8,
+    paddingVertical: 16,
+    borderBottomWidth: hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  rowLast: {
+    borderBottomWidth: 0,
   },
   rowPressed: {
-    backgroundColor: colors.accentSoft,
-  },
-  glyphBubble: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  glyph: {
-    textAlign: 'center',
-    color: colors.accent,
-    fontSize: 20,
+    opacity: 0.7,
   },
   copy: {
     flex: 1,
   },
   rowTitle: {
-    color: colors.ink,
-    fontWeight: '800',
-    fontSize: 16,
+    ...type.body,
+    fontWeight: '500',
   },
   rowBody: {
-    color: colors.muted,
-    fontSize: 13,
-    lineHeight: 18,
+    ...type.label,
     marginTop: 2,
-  },
-  chevron: {
-    color: colors.muted,
-    fontSize: 22,
-    fontWeight: '300',
+    marginBottom: 0,
   },
   cancel: {
-    marginTop: 6,
+    marginTop: 8,
     alignItems: 'center',
     paddingVertical: 12,
   },
   cancelText: {
+    ...type.body,
     color: colors.muted,
-    fontWeight: '700',
-    fontSize: 15,
   },
 })

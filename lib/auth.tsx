@@ -9,7 +9,7 @@ import {
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 
-import { supabase } from './supabase'
+import { supabase, supabaseConfigured, supabaseConfigError } from './supabase'
 import type { Couple, Profile } from '../types/database'
 
 type AuthContextValue = {
@@ -127,17 +127,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return
-      setSession(data.session)
-      if (data.session?.user) {
-        loadCoupleState(data.session.user.id).finally(() => {
-          if (mounted) setIsLoading(false)
-        })
-      } else {
-        setIsLoading(false)
-      }
-    })
+    if (!supabaseConfigured) {
+      setIsLoading(false)
+      return
+    }
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!mounted) return
+        setSession(data.session)
+        if (data.session?.user) {
+          loadCoupleState(data.session.user.id).finally(() => {
+            if (mounted) setIsLoading(false)
+          })
+        } else {
+          setIsLoading(false)
+        }
+      })
+      .catch(() => {
+        if (mounted) setIsLoading(false)
+      })
 
     const {
       data: { subscription },
@@ -160,6 +170,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = useCallback(
     async (email: string, password: string, displayName: string) => {
+      if (!supabaseConfigured) {
+        return { error: supabaseConfigError }
+      }
       const { error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -173,6 +186,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const signIn = useCallback(async (email: string, password: string) => {
+    if (!supabaseConfigured) {
+      return { error: supabaseConfigError }
+    }
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
@@ -188,6 +204,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const createCouple = useCallback(async () => {
+    if (!supabaseConfigured) {
+      return { couple: null, error: supabaseConfigError }
+    }
     const { data, error } = await supabase.rpc('create_couple')
     if (error) {
       return { couple: null, error: error.message }
@@ -198,6 +217,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const joinCouple = useCallback(
     async (inviteCode: string) => {
+      if (!supabaseConfigured) {
+        return { couple: null, error: supabaseConfigError }
+      }
       const { data, error } = await supabase.rpc('join_couple', {
         invite: inviteCode.trim().toUpperCase(),
       })
@@ -211,6 +233,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const deleteAccount = useCallback(async () => {
+    if (!supabaseConfigured) {
+      return { error: supabaseConfigError }
+    }
     const { error } = await supabase.rpc('delete_own_account')
     if (error) {
       return { error: error.message }

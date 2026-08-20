@@ -1,0 +1,43 @@
+from pathlib import Path
+
+
+def patch(html: str) -> str:
+    html = html.replace(
+        '<body>',
+        '<body style="margin:0;background:#F7F2EF">',
+        1,
+    )
+    html = html.replace(
+        '<div id="root"></div>',
+        (
+            '<div id="root">'
+            '<div style="min-height:100%;background:#F7F2EF;color:#3D2C33;'
+            'font-family:system-ui,sans-serif;padding:48px 24px">'
+            '<h1 style="font-size:28px;margin:0 0 8px">Bond</h1>'
+            '<p style="margin:0;color:#9A8690">Daily check-ins for couples.</p>'
+            '</div></div>'
+        ),
+        1,
+    )
+    if 'manifest.webmanifest' not in html:
+        html = html.replace(
+            '</head>',
+            '<link rel="manifest" href="/bond/manifest.webmanifest" />'
+            '<link rel="apple-touch-icon" href="/bond/pwa-192.png" />'
+            '</head>',
+            1,
+        )
+    return html
+
+
+def main() -> None:
+    dist = Path('dist')
+    index = dist / 'index.html'
+    html = patch(index.read_text())
+    index.write_text(html)
+    (dist / '404.html').write_text(html)
+    (dist / '.nojekyll').write_text('')
+
+
+if __name__ == '__main__':
+    main()

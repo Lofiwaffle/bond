@@ -9,12 +9,6 @@ const supabaseKey =
   process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error(
-    'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-  )
-}
-
 function isLoopbackUrl(url: string): boolean {
   try {
     const { hostname } = new URL(url)
@@ -29,17 +23,29 @@ function isLoopbackUrl(url: string): boolean {
   }
 }
 
-if (!__DEV__ && isLoopbackUrl(supabaseUrl)) {
-  throw new Error(
-    'Release builds must use a hosted EXPO_PUBLIC_SUPABASE_URL, not localhost.',
-  )
+function configError(): string | null {
+  if (!supabaseUrl || !supabaseKey) {
+    return 'Bond is not connected to a server in this install.'
+  }
+  if (!__DEV__ && isLoopbackUrl(supabaseUrl)) {
+    return 'This install needs a hosted Bond server, not localhost.'
+  }
+  return null
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
+export const supabaseConfigError = configError()
+export const supabaseConfigured = supabaseConfigError === null
+
+const clientUrl = supabaseConfigured
+  ? supabaseUrl!
+  : 'https://unavailable.supabase.co'
+const clientKey = supabaseConfigured ? supabaseKey! : 'public-anon-key'
+
+export const supabase = createClient<Database>(clientUrl, clientKey, {
   auth: {
     storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
+    autoRefreshToken: supabaseConfigured,
+    persistSession: supabaseConfigured,
     detectSessionInUrl: false,
   },
 })

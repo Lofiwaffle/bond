@@ -32,6 +32,11 @@ jobs:
           EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
       - name: GitHub Pages SPA fallback
         run: python3 scripts/patch-web-export.py
+      - name: Write hosted supabase config
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+        run: python3 scripts/write-supabase-config.py
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

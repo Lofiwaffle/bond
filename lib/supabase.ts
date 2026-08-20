@@ -1,11 +1,18 @@
 import 'react-native-url-polyfill/auto'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { Platform } from 'react-native'
 
 import type { Database } from '../types/database'
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
-const supabaseKey =
+const STORAGE_KEY = 'bond.supabase'
+const DUMMY_URL = 'https://unavailable.supabase.co'
+const DUMMY_KEY = 'public-anon-key'
+
+export type SupabaseAppConfig = { url: string; key: string }
+
+const envUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
+const envKey =
   process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
 
@@ -23,29 +30,136 @@ function isLoopbackUrl(url: string): boolean {
   }
 }
 
-function configError(): string | null {
-  if (!supabaseUrl || !supabaseKey) {
+function configIssue(url?: string | null, key?: string | null): string | null {
+  if (!url?.trim() || !key?.trim()) {
     return 'Bond is not connected to a server in this install.'
   }
-  if (!__DEV__ && isLoopbackUrl(supabaseUrl)) {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return 'Server URL must start with https://'
+    }
+  } catch {
+    return 'Server URL is not valid.'
+  }
+  if (!__DEV__ && isLoopbackUrl(url)) {
     return 'This install needs a hosted Bond server, not localhost.'
+  }
+  if (!__DEV__ && url.startsWith('http://')) {
+    return 'This install needs an https:// server.'
   }
   return null
 }
 
-export const supabaseConfigError = configError()
-export const supabaseConfigured = supabaseConfigError === null
+function makeClient(url: string, key: string, persist: boolean): SupabaseClient<Database> {
+  return createClient<Database>(url, key, {
+    auth: {
+      storage: AsyncStorage,
+      autoRefreshToken: persist,
+      persistSession: persist,
+      detectSessionInUrl: false,
+    },
+  })
+}
 
-const clientUrl = supabaseConfigured
-  ? supabaseUrl!
-  : 'https://unavailable.supabase.co'
-const clientKey = supabaseConfigured ? supabaseKey! : 'public-anon-key'
+const listeners = new Set<() => void>()
 
-export const supabase = createClient<Database>(clientUrl, clientKey, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: supabaseConfigured,
-    persistSession: supabaseConfigured,
-    detectSessionInUrl: false,
-  },
-})
+function notifyConfigListeners() {
+  listeners.forEach((listener) => listener())
+}
+
+export function subscribeSupabaseConfig(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+export let supabase = makeClient(DUMMY_URL, DUMMY_KEY, false)
+export let supabaseConfigured = false
+export let supabaseConfigError: string | null =
+  'Bond is not connected to a server in this install.'
+
+function applyConfig(config: SupabaseAppConfig): string | null {
+  const issue = configIssue(config.url, config.key)
+  if (issue) {
+    supabaseConfigured = false
+    supabaseConfigError = issue
+    supabase = makeClient(DUMMY_URL, DUMMY_KEY, false)
+    notifyConfigListeners()
+    return issue
+  }
+  supabase = makeClient(config.url.trim(), config.key.trim(), true)
+  supabaseConfigured = true
+  supabaseConfigError = null
+  notifyConfigListeners()
+  return null
+}
+
+async function readStoredConfig(): Promise<SupabaseAppConfig | null> {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<SupabaseAppConfig>
+    if (typeof parsed.url === 'string' && typeof parsed.key === 'string') {
+      return { url: parsed.url, key: parsed.key }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+async function readHostedConfig(): Promise<SupabaseAppConfig | null> {
+  if (Platform.OS !== 'web' || typeof fetch === 'undefined') return null
+  const base = process.env.EXPO_PUBLIC_BASE_PATH ?? ''
+  try {
+    const response = await fetch(`${base}/supabase.json`, { cache: 'no-store' })
+    if (!response.ok) return null
+    const parsed = (await response.json()) as Partial<SupabaseAppConfig>
+    if (typeof parsed.url === 'string' && typeof parsed.key === 'string') {
+      return { url: parsed.url, key: parsed.key }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+let initPromise: Promise<void> | null = null
+
+async function resolveConfig(): Promise<SupabaseAppConfig | null> {
+  const stored = await readStoredConfig()
+  if (stored && !configIssue(stored.url, stored.key)) return stored
+
+  if (envUrl && envKey && !configIssue(envUrl, envKey)) {
+    return { url: envUrl, key: envKey }
+  }
+
+  const hosted = await readHostedConfig()
+  if (hosted && !configIssue(hosted.url, hosted.key)) return hosted
+
+  return stored ?? (envUrl && envKey ? { url: envUrl, key: envKey } : hosted)
+}
+
+export function initSupabase(): Promise<void> {
+  if (!initPromise) {
+    initPromise = resolveConfig().then((config) => {
+      if (config) applyConfig(config)
+    })
+  }
+  return initPromise
+}
+
+export async function saveSupabaseConfig(
+  url: string,
+  key: string,
+): Promise<{ error: string | null }> {
+  const issue = applyConfig({ url, key })
+  if (issue) return { error: issue }
+  await AsyncStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ url: url.trim(), key: key.trim() }),
+  )
+  return { error: null }
+}

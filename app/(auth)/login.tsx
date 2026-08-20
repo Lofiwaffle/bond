@@ -5,7 +5,6 @@ import { Link, Redirect } from 'expo-router'
 import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { Icon } from '../../lib/icons'
-import { supabaseConfigError, supabaseConfigured } from '../../lib/supabase'
 import { colors, type } from '../../lib/theme'
 
 export default function LoginScreen() {
@@ -66,7 +65,7 @@ export default function LoginScreen() {
             placeholder="••••••••"
           />
 
-          <ErrorText message={error ?? (supabaseConfigured ? null : supabaseConfigError)} />
+          <ErrorText message={error} />
 
           <PrimaryButton
             label="Sign in"
@@ -77,6 +76,9 @@ export default function LoginScreen() {
 
           <Link href="/(auth)/signup" style={styles.link}>
             Need an account? Sign up
+          </Link>
+          <Link href="/connect" style={styles.privacy}>
+            Change server
           </Link>
           <Link href="/privacy" style={styles.privacy}>
             Privacy

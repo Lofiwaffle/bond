@@ -4,6 +4,7 @@ import { Redirect } from 'expo-router'
 import { LoadingScreen } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { hasSeenOnboarding } from '../lib/onboarding'
+import { supabaseConfigured } from '../lib/supabase'
 
 export default function Index() {
   const { session, profile, isLoading } = useAuth()
@@ -16,6 +17,10 @@ export default function Index() {
 
   if (isLoading) {
     return <LoadingScreen />
+  }
+
+  if (!supabaseConfigured) {
+    return <Redirect href="/connect" />
   }
 
   if (!session) {

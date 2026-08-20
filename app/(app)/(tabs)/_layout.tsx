@@ -59,7 +59,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="stats"
         options={{
-          title: 'Bond',
+          title: 'Growth',
           tabBarIcon: ({ color, size }) => (
             <Feather name="heart" size={size} color={color} />
           ),

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useMemo, useState } from 'react'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { BondSectionHeader } from '../../../components/BondSectionHeader'
 import {
@@ -22,21 +22,37 @@ import {
 import { formatDisplayDate, localDateString } from '../../../lib/dates'
 import { Icon } from '../../../lib/icons'
 import { colors, hairlineWidth, radii, type } from '../../../lib/theme'
+import type { HabitCompletion } from '../../../types/database'
 
 const BADGE_BY_ID = Object.fromEntries(BADGES.map((b) => [b.id, b])) as Record<
   BadgeId,
   (typeof BADGES)[number]
 >
 
+type MemoryFilter = 'all' | BadgeId
+
 export default function BondAchievementsScreen() {
   const { user, partner, isLoading: authLoading } = useAuth()
-  const { counts, completions, isLoading, logHabit } = useHabitBadges()
+  const { counts, completions, isLoading, logHabit, updateNote } =
+    useHabitBadges()
 
   const [activeHabitId, setActiveHabitId] = useState<BadgeId | null>(null)
   const [habitNote, setHabitNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState(localDateString())
+  const [memoryFilter, setMemoryFilter] = useState<MemoryFilter>('all')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState('')
+  const [editError, setEditError] = useState<string | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  const memories = useMemo(() => {
+    return completions.filter((row) => {
+      if (memoryFilter !== 'all' && row.habit_id !== memoryFilter) return false
+      return true
+    })
+  }, [completions, memoryFilter])
 
   if (authLoading || isLoading) return <LoadingScreen />
 
@@ -70,7 +86,33 @@ export default function BondAchievementsScreen() {
       return
     }
     setSelectedDate(localDateString())
+    setMemoryFilter('all')
     closeAchievement()
+  }
+
+  const startEdit = (row: HabitCompletion) => {
+    setEditingId(row.id)
+    setEditDraft(row.note ?? '')
+    setEditError(null)
+    setSelectedDate(habitLocalDate(row.created_at))
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditDraft('')
+    setEditError(null)
+  }
+
+  const saveEdit = async () => {
+    if (!editingId) return
+    setSavingEdit(true)
+    const result = await updateNote(editingId, editDraft)
+    setSavingEdit(false)
+    if (result.error) {
+      setEditError(result.error)
+      return
+    }
+    cancelEdit()
   }
 
   return (
@@ -91,7 +133,7 @@ export default function BondAchievementsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Calendar</Text>
           <Text style={styles.sectionHint}>
-            Tap a day to read the note. Tap a badge below to log a new one.
+            Tap a day to read it. Tap a badge below to log a new one.
           </Text>
           <AchievementCalendar
             completions={completions}
@@ -138,7 +180,7 @@ export default function BondAchievementsScreen() {
             <Field
               value={habitNote}
               onChangeText={setHabitNote}
-              placeholder="What happened? This note shows on the calendar."
+              placeholder="What happened? This note becomes a memory."
               autoCapitalize="sentences"
               autoCorrect
               multiline
@@ -157,32 +199,83 @@ export default function BondAchievementsScreen() {
         <View style={styles.sectionLast}>
           <Text style={styles.sectionTitle}>Our Memories</Text>
           <Text style={styles.sectionHint}>
-            Every achievement you and your partner have written down.
+            Everything you and your partner have logged. Tap one to open that
+            day, or edit a note you wrote.
           </Text>
-          {completions.filter((row) => row.note?.trim()).length === 0 ? (
+          <View style={styles.filterRow}>
+            <FilterChip
+              label="All"
+              selected={memoryFilter === 'all'}
+              onPress={() => setMemoryFilter('all')}
+            />
+            {BADGES.map((badge) => (
+              <FilterChip
+                key={badge.id}
+                label={badge.label}
+                selected={memoryFilter === badge.id}
+                onPress={() => setMemoryFilter(badge.id)}
+              />
+            ))}
+          </View>
+          {memories.length === 0 ? (
             <Text style={styles.sectionHint}>
-              Notes you add while logging will collect here.
+              {memoryFilter === 'all'
+                ? 'Log an achievement to start this collection.'
+                : `No ${BADGE_BY_ID[memoryFilter].label} memories yet.`}
             </Text>
           ) : (
-            completions
-              .filter((row) => row.note?.trim())
-              .map((completion) => (
+            memories.map((completion) => {
+              const isOwn = completion.user_id === user?.id
+              const date = habitLocalDate(completion.created_at)
+              const editing = editingId === completion.id
+              return (
                 <AchievementNote
                   key={completion.id}
                   habitId={completion.habit_id as BadgeId}
                   note={completion.note}
-                  author={
-                    completion.user_id === user?.id
-                      ? 'You'
-                      : (partner?.display_name ?? 'Partner')
-                  }
-                  date={formatDisplayDate(habitLocalDate(completion.created_at))}
+                  author={isOwn ? 'You' : (partner?.display_name ?? 'Partner')}
+                  date={formatDisplayDate(date)}
+                  selected={date === selectedDate}
+                  onPress={() => setSelectedDate(date)}
+                  onEdit={isOwn ? () => startEdit(completion) : undefined}
+                  editing={editing}
+                  draft={editing ? editDraft : undefined}
+                  onChangeDraft={setEditDraft}
+                  onSaveEdit={() => void saveEdit()}
+                  onCancelEdit={cancelEdit}
+                  saving={savingEdit}
+                  editError={editing ? editError : null}
                 />
-              ))
+              )
+            })
           )}
         </View>
       </ScrollView>
     </Screen>
+  )
+}
+
+function FilterChip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string
+  selected: boolean
+  onPress: () => void
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={[styles.chip, selected && styles.chipSelected]}
+    >
+      <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>
+        {label}
+      </Text>
+    </Pressable>
   )
 }
 
@@ -191,29 +284,89 @@ function AchievementNote({
   note,
   author,
   date,
+  selected,
+  onPress,
+  onEdit,
+  editing,
+  draft,
+  onChangeDraft,
+  onSaveEdit,
+  onCancelEdit,
+  saving,
+  editError,
 }: {
   habitId: BadgeId
   note: string | null
   author: string
   date?: string
+  selected?: boolean
+  onPress?: () => void
+  onEdit?: () => void
+  editing?: boolean
+  draft?: string
+  onChangeDraft?: (value: string) => void
+  onSaveEdit?: () => void
+  onCancelEdit?: () => void
+  saving?: boolean
+  editError?: string | null
 }) {
   const badge = BADGE_BY_ID[habitId]
   const body = note?.trim()
+  const Card = onPress ? Pressable : View
+
   return (
-    <View style={styles.noteCard}>
+    <Card
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={
+        onPress
+          ? `${badge.label} memory by ${author}${date ? `, ${date}` : ''}`
+          : undefined
+      }
+      onPress={editing ? undefined : onPress}
+      style={[styles.noteCard, selected && styles.noteCardSelected]}
+    >
       <View style={styles.noteCardHead}>
         <Icon name={badge.icon} size={16} color={colors.ink} />
         <Text style={styles.noteMeta}>
           {badge.label} · {author}
           {date ? ` · ${date}` : ''}
         </Text>
+        {onEdit && !editing ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Edit memory"
+            onPress={onEdit}
+            hitSlop={8}
+          >
+            <Text style={styles.editLabel}>Edit</Text>
+          </Pressable>
+        ) : null}
       </View>
-      {body ? (
+      {editing ? (
+        <>
+          <Field
+            value={draft ?? ''}
+            onChangeText={(value) => onChangeDraft?.(value)}
+            placeholder="What do you want to remember?"
+            autoCapitalize="sentences"
+            autoCorrect
+            multiline
+            style={styles.note}
+          />
+          <ErrorText message={editError ?? null} />
+          <PrimaryButton
+            label="Save memory"
+            onPress={() => onSaveEdit?.()}
+            loading={saving}
+          />
+          <TextLink label="Cancel" onPress={() => onCancelEdit?.()} />
+        </>
+      ) : body ? (
         <Text style={styles.noteBody}>{body}</Text>
       ) : (
         <Text style={styles.noteEmpty}>Logged without a note.</Text>
       )}
-    </View>
+    </Card>
   )
 }
 
@@ -245,6 +398,31 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginBottom: 12,
   },
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  chip: {
+    borderWidth: hairlineWidth,
+    borderColor: colors.border,
+    borderRadius: radii.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chipSelected: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  chipLabel: {
+    ...type.label,
+    color: colors.ink,
+    marginBottom: 0,
+  },
+  chipLabelSelected: {
+    color: colors.onAccent,
+  },
   fieldLabel: {
     ...type.label,
     marginBottom: 6,
@@ -263,6 +441,9 @@ const styles = StyleSheet.create({
     borderWidth: hairlineWidth,
     borderColor: colors.border,
   },
+  noteCardSelected: {
+    borderColor: colors.accent,
+  },
   noteCardHead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -273,6 +454,11 @@ const styles = StyleSheet.create({
     ...type.label,
     marginBottom: 0,
     flex: 1,
+  },
+  editLabel: {
+    ...type.label,
+    color: colors.accent,
+    marginBottom: 0,
   },
   noteBody: {
     ...type.body,

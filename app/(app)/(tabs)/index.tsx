@@ -54,7 +54,7 @@ export default function EntriesScreen() {
   const { profile, partner, isLoading: authLoading } = useAuth()
   const today = localDateString()
   const { days, isLoading, refresh } = useCheckInHistory()
-  const { mine: todayMine } = useTodayCheckIn()
+  const { mine: todayMine, waitingForPartner } = useTodayCheckIn()
 
   useFocusEffect(
     useCallback(() => {
@@ -93,23 +93,49 @@ export default function EntriesScreen() {
           <RefreshControl refreshing={false} onRefresh={() => void refresh()} />
         }
       >
-        {!todayMine ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Check-in with today's prompt"
-            onPress={() => router.push('/(app)/check-in')}
-            style={({ pressed }) => [
-              styles.composer,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={styles.composerKicker}>Check-in</Text>
-            <Text style={styles.composerTitle}>{todayPrompt.text}</Text>
-            <Text style={styles.composerHint}>
-              Log how connected you felt today. Tap to check in.
-            </Text>
-          </Pressable>
-        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            !todayMine
+              ? "Check-in with today's prompt"
+              : waitingForPartner
+                ? `Waiting for ${partnerName} to check in`
+                : "Open today's check-in"
+          }
+          onPress={() => router.push('/(app)/check-in')}
+          style={({ pressed }) => [
+            styles.composer,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={styles.composerKicker}>Check-in</Text>
+          {!todayMine ? (
+            <>
+              <Text style={styles.composerTitle}>{todayPrompt.text}</Text>
+              <Text style={styles.composerHint}>
+                Log how connected you felt today. Tap to check in.
+              </Text>
+            </>
+          ) : waitingForPartner ? (
+            <>
+              <Text style={styles.composerTitle}>
+                Waiting for {partnerName} to check in
+              </Text>
+              <Text style={styles.composerHint}>
+                They can't see yours until they save theirs. Tap to view.
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.composerTitle}>
+                Today is open for both of you
+              </Text>
+              <Text style={styles.composerHint}>
+                Tap to reread how you each felt.
+              </Text>
+            </>
+          )}
+        </Pressable>
 
         {feed.map((day) => (
           <DayGroup

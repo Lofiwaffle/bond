@@ -31,6 +31,10 @@ type HabitBadgesValue = {
     habitId: BadgeId,
     note?: string,
   ) => Promise<{ error: string | null }>
+  updateNote: (
+    id: string,
+    note: string,
+  ) => Promise<{ error: string | null }>
 }
 
 const HabitBadgesContext = createContext<HabitBadgesValue | undefined>(
@@ -82,7 +86,7 @@ export function HabitBadgesProvider({ children }: { children: ReactNode }) {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'habit_completions',
           filter: `couple_id=eq.${profile.couple_id}`,
@@ -124,6 +128,29 @@ export function HabitBadgesProvider({ children }: { children: ReactNode }) {
     [profile?.couple_id, refresh, user?.id],
   )
 
+  const updateNote = useCallback(
+    async (id: string, note: string) => {
+      if (!user?.id || !profile?.couple_id) {
+        return { error: 'You must be paired to edit a memory' }
+      }
+
+      const trimmed = note.trim()
+      const { error: updateError } = await supabase
+        .from('habit_completions')
+        .update({ note: trimmed.length > 0 ? trimmed : null })
+        .eq('id', id)
+        .eq('user_id', user.id)
+
+      if (updateError) {
+        return { error: updateError.message }
+      }
+
+      await refresh()
+      return { error: null }
+    },
+    [profile?.couple_id, refresh, user?.id],
+  )
+
   const counts = useMemo(
     () =>
       completions.reduce<Record<BadgeId, number>>(
@@ -145,8 +172,9 @@ export function HabitBadgesProvider({ children }: { children: ReactNode }) {
       error,
       refresh,
       logHabit,
+      updateNote,
     }),
-    [completions, counts, error, isLoading, logHabit, refresh],
+    [completions, counts, error, isLoading, logHabit, refresh, updateNote],
   )
 
   return (

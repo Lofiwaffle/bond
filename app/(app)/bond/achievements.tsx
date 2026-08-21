@@ -155,7 +155,7 @@ export default function BondAchievementsScreen() {
         ) : null}
 
         <View style={styles.sectionLast}>
-          <Text style={styles.sectionTitle}>All notes</Text>
+          <Text style={styles.sectionTitle}>Our Memories</Text>
           <Text style={styles.sectionHint}>
             Every achievement you and your partner have written down.
           </Text>

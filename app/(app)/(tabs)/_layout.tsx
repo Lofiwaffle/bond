@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons'
 import { Redirect, Tabs, router } from 'expo-router'
-import { Pressable, StyleSheet, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { LoadingScreen } from '../../../components/ui'
 import { useAuth } from '../../../lib/auth'
@@ -10,11 +10,14 @@ function CheckInFab() {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Check in"
+      accessibilityLabel="Check-in"
       onPress={() => router.push('/(app)/check-in')}
-      style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+      style={({ pressed }) => [styles.fabWrap, pressed && styles.fabPressed]}
     >
-      <Feather name="plus" size={26} color={colors.onAccent} />
+      <View style={styles.fab}>
+        <Feather name="plus" size={26} color={colors.onAccent} />
+      </View>
+      <Text style={styles.fabLabel}>Check-in</Text>
     </Pressable>
   )
 }
@@ -47,7 +50,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="check-in-tab"
         options={{
-          title: '',
+          title: 'Check-in',
           tabBarLabel: () => null,
           tabBarButton: () => (
             <View style={styles.fabSlot}>
@@ -94,7 +97,10 @@ const styles = StyleSheet.create({
   },
   fabSlot: {
     top: -18,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+  },
+  fabWrap: {
     alignItems: 'center',
   },
   fab: {
@@ -105,6 +111,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...elevation.fab,
+  },
+  fabLabel: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '400',
+    color: colors.tabBarIconMuted,
   },
   fabPressed: {
     transform: [{ scale: 0.96 }],

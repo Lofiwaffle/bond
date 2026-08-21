@@ -96,7 +96,9 @@ export function PartnerActivitySync({ children }: { children: ReactNode }) {
     if (!user?.id || !profile?.couple_id) return
 
     const channel = supabase
-      .channel(`partner_signals:${profile.couple_id}`)
+      .channel(
+        `partner_signals:${profile.couple_id}:${Math.random().toString(36).slice(2)}`,
+      )
       .on(
         'postgres_changes',
         {

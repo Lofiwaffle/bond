@@ -124,7 +124,9 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
     if (!user?.id || !profile?.couple_id) return
 
     const channel = supabase
-      .channel(`daily_check_ins:${profile.couple_id}`)
+      .channel(
+        `daily_check_ins:${profile.couple_id}:${Math.random().toString(36).slice(2)}`,
+      )
       .on(
         'postgres_changes',
         {

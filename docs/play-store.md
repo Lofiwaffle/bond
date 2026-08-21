@@ -87,7 +87,7 @@ Bond is a private space for couples to check in every day.
 
 • Save how connected you felt, answer a shared prompt, and tag what shaped the day  
 • Your partner’s entry stays hidden until they check in too  
-• Keep SMART goals, habits, streaks, and weekly review summaries together  
+• Keep SMART goals, achievements, streaks, and weekly review summaries together  
 
 Bond is for two people who already know each other. There is no public feed and no ads.
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Pressable,
   RefreshControl,
@@ -24,6 +24,12 @@ import { useAuth } from '../../../lib/auth'
 import { BADGES, badgesForProgress } from '../../../lib/badges'
 import { localDateString } from '../../../lib/dates'
 import { Icon, type IconName } from '../../../lib/icons'
+import {
+  areNotificationsEnabled,
+  disableNotifications,
+  enableNotifications,
+  syncCheckInReminder,
+} from '../../../lib/notifications'
 import { colors, hairlineWidth, type } from '../../../lib/theme'
 
 function initialOf(name: string): string {
@@ -45,14 +51,14 @@ const LINKS: Array<{
   icon: IconName
   title: string
   body: string
-  href: '/(app)/bond/habits' | '/(app)/bond/streaks' | '/(app)/bond/goals' | '/(app)/bond/reviews' | '/(app)/weekly-review'
+  href: '/(app)/bond/achievements' | '/(app)/bond/streaks' | '/(app)/bond/goals' | '/(app)/bond/reviews' | '/(app)/weekly-review'
 }> = [
   {
-    id: 'habits',
+    id: 'achievements',
     icon: 'calendar',
-    title: 'Habits',
-    body: 'Calendar and badge key',
-    href: '/(app)/bond/habits',
+    title: 'Achievements',
+    body: 'Calendar and notes',
+    href: '/(app)/bond/achievements',
   },
   {
     id: 'streaks',
@@ -89,6 +95,7 @@ export default function MoreScreen() {
     profile,
     couple,
     partner,
+    user,
     isLoading,
     signOut,
     refreshProfile,
@@ -105,6 +112,13 @@ export default function MoreScreen() {
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [notifyOn, setNotifyOn] = useState(false)
+  const [notifyBusy, setNotifyBusy] = useState(false)
+  const [notifyError, setNotifyError] = useState<string | null>(null)
+
+  useEffect(() => {
+    void areNotificationsEnabled().then(setNotifyOn)
+  }, [])
 
   const stats = useMemo(() => {
     const today = localDateString()
@@ -137,6 +151,29 @@ export default function MoreScreen() {
     void refreshProfile()
     void refreshHistory()
     void refreshHabits()
+  }
+
+  const onToggleNotifications = async () => {
+    setNotifyError(null)
+    setNotifyBusy(true)
+    if (notifyOn) {
+      await disableNotifications()
+      setNotifyOn(false)
+      setNotifyBusy(false)
+      return
+    }
+    const granted = await enableNotifications(user?.id)
+    setNotifyOn(granted)
+    setNotifyBusy(false)
+    if (!granted) {
+      setNotifyError(
+        'Allow notifications in your browser or phone settings to get reminders.',
+      )
+      return
+    }
+    const today = localDateString()
+    const hasCompletedToday = days.some((day) => day.date === today && day.mine)
+    await syncCheckInReminder(Boolean(hasCompletedToday))
   }
 
   const onDeleteAccount = async () => {
@@ -200,7 +237,7 @@ export default function MoreScreen() {
           <View style={styles.statDivider} />
           <View style={styles.stat}>
             <Text style={styles.statValue}>{stats.earned.length}/5</Text>
-            <Text style={styles.statLabel}>habits</Text>
+            <Text style={styles.statLabel}>earned</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.stat}>
@@ -212,7 +249,7 @@ export default function MoreScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Highlights</Text>
           <Text style={styles.sectionHint}>
-            Habits you've unlocked together.
+            Achievements you've unlocked together.
           </Text>
           <View style={styles.chipWrap}>
             {BADGES.map((badge) => {
@@ -238,8 +275,8 @@ export default function MoreScreen() {
           </View>
           <Text style={styles.emptyHint}>
             {stats.habitLogs === 0
-              ? 'No habit logs yet. Open Habits to start filling your portfolio.'
-              : `${stats.habitLogs} habit moment${stats.habitLogs === 1 ? '' : 's'} logged · ${stats.myCheckIns} check-in${stats.myCheckIns === 1 ? '' : 's'}`}
+              ? 'No achievements yet. Open Achievements to start filling your portfolio.'
+              : `${stats.habitLogs} achievement${stats.habitLogs === 1 ? '' : 's'} logged · ${stats.myCheckIns} check-in${stats.myCheckIns === 1 ? '' : 's'}`}
           </Text>
         </View>
 
@@ -282,7 +319,24 @@ export default function MoreScreen() {
         ) : null}
 
         <View style={styles.accountBlock}>
-          <Text style={styles.label}>Account</Text>
+          <Text style={styles.label}>Notifications</Text>
+          <Text style={styles.sectionHint}>
+            Daily check-in reminder at 8:00 PM, plus an alert when your partner
+            checks in, logs an achievement, or updates a goal.
+          </Text>
+          <TextLink
+            label={
+              notifyBusy
+                ? 'Working...'
+                : notifyOn
+                  ? 'Turn notifications off'
+                  : 'Turn notifications on'
+            }
+            onPress={() => void onToggleNotifications()}
+          />
+          {notifyError ? <ErrorText message={notifyError} /> : null}
+
+          <Text style={[styles.label, styles.accountLabel]}>Account</Text>
           <TextLink
             label="Privacy"
             onPress={() => router.push('/privacy')}
@@ -489,6 +543,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingBottom: 24,
     gap: 8,
+  },
+  accountLabel: {
+    marginTop: 16,
   },
   deleteBtn: {
     alignSelf: 'flex-start',

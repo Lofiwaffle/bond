@@ -48,10 +48,34 @@ export function useHabitBadges() {
     void refresh()
   }, [refresh])
 
+  useEffect(() => {
+    if (!user?.id || !profile?.couple_id) return
+
+    const channel = supabase
+      .channel(`habit_completions:${profile.couple_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'habit_completions',
+          filter: `couple_id=eq.${profile.couple_id}`,
+        },
+        () => {
+          void refresh()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [profile?.couple_id, refresh, user?.id])
+
   const logHabit = useCallback(
     async (habitId: BadgeId, note?: string) => {
       if (!user?.id || !profile?.couple_id) {
-        return { error: 'You must be paired to log a habit' }
+        return { error: 'You must be paired to log an achievement' }
       }
 
       const trimmed = note?.trim()

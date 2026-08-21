@@ -13,8 +13,8 @@ Bond (“we”) provides a paired daily check-in space for two partners.
 - Account: email, password (stored by our auth provider, not in plain text), display name
 - Couple pairing: invite codes and the link between two accounts
 - Check-ins: connection scores, optional notes, activity tags, prompt answers, timestamps
-- Shared content you choose to save: habits, goals, weekly reviews, and summaries of completed weeks
-- Device: local reminder permission; a device-local scheduled notification if you allow it
+- Shared content you choose to save: achievements, goals, weekly reviews, and summaries of completed weeks
+- Device: check-in reminder and partner activity notifications if you allow them
 
 We do not collect precise location, contacts, photos, microphone, or advertising IDs.
 

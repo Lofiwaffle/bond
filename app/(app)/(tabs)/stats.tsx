@@ -12,7 +12,7 @@ import { formatDisplayDate, localDateString } from '../../../lib/dates'
 import { Icon, type IconName } from '../../../lib/icons'
 import { colors, hairlineWidth, radii, type } from '../../../lib/theme'
 
-export type BondSection = 'habits' | 'goals' | 'streaks' | 'reviews'
+export type BondSection = 'achievements' | 'goals' | 'streaks' | 'reviews'
 
 const HUB_OPTIONS: Array<{
   id: BondSection
@@ -21,10 +21,10 @@ const HUB_OPTIONS: Array<{
   body: string
 }> = [
   {
-    id: 'habits',
+    id: 'achievements',
     icon: 'calendar',
-    title: 'Habits',
-    body: 'Calendar and key for Spark through Sync',
+    title: 'Achievements',
+    body: 'Calendar and notes for Spark through Sync',
   },
   {
     id: 'goals',
@@ -59,7 +59,7 @@ function useHubStatus(): Partial<Record<BondSection, string>> {
     const earned = badgesForProgress({ completions: habitCounts }).filter(
       (b) => b.earned,
     ).length
-    status.habits = `${earned}/5 unlocked`
+    status.achievements = `${earned}/5 unlocked`
   }
 
   if (!goalsLoading) {

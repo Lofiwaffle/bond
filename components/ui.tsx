@@ -8,6 +8,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type TextInputProps,
   type ViewStyle,
 } from 'react-native'
@@ -387,21 +388,34 @@ export function StreakChip({ streak }: { streak: number }) {
   )
 }
 
-const HABIT_EMPTY = '#EDE6E8'
-const HABIT_CELL = 13
-const HABIT_GAP = 3
+const ACHIEVEMENT_EMPTY = '#EDE6E8'
+const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+const CAL_GAP = 5
+const WEEKDAY_COL = 16
 
-export function HabitCalendar({
+export function AchievementCalendar({
   completions,
-  onPressHabit,
-  weekCount = 16,
+  onPressAchievement,
+  onPressDate,
+  selectedDate,
+  weekCount = 12,
 }: {
-  completions: Array<{ habit_id: string; created_at: string }>
-  onPressHabit?: (id: BadgeId) => void
+  completions: Array<{ habit_id: string; created_at: string; note?: string | null }>
+  onPressAchievement?: (id: BadgeId) => void
+  onPressDate?: (date: string) => void
+  selectedDate?: string | null
   weekCount?: number
 }) {
+  const { width } = useWindowDimensions()
   const weeks = useMemo(() => habitCalendarWeeks(weekCount), [weekCount])
   const dayCounts = useMemo(() => habitDayCounts(completions), [completions])
+  const noteDates = useMemo(() => {
+    const dates = new Set<string>()
+    for (const row of completions) {
+      if (row.note?.trim()) dates.add(habitLocalDateFromIso(row.created_at))
+    }
+    return dates
+  }, [completions])
   const today = localDateString()
   const badgeById = useMemo(
     () => Object.fromEntries(BADGES.map((b) => [b.id, b])) as Record<
@@ -421,64 +435,105 @@ export function HabitCalendar({
     return badgesForProgress({ completions: counts })
   }, [dayCounts])
 
+  const available = Math.max(220, width - 40 - WEEKDAY_COL - 8)
+  const cell = Math.max(
+    22,
+    Math.min(
+      36,
+      Math.floor((available - (weekCount - 1) * CAL_GAP) / weekCount),
+    ),
+  )
+
   return (
     <View style={styles.habitCal}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.habitCalGrid}
-      >
-        {weeks.map((week, wi) => (
-          <View key={wi} style={styles.habitCalWeek}>
-            {week.map((date) => {
-              const summary = habitCombinedDaySummary(dayCounts, date)
-              const future = date > today
-              const badge = summary.primary
-                ? badgeById[summary.primary]
-                : null
-              const fill = future
-                ? 'transparent'
-                : !badge
-                  ? HABIT_EMPTY
-                  : summary.total === 1
-                    ? colors.hairline
-                    : colors.ink
+      <View style={styles.habitCalRow}>
+        <View style={[styles.habitCalWeekdays, { gap: CAL_GAP }]}>
+          {WEEKDAY_LABELS.map((label, i) => (
+            <Text
+              key={`${label}-${i}`}
+              style={[styles.habitCalWeekday, { height: cell, lineHeight: cell }]}
+            >
+              {label}
+            </Text>
+          ))}
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[styles.habitCalGrid, { gap: CAL_GAP }]}
+        >
+          {weeks.map((week, wi) => (
+            <View key={wi} style={[styles.habitCalWeek, { gap: CAL_GAP }]}>
+              {week.map((date) => {
+                const summary = habitCombinedDaySummary(dayCounts, date)
+                const future = date > today
+                const badge = summary.primary
+                  ? badgeById[summary.primary]
+                  : null
+                const selected = date === selectedDate
+                const fill = future
+                  ? 'transparent'
+                  : !badge
+                    ? ACHIEVEMENT_EMPTY
+                    : summary.total === 1
+                      ? (badge.colorSoft ?? colors.hairline)
+                      : (badge.color ?? colors.ink)
 
-              return (
-                <View
-                  key={date}
-                  accessibilityLabel={
-                    future
-                      ? undefined
-                      : summary.total === 0
-                        ? `${date}: no habits`
-                        : `${date}: ${summary.habits.join(', ')}`
-                  }
-                  style={[
-                    styles.habitCalCell,
-                    {
-                      backgroundColor: fill,
-                      borderColor: date === today ? colors.accent : 'transparent',
-                      borderWidth: date === today && !future ? 1.5 : 0,
-                      opacity: future ? 0 : 1,
-                    },
-                  ]}
-                />
-              )
-            })}
-          </View>
-        ))}
-      </ScrollView>
+                return (
+                  <Pressable
+                    key={date}
+                    disabled={future || !onPressDate}
+                    accessibilityRole={onPressDate && !future ? 'button' : undefined}
+                    accessibilityLabel={
+                      future
+                        ? undefined
+                        : summary.total === 0
+                          ? `${date}: no achievements`
+                          : `${date}: ${summary.habits.join(', ')}`
+                    }
+                    onPress={() => onPressDate?.(date)}
+                    style={[
+                      styles.habitCalCell,
+                      {
+                        width: cell,
+                        height: cell,
+                        borderRadius: Math.max(6, Math.round(cell / 4)),
+                        backgroundColor: fill,
+                        borderColor: selected
+                          ? colors.accent
+                          : date === today
+                            ? colors.accent
+                            : 'transparent',
+                        borderWidth: selected || date === today ? 2 : 0,
+                        opacity: future ? 0 : 1,
+                      },
+                    ]}
+                  >
+                    {noteDates.has(date) ? (
+                      <View
+                        style={[
+                          styles.habitCalNoteDot,
+                          summary.total > 1 && styles.habitCalNoteDotOnDark,
+                        ]}
+                      />
+                    ) : null}
+                  </Pressable>
+                )
+              })}
+            </View>
+          ))}
+        </ScrollView>
+      </View>
 
       <Text style={styles.label}>Key</Text>
       <View style={styles.habitCalKey}>
         {progress.map((badge) => (
           <Pressable
             key={badge.id}
-            accessibilityRole={onPressHabit ? 'button' : undefined}
+            accessibilityRole={onPressAchievement ? 'button' : undefined}
             accessibilityLabel={`${badge.label}, ${badge.count} logged. Tap to log.`}
-            disabled={!onPressHabit}
-            onPress={() => onPressHabit?.(badge.id)}
+            disabled={!onPressAchievement}
+            onPress={() => onPressAchievement?.(badge.id)}
             style={styles.habitCalKeyItem}
           >
             <Icon name={badge.icon} size={16} color={colors.ink} />
@@ -496,6 +551,17 @@ export function HabitCalendar({
     </View>
   )
 }
+
+function habitLocalDateFromIso(iso: string): string {
+  const d = new Date(iso)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/** @deprecated Use AchievementCalendar */
+export const HabitCalendar = AchievementCalendar
 
 /** @deprecated Prefer HabitCalendar: kept for any leftover callers */
 export function BadgeRow({
@@ -727,18 +793,38 @@ const styles = StyleSheet.create({
   habitCal: {
     gap: 12,
   },
+  habitCalRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  habitCalWeekdays: {
+    width: WEEKDAY_COL,
+    paddingTop: 2,
+  },
+  habitCalWeekday: {
+    fontSize: 10,
+    color: colors.muted,
+    textAlign: 'center',
+  },
   habitCalGrid: {
     flexDirection: 'row',
-    gap: HABIT_GAP,
     paddingVertical: 2,
   },
-  habitCalWeek: {
-    gap: HABIT_GAP,
-  },
+  habitCalWeek: {},
   habitCalCell: {
-    width: HABIT_CELL,
-    height: HABIT_CELL,
-    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: 3,
+  },
+  habitCalNoteDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: colors.accent,
+  },
+  habitCalNoteDotOnDark: {
+    backgroundColor: colors.white,
   },
   habitCalKey: {
     flexDirection: 'row',

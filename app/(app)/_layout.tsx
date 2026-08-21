@@ -2,6 +2,7 @@ import { Redirect, Stack } from 'expo-router'
 
 import { LoadingScreen } from '../../components/ui'
 import { CheckInProvider } from '../../hooks/useCheckIn'
+import { PartnerActivitySync } from '../../hooks/usePartnerActivity'
 import { useAuth } from '../../lib/auth'
 
 export default function AppLayout() {
@@ -12,28 +13,30 @@ export default function AppLayout() {
 
   return (
     <CheckInProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="bond" />
-        <Stack.Screen
-          name="check-in"
-          options={{
-            presentation: 'modal',
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen
-          name="weekly-review"
-          options={{
-            presentation: 'modal',
-            animation: 'slide_from_bottom',
-          }}
-        />
-        <Stack.Screen name="day/[date]" />
-        <Stack.Screen name="pair" />
-        <Stack.Screen name="setup" />
-        <Stack.Screen name="history" />
-      </Stack>
+      <PartnerActivitySync>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="bond" />
+          <Stack.Screen
+            name="check-in"
+            options={{
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+          <Stack.Screen
+            name="weekly-review"
+            options={{
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+          <Stack.Screen name="day/[date]" />
+          <Stack.Screen name="pair" />
+          <Stack.Screen name="setup" />
+          <Stack.Screen name="history" />
+        </Stack>
+      </PartnerActivitySync>
     </CheckInProvider>
   )
 }

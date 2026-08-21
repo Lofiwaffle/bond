@@ -103,9 +103,10 @@ export default function EntriesScreen() {
               pressed && styles.pressed,
             ]}
           >
+            <Text style={styles.composerKicker}>Daily check-in reminder</Text>
             <Text style={styles.composerTitle}>{todayPrompt.text}</Text>
             <Text style={styles.composerHint}>
-              Today's prompt · tap to check in
+              Log how connected you felt today. Tap to check in.
             </Text>
           </Pressable>
         ) : null}
@@ -348,10 +349,17 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
   },
   composer: {
-    paddingHorizontal: 20,
+    marginHorizontal: 20,
+    marginBottom: 8,
+    paddingHorizontal: 16,
     paddingVertical: 16,
-    borderBottomWidth: hairlineWidth,
-    borderBottomColor: colors.hairline,
+    backgroundColor: colors.accentSoft,
+    borderRadius: radii.md,
+  },
+  composerKicker: {
+    ...type.label,
+    color: colors.accent,
+    marginBottom: 4,
   },
   composerTitle: {
     ...type.body,

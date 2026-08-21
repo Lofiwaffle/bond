@@ -47,7 +47,7 @@ const SLIDES: Slide[] = [
     id: 'pair',
     icon: 'users',
     title: 'Pair with a code',
-    body: 'Create an account, generate an invite, and share it with one person. Then habits, goals, and weekly reviews live here together.',
+    body: 'Create an account, generate an invite, and share it with one person. Then achievements, goals, and weekly reviews live here together.',
   },
 ]
 

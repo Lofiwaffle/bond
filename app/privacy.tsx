@@ -12,7 +12,7 @@ const SECTIONS: Array<{ title: string; body: string }> = [
   },
   {
     title: 'Data we collect',
-    body: 'Account: email, password (stored by our auth provider, not in plain text), and display name. Couple pairing: invite codes and the link between two accounts. Check-ins: connection scores, optional notes, activity tags, prompt answers, and timestamps. Shared content you choose to save: habits, goals, weekly reviews, and summaries of completed weeks. Device: a local reminder if you allow notifications. We do not collect precise location, contacts, photos, microphone, or advertising IDs.',
+    body: 'Account: email, password (stored by our auth provider, not in plain text), and display name. Couple pairing: invite codes and the link between two accounts. Check-ins: connection scores, optional notes, activity tags, prompt answers, and timestamps. Shared content you choose to save: achievements, goals, weekly reviews, and summaries of completed weeks. Device: a check-in reminder and partner activity alerts if you allow notifications. We do not collect precise location, contacts, photos, microphone, or advertising IDs.',
   },
   {
     title: 'How we use data',

@@ -11,6 +11,7 @@ export type Profile = {
   display_name: string
   couple_id: string | null
   created_at: string
+  expo_push_token?: string | null
 }
 
 export type Couple = {
@@ -141,6 +142,7 @@ export type Database = {
         }
         Update: {
           display_name?: string
+          expo_push_token?: string | null
         }
         Relationships: []
       }
@@ -227,6 +229,28 @@ export type Database = {
         }
         Update: {
           note?: string | null
+        }
+        Relationships: []
+      }
+      partner_signals: {
+        Row: {
+          id: string
+          couple_id: string
+          actor_id: string
+          event_type: string
+          summary: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          couple_id: string
+          actor_id: string
+          event_type: string
+          summary: string
+          created_at?: string
+        }
+        Update: {
+          summary?: string
         }
         Relationships: []
       }

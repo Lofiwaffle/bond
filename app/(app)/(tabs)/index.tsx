@@ -96,14 +96,14 @@ export default function EntriesScreen() {
         {!todayMine ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Check in with today's prompt"
+            accessibilityLabel="Check-in with today's prompt"
             onPress={() => router.push('/(app)/check-in')}
             style={({ pressed }) => [
               styles.composer,
               pressed && styles.pressed,
             ]}
           >
-            <Text style={styles.composerKicker}>Daily check-in reminder</Text>
+            <Text style={styles.composerKicker}>Check-in</Text>
             <Text style={styles.composerTitle}>{todayPrompt.text}</Text>
             <Text style={styles.composerHint}>
               Log how connected you felt today. Tap to check in.

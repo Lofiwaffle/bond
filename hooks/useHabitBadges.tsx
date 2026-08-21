@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
 
 import { useAuth } from '../lib/auth'
 import type { BadgeId } from '../lib/badges'
@@ -13,7 +21,23 @@ const EMPTY_COUNTS: Record<BadgeId, number> = {
   sync: 0,
 }
 
-export function useHabitBadges() {
+type HabitBadgesValue = {
+  completions: HabitCompletion[]
+  counts: Record<BadgeId, number>
+  isLoading: boolean
+  error: string | null
+  refresh: () => Promise<void>
+  logHabit: (
+    habitId: BadgeId,
+    note?: string,
+  ) => Promise<{ error: string | null }>
+}
+
+const HabitBadgesContext = createContext<HabitBadgesValue | undefined>(
+  undefined,
+)
+
+export function HabitBadgesProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth()
   const [completions, setCompletions] = useState<HabitCompletion[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -52,7 +76,9 @@ export function useHabitBadges() {
     if (!user?.id || !profile?.couple_id) return
 
     const channel = supabase
-      .channel(`habit_completions:${profile.couple_id}`)
+      .channel(
+        `habit_completions:${profile.couple_id}:${Math.random().toString(36).slice(2)}`,
+      )
       .on(
         'postgres_changes',
         {
@@ -98,14 +124,42 @@ export function useHabitBadges() {
     [profile?.couple_id, refresh, user?.id],
   )
 
-  const counts = completions.reduce<Record<BadgeId, number>>(
-    (acc, c) => {
-      const id = c.habit_id as BadgeId
-      acc[id] = (acc[id] ?? 0) + 1
-      return acc
-    },
-    { ...EMPTY_COUNTS },
+  const counts = useMemo(
+    () =>
+      completions.reduce<Record<BadgeId, number>>(
+        (acc, c) => {
+          const id = c.habit_id as BadgeId
+          acc[id] = (acc[id] ?? 0) + 1
+          return acc
+        },
+        { ...EMPTY_COUNTS },
+      ),
+    [completions],
   )
 
-  return { completions, counts, isLoading, error, refresh, logHabit }
+  const value = useMemo(
+    () => ({
+      completions,
+      counts,
+      isLoading,
+      error,
+      refresh,
+      logHabit,
+    }),
+    [completions, counts, error, isLoading, logHabit, refresh],
+  )
+
+  return (
+    <HabitBadgesContext.Provider value={value}>
+      {children}
+    </HabitBadgesContext.Provider>
+  )
+}
+
+export function useHabitBadges() {
+  const ctx = useContext(HabitBadgesContext)
+  if (!ctx) {
+    throw new Error('useHabitBadges must be used within HabitBadgesProvider')
+  }
+  return ctx
 }

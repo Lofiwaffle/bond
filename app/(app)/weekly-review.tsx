@@ -267,7 +267,8 @@ export default function WeeklyReviewScreen() {
                 </Text>
               ) : null}
               <Text style={styles.hint}>
-                Say these out loud and keep one small thing you can actually do.
+                Keep one small thing you can actually do. Talking together is
+                optional, and only if it feels safe.
               </Text>
             </View>
           </View>

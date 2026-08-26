@@ -151,17 +151,17 @@ export default function OnboardingScreen() {
           <UnderstandingPreview yours={yours} />
           <Text style={styles.body}>
             {yours >= 4
-              ? 'You felt close. They felt far. That gap is the point — you can name it while it is still small.'
+              ? 'You felt close. They felt far. Naming the gap is enough — talking it through together is optional, and only if it feels safe.'
               : yours <= 2
-                ? 'You named a hard day. Seeing it together is how you start coming back, without a fight about who is right.'
-                : 'Same day, two different temperatures. Understanding starts when both versions can sit in the open.'}
+                ? 'You named a hard day. You do not have to discuss it together. A conversation is optional, and only if it feels safe.'
+                : 'Same day, two different temperatures. Understanding can stay in the app. Talking together is optional, and only if it feels safe.'}
           </Text>
         </Slide>
 
         <Slide
           width={width}
           kicker="4 · One small action"
-          title="Then do one gentle thing together."
+          title="Then one small next step."
         >
           <ActionPreview />
           <ExpectationRow
@@ -180,7 +180,8 @@ export default function OnboardingScreen() {
             body="An 8pm nudge if you want it. You can leave notifications off."
           />
           <Text style={styles.body}>
-            Next, invite the one person this ritual is for.
+            Next, invite the one person this ritual is for. Bond is not therapy
+            or emergency support.
           </Text>
         </Slide>
       </ScrollView>
@@ -204,6 +205,10 @@ export default function OnboardingScreen() {
             <TextLink
               label="I already have an account"
               onPress={() => void finish('/(auth)/login')}
+            />
+            <TextLink
+              label="Privacy"
+              onPress={() => router.push('/privacy')}
             />
           </>
         ) : (

@@ -12,6 +12,7 @@ import {
 } from '../lib/notifications'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../lib/toast'
+import { inAppSignalCopy } from '../lib/notificationCopy'
 import { useTodayCheckIn } from './useCheckIn'
 
 const ASKED_KEY = 'bond.notifications.asked'
@@ -24,58 +25,10 @@ type PartnerSignal = {
   summary: string
 }
 
-function copyForSignal(
-  signal: PartnerSignal,
-  partnerName: string,
-): { title: string; body: string } {
-  switch (signal.event_type) {
-    case 'partner_checked_in':
-      return {
-        title: 'Bond',
-        body: `${partnerName} checked in. Yours stays private until you add it.`,
-      }
-    case 'check_in_nudge':
-      return {
-        title: 'Bond',
-        body: `${partnerName} saved today when you have a minute. No rush.`,
-      }
-    case 'partner_logged_achievement':
-      return {
-        title: 'New achievement',
-        body: `${partnerName} ${signal.summary}.`,
-      }
-    case 'partner_set_goal':
-      return {
-        title: 'Bond',
-        body: `${partnerName} set a goal.`,
-      }
-    case 'partner_completed_goal':
-      return {
-        title: 'Bond',
-        body: `${partnerName} completed a goal.`,
-      }
-    case 'partner_weekly_review':
-      return {
-        title: 'Bond',
-        body: `${partnerName} finished a weekly review.`,
-      }
-    case 'partner_joined':
-      return {
-        title: 'Bond',
-        body: `${partnerName} joined your Bond.`,
-      }
-    default:
-      return {
-        title: 'Bond',
-        body: `${partnerName} ${signal.summary}.`,
-      }
-  }
-}
-
 /** Requests reminder permission, keeps the daily check-in alarm in sync, and
  *  surfaces partner activity from `partner_signals` realtime. */
 export function PartnerActivitySync({ children }: { children: ReactNode }) {
-  const { user, partner, profile } = useAuth()
+  const { user, profile } = useAuth()
   const { mine, isLoading } = useTodayCheckIn()
   const { showToast } = useToast()
 
@@ -115,10 +68,8 @@ export function PartnerActivitySync({ children }: { children: ReactNode }) {
         (payload) => {
           const row = payload.new as PartnerSignal
           if (!row?.actor_id || row.actor_id === user.id) return
-          const name = partner?.display_name?.trim() || 'Your partner'
-          const copy = copyForSignal(row, name)
-          void showLocalNotification(copy.title, copy.body)
-          showToast(copy.body)
+          void showLocalNotification()
+          showToast(inAppSignalCopy(row.event_type))
         },
       )
       .subscribe()
@@ -126,7 +77,7 @@ export function PartnerActivitySync({ children }: { children: ReactNode }) {
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [partner?.display_name, profile?.couple_id, showToast, user?.id])
+  }, [profile?.couple_id, showToast, user?.id])
 
   return <View style={styles.wrap}>{children}</View>
 }

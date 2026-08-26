@@ -1,4 +1,4 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { colors, hit, radii, type } from '../lib/theme'
 
@@ -40,7 +40,12 @@ export function ConfirmDialog({
         />
         <View style={styles.sheet} accessibilityRole="alert">
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.body}>{body}</Text>
+          <ScrollView
+            style={styles.bodyScroll}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.body}>{body}</Text>
+          </ScrollView>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={busy ? 'Working' : confirmLabel}
@@ -105,10 +110,13 @@ const styles = StyleSheet.create({
     ...type.heading,
     marginBottom: 8,
   },
+  bodyScroll: {
+    maxHeight: 280,
+    marginBottom: 20,
+  },
   body: {
     ...type.body,
     color: colors.muted,
-    marginBottom: 20,
   },
   confirm: {
     backgroundColor: colors.accentFill,

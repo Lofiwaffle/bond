@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import Constants from 'expo-constants'
 
 import { reportError } from './monitor'
+import { LOCK_SCREEN_BODY, LOCK_SCREEN_TITLE } from './notificationCopy'
 import { supabase } from './supabase'
 
 const ENABLED_KEY = 'bond.notifications.enabled'
@@ -22,6 +23,13 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 })
+
+const LOCK_SCREEN_CONTENT = {
+  title: LOCK_SCREEN_TITLE,
+  body: LOCK_SCREEN_BODY,
+  sound: 'default' as const,
+  interruptionLevel: 'passive' as const,
+}
 
 export async function areNotificationsEnabled(): Promise<boolean> {
   const value = await AsyncStorage.getItem(ENABLED_KEY)
@@ -44,13 +52,18 @@ export async function requestNotificationPermission(): Promise<boolean> {
 
 async function ensureAndroidChannels(): Promise<void> {
   if (Platform.OS !== 'android') return
+  const lockScreen = {
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+  }
   await Notifications.setNotificationChannelAsync('bond-reminders', {
     name: 'Check-in reminders',
     importance: Notifications.AndroidImportance.DEFAULT,
+    ...lockScreen,
   })
   await Notifications.setNotificationChannelAsync('partner-activity', {
     name: 'Partner activity',
     importance: Notifications.AndroidImportance.DEFAULT,
+    ...lockScreen,
   })
 }
 
@@ -94,8 +107,8 @@ export async function registerPushToken(userId: string): Promise<void> {
 }
 
 export async function showLocalNotification(
-  title: string,
-  body: string,
+  _title?: string,
+  _body?: string,
   channelId = 'partner-activity',
 ): Promise<void> {
   const enabled = await areNotificationsEnabled()
@@ -107,9 +120,7 @@ export async function showLocalNotification(
     await ensureAndroidChannels()
     await Notifications.scheduleNotificationAsync({
       content: {
-        title,
-        body,
-        sound: 'default',
+        ...LOCK_SCREEN_CONTENT,
         ...(Platform.OS === 'android' ? { channelId } : {}),
       },
       trigger: null,
@@ -138,9 +149,7 @@ export async function syncCheckInReminder(
 
     const id = await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Bond check-in',
-        body: 'How connected did you feel today? Take a moment to check in.',
-        sound: 'default',
+        ...LOCK_SCREEN_CONTENT,
         ...(Platform.OS === 'android' ? { channelId: 'bond-reminders' } : {}),
       },
       trigger: {

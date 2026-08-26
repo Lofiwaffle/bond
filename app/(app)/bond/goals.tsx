@@ -615,16 +615,16 @@ function GoalDetail({
         />
       ) : null}
 
-      <Text style={styles.sectionTitle}>Review together</Text>
+      <Text style={styles.sectionTitle}>Progress notes</Text>
       <Text style={styles.sectionHint}>
-        Check progress against the success criteria. Both of you can write
-        here.
+        Check progress against the success criteria. Either of you can write
+        here. You do not have to review this out loud together.
       </Text>
 
       {reviews.length === 0 ? (
         <Text style={styles.emptyReviews}>
-          No reviews yet.
-          {readOnly ? '' : ' Write the first one together.'}
+          No notes yet.
+          {readOnly ? '' : ' You can add one from here.'}
         </Text>
       ) : (
         reviews.map((item) => (

@@ -1,4 +1,4 @@
-type ErrorArea = 'auth' | 'supabase' | 'notifications' | 'app'
+type ErrorArea = 'auth' | 'supabase' | 'notifications' | 'app' | 'export'
 
 type ErrorPayload = {
   area: ErrorArea

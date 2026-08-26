@@ -40,6 +40,7 @@ type AuthContextValue = {
     inviteCode: string,
   ) => Promise<{ couple: Couple | null; error: string | null }>
   deleteAccount: () => Promise<{ error: string | null }>
+  leaveCouple: () => Promise<{ error: string | null }>
   updateDisplayName: (name: string) => Promise<{ error: string | null }>
 }
 
@@ -292,6 +293,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [refreshProfile],
   )
 
+  const leaveCouple = useCallback(async () => {
+    if (!supabaseConfigured) {
+      return { error: supabaseConfigError }
+    }
+    const { error } = await supabase.rpc('leave_couple')
+    if (error) {
+      reportError('auth', error.message, { op: 'leave-couple' })
+      return { error: error.message }
+    }
+    await refreshProfile()
+    return { error: null }
+  }, [refreshProfile])
+
   const deleteAccount = useCallback(async () => {
     if (!supabaseConfigured) {
       return { error: supabaseConfigError }
@@ -353,6 +367,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       createCouple,
       joinCouple,
       deleteAccount,
+      leaveCouple,
       updateDisplayName,
     }),
     [
@@ -370,6 +385,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       createCouple,
       joinCouple,
       deleteAccount,
+      leaveCouple,
       updateDisplayName,
     ],
   )

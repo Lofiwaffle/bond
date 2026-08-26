@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import { reportError } from './monitor'
+import { LOCK_SCREEN_BODY, LOCK_SCREEN_TITLE } from './notificationCopy'
 
 const ENABLED_KEY = 'bond.notifications.enabled'
 const WEB_REMINDER_DATE_KEY = 'bond.checkin.webReminderDate'
@@ -58,8 +59,8 @@ export async function registerPushToken(_userId: string): Promise<void> {
 }
 
 export async function showLocalNotification(
-  title: string,
-  body: string,
+  _title?: string,
+  _body?: string,
   _channelId = 'partner-activity',
 ): Promise<void> {
   const enabled = await areNotificationsEnabled()
@@ -68,7 +69,11 @@ export async function showLocalNotification(
   try {
     const granted = await requestNotificationPermission()
     if (!granted) return
-    const payload = { type: 'notify', title, body }
+    const payload = {
+      type: 'notify',
+      title: LOCK_SCREEN_TITLE,
+      body: LOCK_SCREEN_BODY,
+    }
     const worker =
       typeof navigator !== 'undefined' ? navigator.serviceWorker : undefined
     if (worker?.controller) {
@@ -77,7 +82,7 @@ export async function showLocalNotification(
     }
     const NotificationApi = webNotificationApi()
     if (NotificationApi && NotificationApi.permission === 'granted') {
-      new NotificationApi(title, { body })
+      new NotificationApi(LOCK_SCREEN_TITLE, { body: LOCK_SCREEN_BODY })
     }
   } catch (error) {
     reportError('notifications', error, { platform: 'web' })
@@ -117,11 +122,7 @@ export async function syncCheckInReminder(
         const shown = await AsyncStorage.getItem(WEB_REMINDER_DATE_KEY)
         if (shown === today) return
         await AsyncStorage.setItem(WEB_REMINDER_DATE_KEY, today)
-        await showLocalNotification(
-          'Bond check-in',
-          'How connected did you feel today? Take a moment to check in.',
-          'bond-reminders',
-        )
+        await showLocalNotification()
       } catch (error) {
         reportError('notifications', error, { platform: 'web' })
       }

@@ -394,6 +394,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: { ok: boolean }
       }
+      leave_couple: {
+        Args: Record<PropertyKey, never>
+        Returns: { ok: boolean; left: boolean; couple_deleted: boolean }
+      }
       has_own_check_in: {
         Args: { p_couple_id: string; p_date: string }
         Returns: boolean

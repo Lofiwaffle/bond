@@ -25,6 +25,9 @@ type WebhookBody = {
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 const MILESTONE_THRESHOLDS = [7, 25, 50, 100] as const
+/** Lock-screen copy must stay generic. Never include scores, notes, or names. */
+const PUSH_TITLE = 'Bond'
+const PUSH_BODY = 'Open the app when you have a minute.'
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') {
@@ -89,10 +92,8 @@ Deno.serve(async (req: Request) => {
       coupleId: record.couple_id,
       eventDate: record.check_in_date,
       eventType,
-      title: 'Bond',
-      body: bothIn
-        ? 'Your check-in together is ready.'
-        : 'Your partner checked in. Add yours when you’re ready.',
+      title: PUSH_TITLE,
+      body: PUSH_BODY,
       channelId: 'partner-activity',
       data: {
         type: eventType,
@@ -121,8 +122,8 @@ Deno.serve(async (req: Request) => {
             // Once per lifetime threshold (fixed date + typed event)
             eventDate: '1970-01-01',
             eventType: `milestone_${threshold}`,
-            title: 'Bond',
-            body: `You’ve made space for each other ${threshold} times.`,
+            title: PUSH_TITLE,
+            body: PUSH_BODY,
             channelId: 'partner-activity',
             data: {
               type: 'milestone',

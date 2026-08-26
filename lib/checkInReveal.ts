@@ -82,22 +82,22 @@ export function revealReflection(
     difference = `You named ${mineActs[0].toLowerCase()}. They named ${theirActs[0].toLowerCase()}.`
   }
 
-  let starter = 'What felt true about today, in a sentence?'
+  let starter = 'If talking together feels safe, what felt true about today?'
   let suggestedAction: RevealActionId = 'plan'
   if (gap === 0 && mine.score >= 4) {
-    starter = 'What made today feel close?'
+    starter = 'If it feels safe, what made today feel close?'
     suggestedAction = 'appreciate'
   } else if (gap === 0 && mine.score <= 2) {
-    starter = 'What do you need tonight that is small and doable?'
+    starter = 'If it feels safe, what is one small thing you need tonight?'
     suggestedAction = 'support'
   } else if (gap >= 2) {
-    starter = 'What would have helped you feel a little more together today?'
+    starter = 'If it feels safe, what would have helped a little today?'
     suggestedAction = 'support'
   } else if (sharedActs.includes('Food') || sharedActs.includes('Home')) {
-    starter = 'Want to share a meal or an evening at home tomorrow?'
+    starter = 'If it feels safe, want a quiet meal or evening at home tomorrow?'
     suggestedAction = 'plan'
   } else if (!mineWords || !theirsWords) {
-    starter = 'Want to sit together without talking it all the way through?'
+    starter = 'Talking is optional. Sitting nearby without a conversation is enough.'
     suggestedAction = 'appreciate'
   }
 

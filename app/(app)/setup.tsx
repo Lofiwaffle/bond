@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
-import { Redirect, router } from 'expo-router'
+import { Redirect, router, type Href } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
 
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../../lib/auth'
 import { Icon } from '../../lib/icons'
 import { useToast } from '../../lib/toast'
+import { DELETE_SEMANTICS, UNPAIR_SEMANTICS } from '../../lib/privacy'
 import { colors, type } from '../../lib/theme'
 
 export default function SetupScreen() {
@@ -29,6 +30,7 @@ export default function SetupScreen() {
     updateDisplayName,
     signOut,
     deleteAccount,
+    leaveCouple,
   } = useAuth()
   const [name, setName] = useState(profile?.display_name?.trim() ?? '')
   const [inviteCode, setInviteCode] = useState('')
@@ -38,7 +40,9 @@ export default function SetupScreen() {
   const [joining, setJoining] = useState(false)
   const [copied, setCopied] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [leaving, setLeaving] = useState(false)
   const { showToast } = useToast()
 
   if (isLoading) return <LoadingScreen />
@@ -86,6 +90,20 @@ export default function SetupScreen() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const onLeave = async () => {
+    if (leaving) return
+    setLeaving(true)
+    const result = await leaveCouple()
+    setLeaving(false)
+    if (result.error) {
+      setConfirmLeave(false)
+      setError(result.error)
+      return
+    }
+    setConfirmLeave(false)
+    showToast('You left this Bond')
+  }
+
   const onDelete = async () => {
     if (deleting) return
     setDeleting(true)
@@ -102,6 +120,14 @@ export default function SetupScreen() {
   const accountLinks = (
     <View style={styles.account}>
       <TextLink label="Sign out" onPress={() => void signOut()} />
+      <TextLink
+        label="Privacy"
+        onPress={() => router.push('/privacy')}
+      />
+      <TextLink
+        label="Help & safety"
+        onPress={() => router.push('/help' as Href)}
+      />
       <TextLink
         label="Delete account"
         onPress={() => setConfirmDelete(true)}
@@ -133,12 +159,27 @@ export default function SetupScreen() {
             onPress={() => router.replace('/(app)/(tabs)')}
           />
           <ErrorText message={error} />
+          <TextLink
+            label={leaving ? 'Leaving...' : 'Leave this Bond'}
+            onPress={() => setConfirmLeave(true)}
+            disabled={leaving}
+          />
           {accountLinks}
         </ScrollView>
         <ConfirmDialog
+          visible={confirmLeave}
+          title="Leave this Bond?"
+          body={UNPAIR_SEMANTICS}
+          confirmLabel="Leave this Bond"
+          destructive
+          busy={leaving}
+          onCancel={() => setConfirmLeave(false)}
+          onConfirm={() => void onLeave()}
+        />
+        <ConfirmDialog
           visible={confirmDelete}
           title="Delete account?"
-          body="This permanently removes your profile and sign-in."
+          body={DELETE_SEMANTICS}
           confirmLabel="Delete account"
           destructive
           busy={deleting}
@@ -209,7 +250,7 @@ export default function SetupScreen() {
       <ConfirmDialog
         visible={confirmDelete}
         title="Delete account?"
-        body="This permanently removes your profile and sign-in."
+        body={DELETE_SEMANTICS}
         confirmLabel="Delete account"
         destructive
         busy={deleting}

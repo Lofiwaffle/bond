@@ -31,7 +31,8 @@ import type { DailyCheckIn } from '../types/database'
 export function PrivacyLine() {
   return (
     <Text style={styles.privacy}>
-      Private until you both check in. No one else sees this.
+      Private until you both check in. Then only the two of you. Private
+      thoughts stay on this device.
     </Text>
   )
 }
@@ -211,8 +212,12 @@ export function RevealMoment({
         <Text style={styles.body}>{insight.difference}</Text>
       ) : null}
 
-      <Text style={styles.sectionLabel}>A way into the conversation</Text>
+      <Text style={styles.sectionLabel}>If talking together feels safe</Text>
       <Text style={styles.starter}>{insight.starter}</Text>
+      <Text style={styles.body}>
+        Skip this if a conversation would not be safe. Bond will not tell you
+        that you have to talk it through.
+      </Text>
 
       <Text style={styles.sectionLabel}>One small action</Text>
       <View style={styles.actionRow}>

@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native'
-import { Redirect, router } from 'expo-router'
+import { Redirect, router, type Href } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
 
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
@@ -22,12 +22,14 @@ import {
 import { useCheckInHistory } from '../../../hooks/useCheckIn'
 import { useAuth } from '../../../lib/auth'
 import { localDateString } from '../../../lib/dates'
+import { buildExportBundle, shareExportBundle } from '../../../lib/exportData'
 import {
   areNotificationsEnabled,
   disableNotifications,
   enableNotifications,
   syncCheckInReminder,
 } from '../../../lib/notifications'
+import { DELETE_SEMANTICS, UNPAIR_SEMANTICS } from '../../../lib/privacy'
 import { useToast } from '../../../lib/toast'
 import { colors, hairlineWidth, hit, type } from '../../../lib/theme'
 
@@ -55,13 +57,19 @@ export default function UsScreen() {
     signOut,
     refreshProfile,
     deleteAccount,
+    leaveCouple,
   } = useAuth()
   const { days, isLoading: historyLoading, error: historyError, refresh: refreshHistory } =
     useCheckInHistory()
   const [copied, setCopied] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [leaveError, setLeaveError] = useState<string | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
   const [notifyOn, setNotifyOn] = useState(false)
   const [notifyBusy, setNotifyBusy] = useState(false)
   const [notifyError, setNotifyError] = useState<string | null>(null)
@@ -114,6 +122,36 @@ export default function UsScreen() {
     const today = localDateString()
     const hasCompletedToday = days.some((day) => day.date === today && day.mine)
     await syncCheckInReminder(Boolean(hasCompletedToday))
+  }
+
+  const onExport = async () => {
+    if (exporting || !user?.id) return
+    setExportError(null)
+    setExporting(true)
+    const bundle = await buildExportBundle(user.id)
+    const result = await shareExportBundle(bundle)
+    setExporting(false)
+    if (result.error) {
+      setExportError(result.error)
+      return
+    }
+    showToast('Data export ready')
+  }
+
+  const onLeaveCouple = async () => {
+    if (leaving) return
+    setLeaveError(null)
+    setLeaving(true)
+    const result = await leaveCouple()
+    setLeaving(false)
+    if (result.error) {
+      setConfirmLeave(false)
+      setLeaveError(result.error)
+      return
+    }
+    setConfirmLeave(false)
+    showToast('You left this Bond')
+    router.replace('/(app)/setup')
   }
 
   const onDeleteAccount = async () => {
@@ -193,8 +231,9 @@ export default function UsScreen() {
         <View style={styles.accountBlock}>
           <Text style={styles.label}>Notifications</Text>
           <Text style={styles.sectionHint}>
-            Daily check-in reminder at 8:00 PM, plus an alert when your partner
-            checks in.
+            Daily reminder at 8:00 PM, plus an alert when your partner checks
+            in. Lock screens never show scores, words, or names — only a generic
+            Bond notice.
           </Text>
           <TextLink
             label={
@@ -209,12 +248,48 @@ export default function UsScreen() {
           />
           {notifyError ? <ErrorText message={notifyError} /> : null}
 
-          <Text style={[styles.label, styles.accountLabel]}>Account</Text>
+          <Text style={[styles.label, styles.accountLabel]}>Privacy & safety</Text>
+          <Text style={styles.sectionHint}>
+            Bond is not therapy or emergency support. Who can see each entry is
+            listed in Privacy.
+          </Text>
           <TextLink
             label="Privacy"
             onPress={() => router.push('/privacy')}
           />
+          <TextLink
+            label="Help & safety"
+            onPress={() => router.push('/help' as Href)}
+          />
+          <TextLink
+            label={exporting ? 'Preparing download...' : 'Download my data'}
+            onPress={() => void onExport()}
+            disabled={exporting}
+          />
+          {exportError ? <ErrorText message={exportError} /> : null}
+
+          <Text style={[styles.label, styles.accountLabel]}>Account</Text>
           <TextLink label="Sign out" onPress={() => void signOut()} />
+          {leaveError ? <ErrorText message={leaveError} /> : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Leave this Bond"
+            onPress={() => {
+              setLeaveError(null)
+              setConfirmLeave(true)
+            }}
+            disabled={leaving}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.deleteBtn,
+              pressed && styles.deleteBtnPressed,
+              leaving && styles.deleteBtnDisabled,
+            ]}
+          >
+            <Text style={styles.leaveLabel}>
+              {leaving ? 'Leaving...' : 'Leave this Bond'}
+            </Text>
+          </Pressable>
           {deleteError ? <ErrorText message={deleteError} /> : null}
           <Pressable
             accessibilityRole="button"
@@ -238,9 +313,19 @@ export default function UsScreen() {
         </View>
       </ScrollView>
       <ConfirmDialog
+        visible={confirmLeave}
+        title="Leave this Bond?"
+        body={UNPAIR_SEMANTICS}
+        confirmLabel="Leave this Bond"
+        destructive
+        busy={leaving}
+        onCancel={() => setConfirmLeave(false)}
+        onConfirm={() => void onLeaveCouple()}
+      />
+      <ConfirmDialog
         visible={confirmDelete}
         title="Delete account?"
-        body="This permanently removes your profile and sign-in. Shared couple data stays for your partner until they delete their account too."
+        body={DELETE_SEMANTICS}
         confirmLabel="Delete account"
         destructive
         busy={deleting}
@@ -441,5 +526,9 @@ const styles = StyleSheet.create({
   deleteLabel: {
     ...type.body,
     color: colors.danger,
+  },
+  leaveLabel: {
+    ...type.body,
+    color: colors.muted,
   },
 })

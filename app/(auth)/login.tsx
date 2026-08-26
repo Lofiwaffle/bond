@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ScrollView, StyleSheet, Text } from 'react-native'
-import { Link, Redirect } from 'expo-router'
+import { Link, Redirect, type Href } from 'expo-router'
 
 import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen, StatusPanel } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
@@ -89,6 +89,9 @@ export default function LoginScreen() {
         </Link>
         <Link href="/privacy" style={styles.privacy}>
           Privacy
+        </Link>
+        <Link href={'/help' as Href} style={styles.privacy}>
+          Help & safety
         </Link>
       </ScrollView>
     </Screen>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Pressable,
   RefreshControl,
@@ -19,12 +19,9 @@ import {
   StatusPanel,
   TextLink,
 } from '../../../components/ui'
-import { computeStreak, useCheckInHistory } from '../../../hooks/useCheckIn'
-import { useHabitBadges } from '../../../hooks/useHabitBadges'
+import { useCheckInHistory } from '../../../hooks/useCheckIn'
 import { useAuth } from '../../../lib/auth'
-import { BADGES, badgesForProgress } from '../../../lib/badges'
 import { localDateString } from '../../../lib/dates'
-import { Icon, type IconName } from '../../../lib/icons'
 import {
   areNotificationsEnabled,
   disableNotifications,
@@ -48,51 +45,7 @@ function togetherSinceLabel(iso: string | null | undefined): string {
   })}`
 }
 
-const LINKS: Array<{
-  id: string
-  icon: IconName
-  title: string
-  body: string
-  href: '/(app)/bond/achievements' | '/(app)/bond/streaks' | '/(app)/bond/goals' | '/(app)/bond/reviews' | '/(app)/weekly-review'
-}> = [
-  {
-    id: 'achievements',
-    icon: 'calendar',
-    title: 'Achievements',
-    body: 'Calendar and notes',
-    href: '/(app)/bond/achievements',
-  },
-  {
-    id: 'streaks',
-    icon: 'trending-up',
-    title: 'Streaks',
-    body: 'Daily streak and rhythm',
-    href: '/(app)/bond/streaks',
-  },
-  {
-    id: 'goals',
-    icon: 'target',
-    title: 'Goals',
-    body: 'Shared SMART goals',
-    href: '/(app)/bond/goals',
-  },
-  {
-    id: 'reviews',
-    icon: 'book-open',
-    title: 'Reviews',
-    body: 'Past weekly review summaries',
-    href: '/(app)/bond/reviews',
-  },
-  {
-    id: 'weekly',
-    icon: 'edit-3',
-    title: 'Weekly review',
-    body: 'Look back on the week together',
-    href: '/(app)/weekly-review',
-  },
-]
-
-export default function MoreScreen() {
+export default function UsScreen() {
   const {
     profile,
     couple,
@@ -105,11 +58,6 @@ export default function MoreScreen() {
   } = useAuth()
   const { days, isLoading: historyLoading, error: historyError, refresh: refreshHistory } =
     useCheckInHistory()
-  const {
-    counts,
-    isLoading: habitsLoading,
-    refresh: refreshHabits,
-  } = useHabitBadges()
   const [copied, setCopied] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -123,19 +71,7 @@ export default function MoreScreen() {
     void areNotificationsEnabled().then(setNotifyOn)
   }, [])
 
-  const stats = useMemo(() => {
-    const today = localDateString()
-    const myDates = days.filter((d) => d.mine).map((d) => d.date)
-    const streak = computeStreak(myDates, today)
-    const myCheckIns = days.filter((d) => d.mine).length
-    const syncDays = days.filter((d) => d.revealed).length
-    const badges = badgesForProgress({ completions: counts })
-    const earned = badges.filter((b) => b.earned)
-    const habitLogs = Object.values(counts).reduce((a, n) => a + n, 0)
-    return { streak, myCheckIns, syncDays, badges, earned, habitLogs }
-  }, [counts, days])
-
-  if (isLoading || historyLoading || habitsLoading) return <LoadingScreen />
+  if (isLoading || historyLoading) return <LoadingScreen />
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
 
   const myName = profile.display_name?.trim() || 'You'
@@ -154,7 +90,6 @@ export default function MoreScreen() {
   const refreshAll = () => {
     void refreshProfile()
     void refreshHistory()
-    void refreshHabits()
   }
 
   const onToggleNotifications = async () => {
@@ -201,12 +136,12 @@ export default function MoreScreen() {
           <RefreshControl refreshing={false} onRefresh={refreshAll} />
         }
       >
-        <Text style={styles.label}>Couple portfolio</Text>
+        <Text style={styles.label}>Us</Text>
         <Text style={styles.heroTitle}>{coupleTitle}</Text>
         <Text style={styles.heroSub}>{since}</Text>
         {historyError ? (
           <StatusPanel
-            message="Couldn't refresh your couple stats."
+            message="Couldn't refresh your couple."
             onRetry={refreshAll}
           />
         ) : null}
@@ -241,89 +176,11 @@ export default function MoreScreen() {
           </View>
         </View>
 
-        <View style={styles.statStrip}>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{stats.streak}</Text>
-            <Text style={styles.statLabel}>day streak</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{stats.earned.length}/5</Text>
-            <Text style={styles.statLabel}>earned</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{stats.syncDays}</Text>
-            <Text style={styles.statLabel}>sync days</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Highlights</Text>
-          <Text style={styles.sectionHint}>
-            Achievements you've unlocked together.
-          </Text>
-          <View style={styles.chipWrap}>
-            {BADGES.map((badge) => {
-              const earned = stats.badges.find((b) => b.id === badge.id)
-              const count = earned?.count ?? 0
-              const on = count > 0
-              return (
-                <View
-                  key={badge.id}
-                  style={[styles.chip, on && styles.chipOn]}
-                >
-                  <Icon
-                    name={badge.icon}
-                    size={14}
-                    color={on ? colors.onAccent : colors.ink}
-                  />
-                  <Text style={[styles.chipName, on && styles.chipNameOn]}>
-                    {badge.label}
-                  </Text>
-                </View>
-              )
-            })}
-          </View>
-          <Text style={styles.emptyHint}>
-            {stats.habitLogs === 0
-              ? 'No achievements yet. Open Achievements to start filling your portfolio.'
-              : `${stats.habitLogs} achievement${stats.habitLogs === 1 ? '' : 's'} logged · ${stats.myCheckIns} check-in${stats.myCheckIns === 1 ? '' : 's'}`}
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Together</Text>
-          <Text style={styles.sectionHint}>Jump into how you're growing.</Text>
-          {LINKS.map((item, index) => (
-            <Pressable
-              key={item.id}
-              accessibilityRole="button"
-              accessibilityLabel={`${item.title}. ${item.body}`}
-              onPress={() => router.push(item.href)}
-              style={(state) => [
-                styles.linkRow,
-                index === LINKS.length - 1 && styles.linkRowLast,
-                state.pressed && styles.linkRowPressed,
-                Boolean((state as { focused?: boolean }).focused) &&
-                  styles.linkFocus,
-              ]}
-            >
-              <Icon name={item.icon} size={18} color={colors.ink} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.linkTitle}>{item.title}</Text>
-                <Text style={styles.linkBody}>{item.body}</Text>
-              </View>
-              <Icon name="chevron-right" size={16} color={colors.muted} />
-            </Pressable>
-          ))}
-        </View>
-
         {!partner && couple?.invite_code ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Invite your partner</Text>
+            <Text style={styles.sectionTitle}>Pairing</Text>
             <Text style={styles.sectionHint}>
-              Share this code so your portfolio becomes a pair.
+              Share this code so your person can join.
             </Text>
             <Text style={styles.code}>{couple.invite_code}</Text>
             <PrimaryButton
@@ -337,7 +194,7 @@ export default function MoreScreen() {
           <Text style={styles.label}>Notifications</Text>
           <Text style={styles.sectionHint}>
             Daily check-in reminder at 8:00 PM, plus an alert when your partner
-            checks in, logs an achievement, or updates a goal.
+            checks in.
           </Text>
           <TextLink
             label={

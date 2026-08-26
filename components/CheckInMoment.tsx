@@ -67,7 +67,7 @@ export function WaitingMoment({
   nudging: boolean
   onNudge: () => void
   onRefresh: () => void
-  onDone: () => void
+  onDone?: () => void
 }) {
   const [thought, setThought] = useState('')
   const [thoughtReady, setThoughtReady] = useState(false)
@@ -133,7 +133,7 @@ export function WaitingMoment({
         />
       )}
       <TextLink label="See if today is open" onPress={onRefresh} />
-      <TextLink label="Done" onPress={onDone} />
+      {onDone ? <TextLink label="Done" onPress={onDone} /> : null}
     </View>
   )
 }

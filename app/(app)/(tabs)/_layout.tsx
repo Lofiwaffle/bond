@@ -3,15 +3,41 @@ import { Redirect, Tabs, router } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { LoadingScreen } from '../../../components/ui'
+import { useTodayCheckIn } from '../../../hooks/useCheckIn'
 import { useAuth } from '../../../lib/auth'
+import { todayPhase } from '../../../lib/nextStep'
 import { colors, elevation, radii } from '../../../lib/theme'
 
 function CheckInFab() {
+  const { mine, waitingForPartner, bothSubmitted } = useTodayCheckIn()
+  const phase = todayPhase({
+    hasMine: Boolean(mine),
+    waitingForPartner,
+    bothSubmitted,
+  })
+  const label =
+    phase === 'compose' ? 'Check-in' : phase === 'waiting' ? 'Saved' : 'Reveal'
+  const icon = phase === 'compose' ? 'plus' : phase === 'waiting' ? 'check' : 'book-open'
+  const accessibilityLabel =
+    phase === 'compose'
+      ? 'Check in'
+      : phase === 'waiting'
+        ? 'Open saved check-in'
+        : "Open today's reveal"
+
+  const onPress = () => {
+    if (phase === 'compose') {
+      router.push('/(app)/check-in')
+      return
+    }
+    router.navigate('/(app)/(tabs)')
+  }
+
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Check-in"
-      onPress={() => router.push('/(app)/check-in')}
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
       style={(state) => [
         styles.fabWrap,
         state.pressed && styles.fabPressed,
@@ -19,9 +45,9 @@ function CheckInFab() {
       ]}
     >
       <View style={styles.fab}>
-        <Feather name="plus" size={26} color={colors.onAccent} />
+        <Feather name={icon} size={26} color={colors.onAccent} />
       </View>
-      <Text style={styles.fabLabel}>Check-in</Text>
+      <Text style={styles.fabLabel}>{label}</Text>
     </Pressable>
   )
 }
@@ -45,9 +71,18 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Entries',
+          title: 'Today',
           tabBarIcon: ({ color, size }) => (
-            <Feather name="align-left" size={size} color={color} />
+            <Feather name="sun" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'History',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="clock" size={size} color={color} />
           ),
         }}
       />
@@ -68,7 +103,7 @@ export default function TabsLayout() {
         options={{
           title: 'Growth',
           tabBarIcon: ({ color, size }) => (
-            <Feather name="heart" size={size} color={color} />
+            <Feather name="trending-up" size={size} color={color} />
           ),
         }}
       />

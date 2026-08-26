@@ -51,7 +51,7 @@ export function CompactScorePicker({
               key={score}
               accessibilityRole="button"
               accessibilityState={{ selected }}
-              accessibilityLabel={`${score}, ${SCORE_LABELS[score]}`}
+              accessibilityLabel={SCORE_LABELS[score]}
               onPress={() => onChange(score)}
               style={(state) => [
                 styles.scaleCell,

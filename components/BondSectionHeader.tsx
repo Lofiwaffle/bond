@@ -15,13 +15,13 @@ export function BondSectionHeader({
     <View style={styles.header}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Back to Bond"
+        accessibilityLabel="Back to Growth"
         onPress={() => router.back()}
         hitSlop={8}
         style={styles.backBtn}
       >
         <Icon name="chevron-left" size={16} color={colors.muted} />
-        <Text style={styles.backText}>Bond</Text>
+        <Text style={styles.backText}>Growth</Text>
       </Pressable>
       <Text style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}

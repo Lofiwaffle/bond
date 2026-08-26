@@ -203,7 +203,7 @@ export default function BondAchievementsScreen() {
         ) : null}
 
         <View style={styles.sectionLast}>
-          <Text style={styles.sectionTitle}>Our Memories</Text>
+          <Text style={styles.sectionTitle}>Logged</Text>
           <Text style={styles.sectionHint}>
             Everything you and your partner have logged. Tap one to open that
             day, or edit a note you wrote.

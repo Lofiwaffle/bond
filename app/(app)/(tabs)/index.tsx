@@ -5,12 +5,13 @@ import { Redirect, router, useFocusEffect } from 'expo-router'
 import { NextStepCard } from '../../../components/NextStepCard'
 import { RevealMoment, WaitingMoment } from '../../../components/CheckInMoment'
 import { LoadingScreen, Screen, StatusPanel } from '../../../components/ui'
-import { useTodayCheckIn } from '../../../hooks/useCheckIn'
+import { useTodayCheckIn, useCheckInHistory } from '../../../hooks/useCheckIn'
 import { useAuth } from '../../../lib/auth'
 import { hasSentNudge, markNudgeSent } from '../../../lib/checkInDraft'
 import { promptForDate } from '../../../lib/dailyPrompts'
 import { formatDisplayDate, localDateString } from '../../../lib/dates'
 import { todayPhase } from '../../../lib/nextStep'
+import { describeRhythm, welcomeBackCopy } from '../../../lib/rhythm'
 import { colors, type } from '../../../lib/theme'
 
 export default function TodayScreen() {
@@ -25,6 +26,7 @@ export default function TodayScreen() {
     refresh,
     sendNudge,
   } = useTodayCheckIn()
+  const { days } = useCheckInHistory()
   const [nudged, setNudged] = useState(false)
   const [nudging, setNudging] = useState(false)
   const today = localDateString()
@@ -50,6 +52,12 @@ export default function TodayScreen() {
     bothSubmitted,
   })
   const prompt = promptForDate(profile.couple_id, today)
+  const rhythm = describeRhythm(
+    days.filter((d) => d.mine).map((d) => d.date),
+    days.filter((d) => d.revealed).map((d) => d.date),
+    today,
+  )
+  const returning = !mine ? welcomeBackCopy(rhythm) : null
 
   const onNudge = async () => {
     if (!user?.id || nudged || nudging) return
@@ -89,7 +97,10 @@ export default function TodayScreen() {
           <NextStepCard
             kicker="What now"
             title={prompt.text}
-            body="Two minutes. Private until you both check in."
+            body={
+              returning ??
+              'Two minutes. Private until you both check in.'
+            }
             actionLabel="Check in"
             onAction={() => router.push('/(app)/check-in')}
           />

@@ -1,14 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router } from 'expo-router'
 
 import {
   ErrorText,
   Field,
-  Label,
   LoadingScreen,
   PrimaryButton,
-  ScoreMark,
   Screen,
   StatusPanel,
   TextLink,
@@ -18,10 +16,13 @@ import { useAuth } from '../../lib/auth'
 import { formatDisplayDate } from '../../lib/dates'
 import { useToast } from '../../lib/toast'
 import { colors, hairlineWidth, type } from '../../lib/theme'
-import type { WeeklyAnswer } from '../../lib/weeklyPrompts'
+import {
+  intentionAnswers,
+  type WeeklyAnswer,
+} from '../../lib/weeklyPrompts'
 
 export default function WeeklyReviewScreen() {
-  const { partner, isLoading: authLoading } = useAuth()
+  const { partner, profile, isLoading: authLoading } = useAuth()
   const {
     unlocked,
     needsReview,
@@ -32,19 +33,21 @@ export default function WeeklyReviewScreen() {
     partnerReview,
     bothSubmitted,
     waitingForPartner,
-    mySummary,
-    partnerSummary,
     weekCheckIns,
+    daysConnected,
     aiSummary,
     aiLoading,
     aiError,
     generateAiSummary,
-    streak,
+    saveEditedSummary,
+    dismissSummary,
+    restoreSummary,
     isLoading,
     error,
     refresh,
     submit,
   } = useWeeklyReview()
+  const { showToast } = useToast()
 
   const initialAnswers = useMemo(
     () =>
@@ -56,36 +59,29 @@ export default function WeeklyReviewScreen() {
     [prompts],
   )
   const [answers, setAnswers] = useState<WeeklyAnswer[]>([])
+  const [step, setStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const { showToast } = useToast()
+  const [editingSummary, setEditingSummary] = useState(false)
+  const [summaryDraft, setSummaryDraft] = useState('')
+  const [summaryBusy, setSummaryBusy] = useState(false)
 
   useEffect(() => {
     setAnswers(initialAnswers)
+    setStep(0)
   }, [initialAnswers])
-
-  useEffect(() => {
-    if (!unlocked || aiSummary || aiLoading) return
-    if (weekCheckIns.every((d) => !d.mine && !d.partner)) return
-    void generateAiSummary(false)
-  }, [aiLoading, aiSummary, generateAiSummary, unlocked, weekCheckIns])
-
-  const refreshedAfterBoth = useRef(false)
-  useEffect(() => {
-    if (!bothSubmitted || refreshedAfterBoth.current) return
-    refreshedAfterBoth.current = true
-    void generateAiSummary(true)
-  }, [bothSubmitted, generateAiSummary])
 
   if (authLoading || isLoading) return <LoadingScreen />
   if (!partner) return <Redirect href="/(app)/setup" />
   if (!unlocked) {
+    const remaining = Math.max(0, 7 - daysConnected)
     return (
       <Screen>
         <Text style={styles.title}>Weekly review</Text>
         <Text style={styles.subtitle}>
-          Keep a 7-day check-in streak to unlock your weekly reflection (
-          {streak}/7).
+          This opens after seven days of honest reflection, even if they were
+          not in a row. {remaining} more check-in{remaining === 1 ? '' : 's'} on
+          Today.
         </Text>
         <TextLink label="Back" onPress={() => router.back()} />
       </Screen>
@@ -116,15 +112,49 @@ export default function WeeklyReviewScreen() {
     const result = await submit(payload)
     setSubmitting(false)
     if (result.error) setSubmitError(result.error)
-    else showToast('Weekly review saved')
+    else showToast('Saved. Private until they finish too.')
+  }
+
+  const myDays = weekCheckIns.filter((d) => d.mine).length
+  const openDays = weekCheckIns.filter((d) => d.revealed).length
+  const myName = profile?.display_name?.trim() || 'You'
+  const current = prompts[step]
+  const myIntention = mine ? intentionAnswers(mine.answers) : ''
+  const theirIntention = partnerReview
+    ? intentionAnswers(partnerReview.answers)
+    : ''
+
+  const onGenerate = async () => {
+    setSummaryBusy(true)
+    await generateAiSummary(true)
+    setSummaryBusy(false)
+    setEditingSummary(false)
+  }
+
+  const onSaveEdit = async () => {
+    setSummaryBusy(true)
+    const result = await saveEditedSummary(summaryDraft)
+    setSummaryBusy(false)
+    if (result.error) {
+      showToast("Couldn't save that edit.")
+      return
+    }
+    setEditingSummary(false)
+    showToast('Summary updated')
+  }
+
+  const onDismiss = async () => {
+    setSummaryBusy(true)
+    const result = await dismissSummary()
+    setSummaryBusy(false)
+    if (result.error) showToast("Couldn't dismiss that summary.")
   }
 
   return (
     <Screen style={styles.screen} keyboard>
       <Text style={styles.title}>Weekly review</Text>
       <Text style={styles.subtitle}>
-        {formatDisplayDate(weekStart)} – {formatDisplayDate(weekEnd)} · streak{' '}
-        {streak}
+        {formatDisplayDate(weekStart)} – {formatDisplayDate(weekEnd)}
       </Text>
 
       {error ? (
@@ -140,125 +170,192 @@ export default function WeeklyReviewScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your week at a glance</Text>
-          <Text style={styles.summaryLine}>
-            Avg connection:{' '}
-            {mySummary.avg != null
-              ? `${mySummary.avg.toFixed(1)} · ${mySummary.label}`
-              : 'None'}
-          </Text>
-          <View style={styles.faces}>
-            {weekCheckIns.map((day) =>
-              day.mine ? (
-                <ScoreMark key={day.date} score={day.mine.score} size={24} />
-              ) : (
-                <View key={day.date} style={styles.missing} />
-              ),
-            )}
-          </View>
-          {bothSubmitted || waitingForPartner ? (
-            <Text style={styles.summaryLine}>
-              {partner.display_name}:{' '}
-              {partnerSummary.avg != null
-                ? `${partnerSummary.avg.toFixed(1)} · ${partnerSummary.label}`
-                : waitingForPartner
-                  ? 'Waiting for their review'
-                  : 'Hidden until you both finish'}
-            </Text>
-          ) : null}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Week summary</Text>
+          <Text style={styles.sectionTitle}>This week</Text>
           <Text style={styles.hint}>
-            A Bond summary of every daily check-in this week
-            {aiSummary?.source === 'ai' ? ' (AI)' : aiSummary ? ' (local)' : ''}.
+            Participation, not a score. You checked in {myDays} day
+            {myDays === 1 ? '' : 's'}. {openDays} day{openDays === 1 ? '' : 's'}{' '}
+            opened for both of you.
           </Text>
-          {aiLoading && !aiSummary ? (
-            <Text style={styles.hint}>Generating summary…</Text>
-          ) : null}
-          {aiSummary ? (
-            <Text style={styles.aiSummary}>{aiSummary.summary}</Text>
-          ) : (
-            <Text style={styles.hint}>
-              Check in during the week to unlock a narrative of your days
-              together.
-            </Text>
-          )}
-          <ErrorText message={aiError} />
-          <TextLink
-            label={aiSummary ? 'Regenerate summary' : 'Generate summary'}
-            onPress={() => void generateAiSummary(true)}
-            disabled={aiLoading}
-          />
         </View>
 
-        {needsReview ? (
+        {needsReview && current ? (
           <View style={styles.sectionLast}>
-            <Text style={styles.sectionTitle}>Check in with each other</Text>
-            <Text style={styles.hint}>
-              Answer privately. You'll see {partner.display_name}'s answers
-              after they submit too.
+            <Text style={styles.kicker}>
+              {step + 1} of {prompts.length}
             </Text>
-            {prompts.map((prompt, index) => (
-              <View key={prompt.id} style={styles.promptBlock}>
-                <Label>{`Prompt ${index + 1}`}</Label>
-                <Text style={styles.promptText}>{prompt.text}</Text>
-                <Field
-                  value={answers[index]?.answer ?? ''}
-                  onChangeText={(text) => onChangeAnswer(index, text)}
-                  placeholder="Your answer"
-                  accessibilityLabel={`${prompt.text} answer`}
-                  autoCapitalize="sentences"
-                  multiline
-                  style={styles.answer}
-                />
-              </View>
-            ))}
-            <ErrorText message={submitError} />
-            <PrimaryButton
-              label="Save weekly review"
-              onPress={onSubmit}
-              loading={submitting}
+            <Text style={styles.sectionTitle}>{current.text}</Text>
+            <Text style={styles.hint}>
+              Answer on your own. {partner.display_name} will not see this until
+              you both finish.
+            </Text>
+            <Field
+              value={answers[step]?.answer ?? ''}
+              onChangeText={(text) => onChangeAnswer(step, text)}
+              placeholder="A few sentences"
+              accessibilityLabel={current.text}
+              autoCapitalize="sentences"
+              multiline
+              style={styles.answer}
             />
-            <TextLink label="Done" onPress={() => router.back()} />
+            <ErrorText message={submitError} />
+            {step < prompts.length - 1 ? (
+              <PrimaryButton
+                label="Continue"
+                onPress={() => setStep((n) => n + 1)}
+                disabled={!answers[step]?.answer.trim()}
+              />
+            ) : (
+              <PrimaryButton
+                label="Save weekly review"
+                onPress={() => void onSubmit()}
+                loading={submitting}
+                disabled={!answers[step]?.answer.trim()}
+              />
+            )}
+            {step > 0 ? (
+              <TextLink label="Back" onPress={() => setStep((n) => n - 1)} />
+            ) : (
+              <TextLink label="Not this week" onPress={() => router.back()} />
+            )}
           </View>
         ) : null}
 
         {mine && waitingForPartner ? (
           <View style={styles.sectionLast}>
-            <Text style={styles.sectionTitle}>Saved. Waiting on partner</Text>
+            <Text style={styles.sectionTitle}>
+              Saved. Waiting on {partner.display_name}.
+            </Text>
+            <Text style={styles.hint}>
+              They cannot see your answers yet. There is no rush.
+            </Text>
             {mine.answers.map((a) => (
               <View key={a.prompt_id} style={styles.promptBlock}>
                 <Text style={styles.promptText}>{a.prompt_text}</Text>
                 <Text style={styles.answerText}>{a.answer}</Text>
               </View>
             ))}
-            <Text style={styles.hint}>
-              {partner.display_name}'s answers unlock when they finish this
-              week's review.
-            </Text>
             <TextLink label="Done" onPress={() => router.back()} />
           </View>
         ) : null}
 
         {bothSubmitted && mine && partnerReview ? (
-          <View style={styles.sectionLast}>
-            <Text style={styles.sectionTitle}>Revealed together</Text>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Your words, side by side</Text>
             {mine.answers.map((a, index) => {
               const theirs = partnerReview.answers[index]
               return (
                 <View key={a.prompt_id} style={styles.promptBlock}>
                   <Text style={styles.promptText}>{a.prompt_text}</Text>
-                  <Text style={styles.metaLabel}>You</Text>
+                  <Text style={styles.metaLabel}>{myName}</Text>
                   <Text style={styles.answerText}>{a.answer}</Text>
                   <Text style={styles.metaLabel}>{partner.display_name}</Text>
                   <Text style={styles.answerText}>
-                    {theirs?.answer ?? 'None'}
+                    {theirs?.answer ?? ''}
                   </Text>
                 </View>
               )
             })}
+
+            <View style={styles.intention}>
+              <Text style={styles.metaLabel}>This week's intention</Text>
+              {myIntention ? (
+                <Text style={styles.answerText}>{myName}: {myIntention}</Text>
+              ) : null}
+              {theirIntention ? (
+                <Text style={styles.answerText}>
+                  {partner.display_name}: {theirIntention}
+                </Text>
+              ) : null}
+              <Text style={styles.hint}>
+                Say these out loud and keep one small thing you can actually do.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {bothSubmitted ? (
+          <View style={styles.sectionLast}>
+            <Text style={styles.sectionTitle}>Suggested reading</Text>
+            <Text style={styles.hint}>
+              Optional. Clearly not a diagnosis. Your answers above are the
+              record.
+            </Text>
+            {aiSummary && !aiSummary.dismissed ? (
+              <>
+                <Text style={styles.metaLabel}>
+                  {aiSummary.source === 'ai'
+                    ? 'Generated suggestion'
+                    : 'Local suggestion'}
+                  {aiSummary.originalSummary &&
+                  aiSummary.originalSummary !== aiSummary.summary
+                    ? ' · edited'
+                    : ''}
+                </Text>
+                {editingSummary ? (
+                  <Field
+                    value={summaryDraft}
+                    onChangeText={setSummaryDraft}
+                    accessibilityLabel="Edit summary"
+                    autoCapitalize="sentences"
+                    multiline
+                    style={styles.answer}
+                  />
+                ) : (
+                  <Text style={styles.aiSummary}>{aiSummary.summary}</Text>
+                )}
+                <ErrorText message={aiError} />
+                {editingSummary ? (
+                  <PrimaryButton
+                    label="Save this reading"
+                    onPress={() => void onSaveEdit()}
+                    loading={summaryBusy}
+                  />
+                ) : (
+                  <TextLink
+                    label="Edit this reading"
+                    onPress={() => {
+                      setSummaryDraft(aiSummary.summary)
+                      setEditingSummary(true)
+                    }}
+                  />
+                )}
+                <TextLink
+                  label="This doesn't sound like us"
+                  onPress={() => void onDismiss()}
+                  disabled={summaryBusy}
+                />
+                <TextLink
+                  label="Generate again"
+                  onPress={() => void onGenerate()}
+                  disabled={aiLoading || summaryBusy}
+                />
+              </>
+            ) : (
+              <>
+                {aiSummary?.dismissed ? (
+                  <Text style={styles.hint}>
+                    The suggestion is hidden. Your original words stay.
+                  </Text>
+                ) : null}
+                <PrimaryButton
+                  label={
+                    aiLoading || summaryBusy
+                      ? 'Working…'
+                      : aiSummary?.dismissed
+                        ? 'Show a suggestion again'
+                        : 'Generate a suggestion'
+                  }
+                  onPress={() => {
+                    if (aiSummary?.dismissed) {
+                      void restoreSummary()
+                      return
+                    }
+                    void onGenerate()
+                  }}
+                  loading={aiLoading || summaryBusy}
+                />
+              </>
+            )}
             <TextLink label="Done" onPress={() => router.back()} />
           </View>
         ) : null}
@@ -298,21 +395,9 @@ const styles = StyleSheet.create({
     ...type.heading,
     marginBottom: 8,
   },
-  summaryLine: {
-    ...type.body,
+  kicker: {
+    ...type.label,
     marginBottom: 8,
-  },
-  faces: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 8,
-  },
-  missing: {
-    width: 18,
-    height: 18,
-    borderRadius: 6,
-    borderWidth: 0.5,
-    borderColor: colors.border,
   },
   hint: {
     ...type.body,
@@ -324,10 +409,11 @@ const styles = StyleSheet.create({
   },
   promptText: {
     ...type.body,
+    fontWeight: '500',
     marginBottom: 8,
   },
   answer: {
-    minHeight: 72,
+    minHeight: 88,
     textAlignVertical: 'top',
   },
   answerText: {
@@ -341,5 +427,11 @@ const styles = StyleSheet.create({
   metaLabel: {
     ...type.label,
     marginTop: 4,
+  },
+  intention: {
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: hairlineWidth,
+    borderTopColor: colors.hairline,
   },
 })

@@ -26,16 +26,14 @@ export function growthUnlocks({
   myCheckIns,
   revealedDays,
   weeklyUnlocked,
-  habitLogs,
 }: {
   myCheckIns: number
   revealedDays: number
   weeklyUnlocked: boolean
-  habitLogs: number
 }): GrowthUnlocks {
   return {
     patterns: myCheckIns >= 3,
-    achievements: habitLogs > 0 || myCheckIns >= 7,
+    achievements: revealedDays >= 1 || myCheckIns >= 3,
     goals: revealedDays >= 3 || myCheckIns >= 7,
     weeklyReview: weeklyUnlocked,
   }
@@ -57,13 +55,11 @@ export function pickGrowthNext({
   unlocks,
   needsReview,
   activeGoalCount,
-  habitLogs,
   myCheckIns,
 }: {
   unlocks: GrowthUnlocks
   needsReview: boolean
   activeGoalCount: number
-  habitLogs: number
   myCheckIns: number
 }): { next: GrowthDestination | null; remaining: number } {
   if (unlocks.weeklyReview && needsReview) {
@@ -71,10 +67,10 @@ export function pickGrowthNext({
       next: {
         id: 'weekly',
         title: 'Weekly review',
-        body: 'You have a week together. Look back while it is still close.',
+        body: 'Look back in your own words, then pick one small intention.',
         href: '/(app)/weekly-review',
       },
-      remaining: myCheckIns < 3 ? 3 - myCheckIns : 0,
+      remaining: 0,
     }
   }
 
@@ -97,23 +93,11 @@ export function pickGrowthNext({
     }
   }
 
-  if (unlocks.achievements && habitLogs === 0) {
-    return {
-      next: {
-        id: 'achievements',
-        title: 'Achievements',
-        body: 'Save a memory from a day that already happened.',
-        href: '/(app)/bond/achievements',
-      },
-      remaining: 0,
-    }
-  }
-
   return {
     next: {
       id: 'patterns',
-      title: 'Patterns',
-      body: 'See how you have been showing up, without a scoreboard.',
+      title: 'Rhythm',
+      body: 'Days connected, without a punishment for missing one.',
       href: '/(app)/bond/streaks',
     },
     remaining: 0,
@@ -125,8 +109,8 @@ export function unlockedGrowthItems(unlocks: GrowthUnlocks): GrowthDestination[]
   if (unlocks.patterns) {
     items.push({
       id: 'patterns',
-      title: 'Patterns',
-      body: 'Streak and connection mix',
+      title: 'Rhythm',
+      body: 'Days connected',
       href: '/(app)/bond/streaks',
     })
   }
@@ -141,8 +125,8 @@ export function unlockedGrowthItems(unlocks: GrowthUnlocks): GrowthDestination[]
   if (unlocks.achievements) {
     items.push({
       id: 'achievements',
-      title: 'Achievements',
-      body: 'Memories you choose to keep',
+      title: 'Milestones',
+      body: 'Constructive moments you already lived',
       href: '/(app)/bond/achievements',
     })
   }

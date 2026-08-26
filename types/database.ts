@@ -124,6 +124,9 @@ export type WeeklyAiSummary = {
   summary: string
   source: 'ai' | 'fallback'
   model: string | null
+  original_summary: string | null
+  dismissed_at: string | null
+  dismissed_by: string | null
   created_at: string
   updated_at: string
 }
@@ -355,6 +358,9 @@ export type Database = {
           summary: string
           source?: 'ai' | 'fallback'
           model?: string | null
+          original_summary?: string | null
+          dismissed_at?: string | null
+          dismissed_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -362,6 +368,9 @@ export type Database = {
           summary?: string
           source?: 'ai' | 'fallback'
           model?: string | null
+          original_summary?: string | null
+          dismissed_at?: string | null
+          dismissed_by?: string | null
           updated_at?: string
         }
         Relationships: []

@@ -52,3 +52,15 @@ export function addDays(isoDate: string, delta: number): string {
   date.setDate(date.getDate() + delta)
   return localDateString(date)
 }
+
+/** Sunday-start week that contains `date`. */
+export function startOfWeek(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  date.setDate(date.getDate() - date.getDay())
+  return localDateString(date)
+}
+
+export function endOfWeek(isoDate: string): string {
+  return addDays(startOfWeek(isoDate), 6)
+}

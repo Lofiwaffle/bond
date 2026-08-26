@@ -82,8 +82,8 @@ export default function BondReviewsScreen() {
           </View>
         ) : (
           <Text style={styles.emptyBody}>
-            Keep a 7-day check-in streak to unlock weekly reviews. Finished
-            weeks will collect here.
+            Weekly review opens after seven days of honest reflection, even if
+            they were not in a row. Finished weeks live here.
           </Text>
         )}
 
@@ -130,7 +130,8 @@ export default function BondReviewsScreen() {
                     {formatDisplayDate(week.weekEnd)}
                   </Text>
                   <Text style={styles.weekHint} numberOfLines={expanded ? 0 : 2}>
-                    {week.summary}
+                    {week.mine?.answers.find((a) => a.prompt_id === 'intention')
+                      ?.answer || week.summary}
                   </Text>
                 </View>
                 <Icon
@@ -141,8 +142,27 @@ export default function BondReviewsScreen() {
               </Pressable>
               {expanded ? (
                 <View style={styles.detail}>
-                  <Text style={styles.detailKicker}>Week summary</Text>
-                  <Text style={styles.detailBody}>{week.summary}</Text>
+                  {week.mine?.answers.map((answer, index) => (
+                    <View key={answer.prompt_id} style={styles.prompt}>
+                      <Text style={styles.detailKicker}>{answer.prompt_text}</Text>
+                      <Text style={styles.detailBody}>You: {answer.answer}</Text>
+                      {week.partnerReview?.answers[index]?.answer ? (
+                        <Text style={styles.detailBody}>
+                          {partnerName}: {week.partnerReview.answers[index].answer}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ))}
+                  {week.summary ? (
+                    <>
+                      <Text style={styles.detailKicker}>
+                        {week.source === 'review'
+                          ? 'Your words'
+                          : 'Suggested reading'}
+                      </Text>
+                      <Text style={styles.detailBody}>{week.summary}</Text>
+                    </>
+                  ) : null}
                 </View>
               ) : null}
             </View>
@@ -216,5 +236,8 @@ const styles = StyleSheet.create({
   },
   detailBody: {
     ...type.body,
+  },
+  prompt: {
+    marginBottom: 12,
   },
 })

@@ -7,16 +7,14 @@ import {
   Screen,
   StatusPanel,
 } from '../../../components/ui'
-import {
-  computeStreak,
-  useCheckInHistory,
-} from '../../../hooks/useCheckIn'
+import { useCheckInHistory } from '../../../hooks/useCheckIn'
 import { useAuth } from '../../../lib/auth'
 import { localDateString } from '../../../lib/dates'
+import { describeRhythm, welcomeBackCopy } from '../../../lib/rhythm'
 import { SCORE_LABELS, colors, hairlineWidth, radii, scoreColors, type } from '../../../lib/theme'
 
-export default function BondStreaksScreen() {
-  const { partner, isLoading: authLoading } = useAuth()
+export default function BondRhythmScreen() {
+  const { isLoading: authLoading } = useAuth()
   const { days, isLoading, error, refresh } = useCheckInHistory()
   const now = useMemo(() => new Date(), [])
   const year = now.getFullYear()
@@ -24,79 +22,68 @@ export default function BondStreaksScreen() {
   const stats = useMemo(() => {
     const today = localDateString()
     const myDates = days.filter((d) => d.mine).map((d) => d.date)
-    const streak = computeStreak(myDates, today)
-    const togetherCount =
-      days.filter((d) => d.mine).length +
-      days.filter((d) => d.revealed && d.partner).length
-
+    const revealedDates = days.filter((d) => d.revealed).map((d) => d.date)
+    const rhythm = describeRhythm(myDates, revealedDates, today)
     const yearMine = [0, 0, 0, 0, 0]
-    const yearPartner = [0, 0, 0, 0, 0]
     for (const day of days) {
       if (!day.date.startsWith(String(year))) continue
       if (day.mine?.score) yearMine[day.mine.score - 1] += 1
-      if (day.revealed && day.partner?.score) {
-        yearPartner[day.partner.score - 1] += 1
-      }
     }
-
     return {
-      streak,
-      togetherCount,
+      rhythm,
       yearMine,
-      yearPartner,
-      mineTotal: yearMine.reduce((a, b) => a + b, 0),
-      partnerTotal: yearPartner.reduce((a, b) => a + b, 0),
+      mineTotal: yearMine.reduce((a, n) => a + n, 0),
     }
   }, [days, year])
 
   if (authLoading || isLoading) return <LoadingScreen />
 
+  const welcome = welcomeBackCopy(stats.rhythm)
+
   return (
     <Screen style={styles.screen}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <BondSectionHeader
-          title="Patterns"
-          subtitle="How you have been showing up, without a scoreboard."
+          title="Rhythm"
+          subtitle="Days you showed up. Missing one does not erase the rest."
         />
         {error ? (
           <StatusPanel
-            message="Couldn't load your streak."
+            message="Couldn't load your rhythm."
             onRetry={() => void refresh()}
           />
         ) : null}
 
         <View style={styles.section}>
-          <Text style={styles.heroEyebrow}>Together streak</Text>
-          <Text style={styles.heroStreak}>{stats.streak}</Text>
-          <Text style={styles.heroUnit}>days showing up</Text>
+          <Text style={styles.heroEyebrow}>Days connected</Text>
+          <Text style={styles.heroStreak}>{stats.rhythm.daysConnected}</Text>
+          <Text style={styles.heroUnit}>check-ins that still count</Text>
+          {welcome ? <Text style={styles.welcome}>{welcome}</Text> : null}
           <View style={styles.heroStats}>
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{stats.togetherCount}</Text>
-              <Text style={styles.heroStatLabel}>check-ins</Text>
+              <Text style={styles.heroStatValue}>{stats.rhythm.daysOpen}</Text>
+              <Text style={styles.heroStatLabel}>days opened together</Text>
             </View>
             <View style={styles.heroDivider} />
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{stats.mineTotal}</Text>
-              <Text style={styles.heroStatLabel}>{year} yours</Text>
+              <Text style={styles.heroStatValue}>
+                {stats.rhythm.gapDays <= 1 ? stats.rhythm.stretch : '—'}
+              </Text>
+              <Text style={styles.heroStatLabel}>
+                {stats.rhythm.gapDays <= 1
+                  ? 'recent stretch, with room to miss a day'
+                  : 'stretch pauses; days stay'}
+              </Text>
             </View>
           </View>
         </View>
 
         <View style={styles.sectionLast}>
-          <Text style={styles.sectionTitle}>{year} connection mix</Text>
-          <Text style={styles.meta}>You · {stats.mineTotal} check-ins</Text>
+          <Text style={styles.sectionTitle}>How your days felt</Text>
+          <Text style={styles.meta}>
+            Your labels only. Not a ranking, and not a health score.
+          </Text>
           <DistributionBars counts={stats.yearMine} total={stats.mineTotal} />
-          {partner ? (
-            <>
-              <Text style={[styles.meta, { marginTop: 16 }]}>
-                {partner.display_name} · {stats.partnerTotal} revealed
-              </Text>
-              <DistributionBars
-                counts={stats.yearPartner}
-                total={stats.partnerTotal}
-              />
-            </>
-          ) : null}
         </View>
       </ScrollView>
     </Screen>
@@ -154,74 +141,47 @@ const styles = StyleSheet.create({
   heroStreak: {
     ...type.heading,
     fontSize: 48,
-    lineHeight: 52,
-    fontWeight: '500',
+    lineHeight: 56,
   },
   heroUnit: {
     ...type.body,
     color: colors.muted,
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  welcome: {
+    ...type.body,
+    marginBottom: 12,
   },
   heroStats: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    paddingTop: 8,
   },
-  heroStat: { flex: 1, alignItems: 'center' },
-  heroStatValue: { ...type.heading },
+  heroStat: {
+    flex: 1,
+  },
+  heroStatValue: {
+    ...type.heading,
+  },
   heroStatLabel: {
     ...type.label,
-    marginTop: 2,
+    marginTop: 4,
     marginBottom: 0,
   },
-  heroDivider: { width: 0.5, height: 28, backgroundColor: colors.hairline },
+  heroDivider: {
+    width: hairlineWidth,
+    alignSelf: 'stretch',
+    backgroundColor: colors.hairline,
+    marginHorizontal: 12,
+  },
   sectionTitle: {
     ...type.heading,
     marginBottom: 4,
   },
-  sectionHint: {
+  meta: {
     ...type.body,
     color: colors.muted,
     marginBottom: 12,
-  },
-  questRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-  },
-  questTitle: { ...type.body, fontWeight: '500' },
-  questBody: {
-    ...type.label,
-    marginTop: 2,
-    marginBottom: 0,
-  },
-  questCta: { ...type.label, color: colors.accent, marginBottom: 0 },
-  matrix: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  matrixSlot: {
-    width: `${100 / 7}%`,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
-  },
-  matrixDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-  },
-  legendRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendSwatch: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { ...type.label, marginBottom: 0 },
-  meta: {
-    ...type.label,
-    marginBottom: 8,
   },
   distList: { gap: 8 },
   distRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

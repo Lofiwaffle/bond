@@ -12,6 +12,7 @@ import { AppState } from 'react-native'
 import { useAuth } from '../lib/auth'
 import { reportError } from '../lib/monitor'
 import { localDateString } from '../lib/dates'
+import { describeRhythm } from '../lib/rhythm'
 import { supabase } from '../lib/supabase'
 import type { DailyCheckIn } from '../types/database'
 
@@ -320,15 +321,5 @@ export function useDayDetail(date: string) {
 }
 
 export function computeStreak(myDates: string[], today: string): number {
-  const set = new Set(myDates)
-  let streak = 0
-  let cursor = today
-  while (set.has(cursor)) {
-    streak += 1
-    const [y, m, d] = cursor.split('-').map(Number)
-    const prev = new Date(y, m - 1, d)
-    prev.setDate(prev.getDate() - 1)
-    cursor = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-${String(prev.getDate()).padStart(2, '0')}`
-  }
-  return streak
+  return describeRhythm(myDates, [], today).stretch
 }

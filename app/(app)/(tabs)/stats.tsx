@@ -6,7 +6,6 @@ import { NextStepCard } from '../../../components/NextStepCard'
 import { LoadingScreen, Screen } from '../../../components/ui'
 import { useCheckInHistory } from '../../../hooks/useCheckIn'
 import { useCoupleGoal } from '../../../hooks/useCoupleGoal'
-import { useHabitBadges } from '../../../hooks/useHabitBadges'
 import { useWeeklyReview } from '../../../hooks/useWeeklyReview'
 import { useAuth } from '../../../lib/auth'
 import { Icon } from '../../../lib/icons'
@@ -19,14 +18,12 @@ import { colors, hairlineWidth, type } from '../../../lib/theme'
 
 export default function GrowthScreen() {
   const { profile, isLoading } = useAuth()
-  const { counts, isLoading: habitsLoading } = useHabitBadges()
   const { activeGoals, isLoading: goalsLoading } = useCoupleGoal()
   const { days, isLoading: checkInLoading } = useCheckInHistory()
   const { needsReview, unlocked: weeklyUnlocked } = useWeeklyReview()
 
   const myCheckIns = days.filter((d) => d.mine).length
   const revealedDays = days.filter((d) => d.revealed).length
-  const habitLogs = Object.values(counts).reduce((a, n) => a + n, 0)
 
   const unlocks = useMemo(
     () =>
@@ -34,16 +31,14 @@ export default function GrowthScreen() {
         myCheckIns,
         revealedDays,
         weeklyUnlocked,
-        habitLogs,
       }),
-    [habitLogs, myCheckIns, revealedDays, weeklyUnlocked],
+    [myCheckIns, revealedDays, weeklyUnlocked],
   )
 
   const { next, remaining } = pickGrowthNext({
     unlocks,
     needsReview,
     activeGoalCount: activeGoals.length,
-    habitLogs,
     myCheckIns,
   })
 
@@ -51,7 +46,7 @@ export default function GrowthScreen() {
     (item) => item.id !== next?.id,
   )
 
-  if (isLoading || habitsLoading || goalsLoading || checkInLoading) {
+  if (isLoading || goalsLoading || checkInLoading) {
     return <LoadingScreen />
   }
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
@@ -73,7 +68,7 @@ export default function GrowthScreen() {
       ) : (
         <NextStepCard
           kicker="Not yet"
-          title="Patterns open after a few check-ins."
+          title="Rhythm opens after a few check-ins."
           body={
             remaining > 0
               ? `${remaining} more day${remaining === 1 ? '' : 's'} on Today, then this home fills in.`

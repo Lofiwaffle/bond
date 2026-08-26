@@ -1,5 +1,5 @@
 /**
- * Simulate a 7-day streak + unlock weekly review for two fresh test accounts.
+ * Simulate seven check-ins so weekly review unlocks for two fresh test accounts.
  * Run: npx --yes tsx scripts/simulate-weekly-review.ts
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
@@ -87,7 +87,7 @@ async function main() {
   console.log(`  Password:  ${password}`)
   console.log('')
   console.log('Then open Check in → “Start weekly check-in”')
-  console.log('(Both have a 7-day streak ending today.)')
+  console.log('(Both have seven check-ins ending today.)')
 }
 
 main().catch((err) => {

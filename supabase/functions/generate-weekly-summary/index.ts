@@ -96,7 +96,7 @@ Deno.serve(async (req: Request) => {
       .eq('couple_id', coupleId)
       .eq('week_start', weekStart)
       .maybeSingle()
-    if (existing?.summary) {
+    if (existing?.summary && !existing.dismissed_at) {
       return json({
         summary: existing.summary,
         source: existing.source,
@@ -158,7 +158,7 @@ Deno.serve(async (req: Request) => {
           formatNote(slot.mine.note, 'note'),
       )
     } else {
-      parts.push(`${myName} missing`)
+      parts.push(`${myName} did not check in`)
     }
     if (revealed && slot.partner) {
       parts.push(
@@ -196,17 +196,20 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  const prompt = `You are Bond, a warm, concise relationship coach for couples.
-Write a short weekly summary (3–6 short paragraphs or tight bullets) that:
-- Mentions every daily check-in day in the week (scores, connection labels, activities, and notes when present)
-- Stays encouraging and couple-focused (connection, not judgment)
-- Avoids medical advice
-- Uses plain language
+  const prompt = `You are Bond. Write a short suggested reading of a couple's week (3–5 short paragraphs).
+Rules:
+- This is a suggestion for conversation, never a diagnosis, never a verdict about whether the relationship is healthy or unhealthy.
+- Do not blame either person or claim certainty about anyone's intent.
+- Do not rank the partners or compare them as winning or losing the week.
+- Prefer quoting their original words over interpreting them.
+- Mention participation (days they showed up) separately from how the days felt.
+- If weekly reflection answers are present, keep those words visible and do not replace them.
+- Avoid medical or clinical language.
 
 Couple: ${myName} & ${partnerName}
 Week: ${weekStart} to ${weekEnd}
 
-Daily check-ins:
+Daily check-ins (connection labels, not scores against each other):
 ${dayLines.join('\n') || 'No check-ins this week.'}
 ${reflectionBlock}`
 
@@ -230,7 +233,7 @@ ${reflectionBlock}`
             {
               role: 'system',
               content:
-                'You write brief, caring weekly relationship summaries for couples.',
+                'You write optional weekly readings for couples. Never diagnose, blame, or rank partners. Quote their words. Label uncertainty.',
             },
             { role: 'user', content: prompt },
           ],
@@ -262,8 +265,11 @@ ${reflectionBlock}`
       week_start: weekStart,
       week_end: weekEnd,
       summary,
+      original_summary: summary,
       source,
       model,
+      dismissed_at: null,
+      dismissed_by: null,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'couple_id,week_start' },
@@ -308,10 +314,10 @@ function buildFallback(
   partnerName: string,
 ): string {
   return [
-    `Bond week summary (${weekStart} – ${weekEnd}).`,
-    'Here is every daily check-in from your week together:',
+    `A suggested reading of ${weekStart} – ${weekEnd}. Not a verdict.`,
+    'Here is what you wrote and how you showed up:',
     ...dayLines.map((line) => `• ${line}`),
-    `Keep checking in with ${partnerName}. Consistency is how Bond grows.`,
+    `This is for conversation with ${partnerName}, not a diagnosis.`,
   ].join('\n')
 }
 

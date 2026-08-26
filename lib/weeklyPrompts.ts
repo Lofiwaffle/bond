@@ -5,50 +5,28 @@ export type WeeklyPrompt = {
   text: string
 }
 
-/** Fixed sets of 3 reflection prompts; couple+week picks one set. */
-export const WEEKLY_PROMPT_SETS: WeeklyPrompt[][] = [
-  [
-    {
-      id: 'highlight',
-      text: 'What was a highlight of our week together?',
-    },
-    {
-      id: 'support',
-      text: 'Where could we support each other better next week?',
-    },
-    {
-      id: 'grateful',
-      text: 'What are you most grateful for about us right now?',
-    },
-  ],
-  [
-    {
-      id: 'closeness',
-      text: 'When did you feel closest to me this week?',
-    },
-    {
-      id: 'stress',
-      text: 'What stressed you most, and how can I help next time?',
-    },
-    {
-      id: 'looking_forward',
-      text: 'What is one thing you want us to look forward to next week?',
-    },
-  ],
-  [
-    {
-      id: 'appreciate',
-      text: 'What is one thing I did this week that you appreciated?',
-    },
-    {
-      id: 'need',
-      text: 'Is there anything you need from me in the coming week?',
-    },
-    {
-      id: 'fun',
-      text: 'What is something fun we should do together soon?',
-    },
-  ],
+/** One fixed set. Independent answers, revealed after both finish. */
+export const WEEKLY_PROMPTS: WeeklyPrompt[] = [
+  {
+    id: 'felt_good',
+    text: 'What felt good this week?',
+  },
+  {
+    id: 'disconnected',
+    text: 'Where did you feel disconnected?',
+  },
+  {
+    id: 'appreciate',
+    text: 'What did your partner do that you appreciated?',
+  },
+  {
+    id: 'support',
+    text: 'What support would help next week?',
+  },
+  {
+    id: 'intention',
+    text: 'What is one small shared intention for next week?',
+  },
 ]
 
 export type WeeklyAnswer = {
@@ -57,17 +35,8 @@ export type WeeklyAnswer = {
   answer: string
 }
 
-function hashString(input: string): number {
-  let h = 0
-  for (let i = 0; i < input.length; i++) {
-    h = (h * 31 + input.charCodeAt(i)) >>> 0
-  }
-  return h
-}
-
-export function promptsForWeek(coupleId: string, weekStart: string): WeeklyPrompt[] {
-  const idx = hashString(`${coupleId}:${weekStart}`) % WEEKLY_PROMPT_SETS.length
-  return WEEKLY_PROMPT_SETS[idx]
+export function promptsForWeek(_coupleId?: string, _weekStart?: string): WeeklyPrompt[] {
+  return WEEKLY_PROMPTS
 }
 
 export function summarizeScores(scores: number[]): {
@@ -81,4 +50,8 @@ export function summarizeScores(scores: number[]): {
     avg,
     label: SCORE_LABELS[rounded] ?? 'Neutral',
   }
+}
+
+export function intentionAnswers(answers: WeeklyAnswer[]): string {
+  return answers.find((item) => item.prompt_id === 'intention')?.answer?.trim() ?? ''
 }

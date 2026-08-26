@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../lib/auth'
-import { addDays, localDateString } from '../lib/dates'
+import { addDays, endOfWeek, startOfWeek, localDateString } from '../lib/dates'
 import { reportError } from '../lib/monitor'
+import { describeRhythm } from '../lib/rhythm'
 import { supabase } from '../lib/supabase'
 import {
   promptsForWeek,
@@ -10,7 +11,7 @@ import {
   type WeeklyAnswer,
 } from '../lib/weeklyPrompts'
 import { buildCompletedReviewSummary, buildFallbackWeeklySummary } from '../lib/weeklyAiSummary'
-import { computeStreak, useCheckInHistory } from './useCheckIn'
+import { useCheckInHistory } from './useCheckIn'
 
 export type WeeklyReviewRow = {
   id: string
@@ -27,6 +28,8 @@ export type WeeklyAiSummaryState = {
   source: 'ai' | 'fallback'
   model: string | null
   cached: boolean
+  originalSummary: string | null
+  dismissed: boolean
 }
 
 function parseAnswers(raw: unknown): WeeklyAnswer[] {
@@ -60,21 +63,18 @@ export function useWeeklyReview() {
     () => days.filter((d) => d.mine).map((d) => d.date),
     [days],
   )
-  const streak = useMemo(
-    () => computeStreak(myDates, today),
-    [myDates, today],
+  const revealedDates = useMemo(
+    () => days.filter((d) => d.revealed).map((d) => d.date),
+    [days],
+  )
+  const rhythm = useMemo(
+    () => describeRhythm(myDates, revealedDates, today),
+    [myDates, revealedDates, today],
   )
 
-  const completedBlocks = Math.floor(streak / 7)
-  const daysIntoCurrentBlock = streak % 7
-  const weekEnd =
-    completedBlocks === 0
-      ? today
-      : daysIntoCurrentBlock === 0
-        ? today
-        : addDays(today, -daysIntoCurrentBlock)
-  const weekStart = addDays(weekEnd, -6)
-  const unlocked = completedBlocks >= 1
+  const weekStart = startOfWeek(today)
+  const weekEnd = endOfWeek(today)
+  const unlocked = myDates.length >= 7
 
   const prompts = useMemo(() => {
     if (!profile?.couple_id) return []
@@ -117,7 +117,7 @@ export function useWeeklyReview() {
           .eq('week_start', weekStart),
         supabase
           .from('weekly_ai_summaries')
-          .select('summary, source, model')
+          .select('summary, source, model, original_summary, dismissed_at')
           .eq('couple_id', profile.couple_id)
           .eq('week_start', weekStart)
           .maybeSingle(),
@@ -142,7 +142,11 @@ export function useWeeklyReview() {
         source: (summaryRow.source as 'ai' | 'fallback') ?? 'fallback',
         model: summaryRow.model ?? null,
         cached: true,
+        originalSummary: summaryRow.original_summary ?? summaryRow.summary,
+        dismissed: Boolean(summaryRow.dismissed_at),
       })
+    } else {
+      setAiSummary(null)
     }
     setIsLoading(false)
   }, [profile?.couple_id, unlocked, user?.id, weekStart])
@@ -180,6 +184,7 @@ export function useWeeklyReview() {
                   score: d.mine.score,
                   note: d.mine.note,
                   activities: d.mine.activities,
+                  prompt_answer: d.mine.prompt_answer,
                 }
               : null,
             partner: d.partner
@@ -187,16 +192,21 @@ export function useWeeklyReview() {
                   score: d.partner.score,
                   note: d.partner.note,
                   activities: d.partner.activities,
+                  prompt_answer: d.partner.prompt_answer,
                 }
               : null,
             revealed: d.revealed,
           })),
+          mineAnswers: mine?.answers,
+          partnerAnswers: partnerReview?.answers,
         })
         setAiSummary({
           summary: fallback,
           source: 'fallback',
           model: null,
           cached: false,
+          originalSummary: fallback,
+          dismissed: false,
         })
         await supabase.from('weekly_ai_summaries').upsert(
           {
@@ -204,8 +214,11 @@ export function useWeeklyReview() {
             week_start: weekStart,
             week_end: weekEnd,
             summary: fallback,
+            original_summary: fallback,
             source: 'fallback',
             model: null,
+            dismissed_at: null,
+            dismissed_by: null,
           },
           { onConflict: 'couple_id,week_start' },
         )
@@ -226,6 +239,8 @@ export function useWeeklyReview() {
         source: payload.source ?? 'ai',
         model: payload.model ?? null,
         cached: Boolean(payload.cached),
+        originalSummary: payload.summary,
+        dismissed: false,
       })
       setAiLoading(false)
       return { error: null }
@@ -238,6 +253,8 @@ export function useWeeklyReview() {
       weekCheckIns,
       weekEnd,
       weekStart,
+      mine?.answers,
+      partnerReview?.answers,
     ],
   )
 
@@ -280,12 +297,91 @@ export function useWeeklyReview() {
     [mine, profile?.couple_id, refresh, user?.id, weekEnd, weekStart],
   )
 
+  const saveEditedSummary = useCallback(
+    async (text: string) => {
+      if (!user?.id || !profile?.couple_id) {
+        return { error: 'You must be paired' }
+      }
+      const trimmed = text.trim()
+      if (!trimmed) return { error: 'Write a short note, or dismiss instead.' }
+      const { error: updateError } = await supabase
+        .from('weekly_ai_summaries')
+        .update({
+          summary: trimmed,
+          dismissed_at: null,
+          dismissed_by: null,
+        })
+        .eq('couple_id', profile.couple_id)
+        .eq('week_start', weekStart)
+      if (updateError) return { error: updateError.message }
+      setAiSummary((current) =>
+        current
+          ? {
+              ...current,
+              summary: trimmed,
+              dismissed: false,
+            }
+          : current,
+      )
+      return { error: null }
+    },
+    [profile?.couple_id, user?.id, weekStart],
+  )
+
+  const dismissSummary = useCallback(async () => {
+    if (!user?.id || !profile?.couple_id) {
+      return { error: 'You must be paired' }
+    }
+    const { error: updateError } = await supabase
+      .from('weekly_ai_summaries')
+      .update({
+        dismissed_at: new Date().toISOString(),
+        dismissed_by: user.id,
+      })
+      .eq('couple_id', profile.couple_id)
+      .eq('week_start', weekStart)
+    if (updateError) return { error: updateError.message }
+    setAiSummary((current) =>
+      current ? { ...current, dismissed: true } : current,
+    )
+    return { error: null }
+  }, [profile?.couple_id, user?.id, weekStart])
+
+  const restoreSummary = useCallback(async () => {
+    if (!user?.id || !profile?.couple_id) {
+      return { error: 'You must be paired' }
+    }
+    const original = aiSummary?.originalSummary ?? aiSummary?.summary
+    if (!original) return { error: null }
+    const { error: updateError } = await supabase
+      .from('weekly_ai_summaries')
+      .update({
+        summary: original,
+        dismissed_at: null,
+        dismissed_by: null,
+      })
+      .eq('couple_id', profile.couple_id)
+      .eq('week_start', weekStart)
+    if (updateError) return { error: updateError.message }
+    setAiSummary((current) =>
+      current
+        ? {
+            ...current,
+            summary: original,
+            dismissed: false,
+          }
+        : current,
+    )
+    return { error: null }
+  }, [aiSummary?.originalSummary, aiSummary?.summary, profile?.couple_id, user?.id, weekStart])
+
   const bothSubmitted = Boolean(mine && partner && partnerReview)
   const waitingForPartner = Boolean(mine && partner && !partnerReview)
   const needsReview = Boolean(unlocked && partner && !mine)
 
   return {
-    streak,
+    rhythm,
+    daysConnected: rhythm.daysConnected,
     unlocked,
     needsReview,
     weekStart,
@@ -302,6 +398,9 @@ export function useWeeklyReview() {
     aiLoading,
     aiError,
     generateAiSummary,
+    saveEditedSummary,
+    dismissSummary,
+    restoreSummary,
     isLoading: isLoading || historyLoading,
     error,
     refresh: async () => {

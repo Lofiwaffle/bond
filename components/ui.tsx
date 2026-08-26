@@ -491,7 +491,7 @@ export function ReadOnlyChips({ ids }: { ids: string[] }) {
 export function StreakChip({ streak }: { streak: number }) {
   return (
     <Text style={styles.streakLabel}>
-      {streak} day streak
+      {streak} day{streak === 1 ? '' : 's'} connected
     </Text>
   )
 }

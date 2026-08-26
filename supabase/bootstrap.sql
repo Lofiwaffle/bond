@@ -1165,3 +1165,9 @@ create policy "partner_signals_insert_nudge"
     and event_type = 'check_in_nudge'
   );
 
+-- 20260826120000_weekly_summary_dismiss.sql
+alter table public.weekly_ai_summaries
+  add column if not exists original_summary text,
+  add column if not exists dismissed_at timestamptz,
+  add column if not exists dismissed_by uuid references public.profiles (id) on delete set null;
+

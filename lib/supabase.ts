@@ -3,6 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { Platform } from 'react-native'
 
+import { reportError } from './monitor'
+import { markNetworkOffline, markNetworkOnline } from './network'
 import type { Database } from '../types/database'
 
 const STORAGE_KEY = 'bond.supabase'
@@ -64,6 +66,22 @@ function makeClient(url: string, key: string, persist: boolean): SupabaseClient<
       autoRefreshToken: persist,
       persistSession: persist,
       detectSessionInUrl: false,
+    },
+    global: {
+      fetch: async (input, init) => {
+        try {
+          const response = await fetch(input, init)
+          markNetworkOnline()
+          if (!response.ok && response.status >= 500) {
+            reportError('supabase', `HTTP ${response.status}`)
+          }
+          return response
+        } catch (error) {
+          markNetworkOffline()
+          reportError('supabase', error)
+          throw error
+        }
+      },
     },
   })
 }

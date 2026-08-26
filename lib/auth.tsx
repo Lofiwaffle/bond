@@ -7,8 +7,10 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { AppState } from 'react-native'
 import type { Session, User } from '@supabase/supabase-js'
 
+import { reportError } from './monitor'
 import { clearOnboarding } from './onboarding'
 import { supabase, supabaseConfigured, supabaseConfigError } from './supabase'
 import type { Couple, Profile } from '../types/database'
@@ -20,6 +22,8 @@ type AuthContextValue = {
   couple: Couple | null
   partner: Profile | null
   isLoading: boolean
+  sessionError: string | null
+  retrySession: () => Promise<void>
   signUp: (
     email: string,
     password: string,
@@ -49,8 +53,8 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
     .maybeSingle()
 
   if (error) {
-    console.error('Failed to fetch profile', error.message)
-    return null
+    reportError('auth', error.message, { op: 'profile' })
+    throw new Error(error.message)
   }
 
   return data
@@ -64,8 +68,8 @@ async function fetchCouple(coupleId: string): Promise<Couple | null> {
     .maybeSingle()
 
   if (error) {
-    console.error('Failed to fetch couple', error.message)
-    return null
+    reportError('auth', error.message, { op: 'couple' })
+    throw new Error(error.message)
   }
 
   return data
@@ -83,8 +87,8 @@ async function fetchPartner(
     .maybeSingle()
 
   if (error) {
-    console.error('Failed to fetch partner', error.message)
-    return null
+    reportError('auth', error.message, { op: 'partner' })
+    throw new Error(error.message)
   }
 
   return data
@@ -96,23 +100,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [couple, setCouple] = useState<Couple | null>(null)
   const [partner, setPartner] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [sessionError, setSessionError] = useState<string | null>(null)
 
   const loadCoupleState = useCallback(async (userId: string) => {
-    const nextProfile = await fetchProfile(userId)
-    setProfile(nextProfile)
+    try {
+      const nextProfile = await fetchProfile(userId)
+      setProfile(nextProfile)
 
-    if (!nextProfile?.couple_id) {
-      setCouple(null)
-      setPartner(null)
-      return
+      if (!nextProfile?.couple_id) {
+        setCouple(null)
+        setPartner(null)
+        setSessionError(null)
+        return
+      }
+
+      const [nextCouple, nextPartner] = await Promise.all([
+        fetchCouple(nextProfile.couple_id),
+        fetchPartner(nextProfile.couple_id, userId),
+      ])
+      setCouple(nextCouple)
+      setPartner(nextPartner)
+      setSessionError(null)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not load your Bond'
+      reportError('auth', message, { op: 'couple-state' })
+      setSessionError(message)
     }
-
-    const [nextCouple, nextPartner] = await Promise.all([
-      fetchCouple(nextProfile.couple_id),
-      fetchPartner(nextProfile.couple_id, userId),
-    ])
-    setCouple(nextCouple)
-    setPartner(nextPartner)
   }, [])
 
   const refreshProfile = useCallback(async () => {
@@ -126,6 +140,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await loadCoupleState(userId)
   }, [loadCoupleState, session?.user?.id])
 
+  const restoreSession = useCallback(async () => {
+    if (!supabaseConfigured) {
+      setIsLoading(false)
+      return
+    }
+    setSessionError(null)
+    try {
+      const { data, error } = await supabase.auth.getSession()
+      if (error) throw error
+      setSession(data.session)
+      if (data.session?.user) {
+        await loadCoupleState(data.session.user.id)
+      } else {
+        setProfile(null)
+        setCouple(null)
+        setPartner(null)
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not restore your session'
+      reportError('auth', message, { op: 'session' })
+      setSessionError(message)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [loadCoupleState])
+
   useEffect(() => {
     let mounted = true
 
@@ -134,29 +175,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!mounted) return
-        setSession(data.session)
-        if (data.session?.user) {
-          loadCoupleState(data.session.user.id).finally(() => {
-            if (mounted) setIsLoading(false)
-          })
-        } else {
-          setIsLoading(false)
-        }
-      })
-      .catch(() => {
-        if (mounted) setIsLoading(false)
-      })
+    void restoreSession()
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!mounted) return
       setSession(nextSession)
       if (nextSession?.user) {
-        void loadCoupleState(nextSession.user.id)
+        void loadCoupleState(nextSession.user.id).catch((error) => {
+          const message =
+            error instanceof Error ? error.message : 'Could not load your Bond'
+          setSessionError(message)
+        })
       } else {
         setProfile(null)
         setCouple(null)
@@ -164,11 +195,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })
 
+    const app = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void supabase.auth.getSession().then(({ data, error }) => {
+          if (error) {
+            reportError('auth', error.message, { op: 'resume' })
+            return
+          }
+          if (data.session?.user) {
+            void loadCoupleState(data.session.user.id).catch((err) => {
+              reportError('auth', err, { op: 'resume-profile' })
+            })
+          }
+        })
+      }
+    })
+
     return () => {
       mounted = false
       subscription.unsubscribe()
+      app.remove()
     }
-  }, [loadCoupleState])
+  }, [loadCoupleState, restoreSession])
 
   const signUp = useCallback(
     async (email: string, password: string, displayName: string) => {
@@ -182,7 +230,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           data: { display_name: displayName.trim() },
         },
       })
-      return { error: error?.message ?? null }
+      if (error) {
+        reportError('auth', error.message, { op: 'signup' })
+        return { error: error.message }
+      }
+      return { error: null }
     },
     [],
   )
@@ -195,7 +247,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: email.trim(),
       password,
     })
-    return { error: error?.message ?? null }
+    if (error) {
+      reportError('auth', error.message, { op: 'signin' })
+      return { error: error.message }
+    }
+    return { error: null }
   }, [])
 
   const signOut = useCallback(async () => {
@@ -211,6 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { data, error } = await supabase.rpc('create_couple')
     if (error) {
+      reportError('auth', error.message, { op: 'create-couple' })
       return { couple: null, error: error.message }
     }
     await refreshProfile()
@@ -226,6 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         invite: inviteCode.trim().toUpperCase(),
       })
       if (error) {
+        reportError('auth', error.message, { op: 'join-couple' })
         return { couple: null, error: error.message }
       }
       await refreshProfile()
@@ -240,6 +298,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { error } = await supabase.rpc('delete_own_account')
     if (error) {
+      reportError('auth', error.message, { op: 'delete-account' })
       return { error: error.message }
     }
     try {
@@ -265,7 +324,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from('profiles')
         .update({ display_name: trimmed })
         .eq('id', userId)
-      if (error) return { error: error.message }
+      if (error) {
+        reportError('auth', error.message, { op: 'display-name' })
+        return { error: error.message }
+      }
       setProfile((current) =>
         current ? { ...current, display_name: trimmed } : current,
       )
@@ -282,6 +344,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       couple,
       partner,
       isLoading,
+      sessionError,
+      retrySession: restoreSession,
       signUp,
       signIn,
       signOut,
@@ -297,6 +361,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       couple,
       partner,
       isLoading,
+      sessionError,
+      restoreSession,
       signUp,
       signIn,
       signOut,

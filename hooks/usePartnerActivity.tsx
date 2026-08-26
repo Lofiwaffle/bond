@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useEffect, type ReactNode } from 'react'
+import { Platform, View, StyleSheet } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import { useAuth } from '../lib/auth'
@@ -11,7 +11,7 @@ import {
   syncCheckInReminder,
 } from '../lib/notifications'
 import { supabase } from '../lib/supabase'
-import { colors, radii, type } from '../lib/theme'
+import { useToast } from '../lib/toast'
 import { useTodayCheckIn } from './useCheckIn'
 
 const ASKED_KEY = 'bond.notifications.asked'
@@ -32,7 +32,12 @@ function copyForSignal(
     case 'partner_checked_in':
       return {
         title: 'Bond',
-        body: `${partnerName} checked in. Add yours to reveal the day.`,
+        body: `${partnerName} checked in. Yours stays private until you add it.`,
+      }
+    case 'check_in_nudge':
+      return {
+        title: 'Bond',
+        body: `${partnerName} saved today when you have a minute. No rush.`,
       }
     case 'partner_logged_achievement':
       return {
@@ -72,7 +77,7 @@ function copyForSignal(
 export function PartnerActivitySync({ children }: { children: ReactNode }) {
   const { user, partner, profile } = useAuth()
   const { mine, isLoading } = useTodayCheckIn()
-  const [toast, setToast] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   useEffect(() => {
     if (isLoading || !user?.id) return
@@ -113,7 +118,7 @@ export function PartnerActivitySync({ children }: { children: ReactNode }) {
           const name = partner?.display_name?.trim() || 'Your partner'
           const copy = copyForSignal(row, name)
           void showLocalNotification(copy.title, copy.body)
-          setToast(copy.body)
+          showToast(copy.body)
         },
       )
       .subscribe()
@@ -121,48 +126,13 @@ export function PartnerActivitySync({ children }: { children: ReactNode }) {
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [partner?.display_name, profile?.couple_id, user?.id])
+  }, [partner?.display_name, profile?.couple_id, showToast, user?.id])
 
-  useEffect(() => {
-    if (!toast) return
-    const id = setTimeout(() => setToast(null), 5000)
-    return () => clearTimeout(id)
-  }, [toast])
-
-  return (
-    <View style={styles.wrap}>
-      {children}
-      {toast ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={toast}
-          onPress={() => setToast(null)}
-          style={styles.toast}
-        >
-          <Text style={styles.toastText}>{toast}</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  )
+  return <View style={styles.wrap}>{children}</View>
 }
 
 const styles = StyleSheet.create({
   wrap: {
     flex: 1,
-  },
-  toast: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 28,
-    backgroundColor: colors.ink,
-    borderRadius: radii.md,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  toastText: {
-    ...type.body,
-    color: colors.white,
-    marginBottom: 0,
   },
 })

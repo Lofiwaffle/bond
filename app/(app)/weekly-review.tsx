@@ -10,11 +10,13 @@ import {
   PrimaryButton,
   ScoreMark,
   Screen,
+  StatusPanel,
   TextLink,
 } from '../../components/ui'
 import { useWeeklyReview } from '../../hooks/useWeeklyReview'
 import { useAuth } from '../../lib/auth'
 import { formatDisplayDate } from '../../lib/dates'
+import { useToast } from '../../lib/toast'
 import { colors, hairlineWidth, type } from '../../lib/theme'
 import type { WeeklyAnswer } from '../../lib/weeklyPrompts'
 
@@ -40,6 +42,7 @@ export default function WeeklyReviewScreen() {
     streak,
     isLoading,
     error,
+    refresh,
     submit,
   } = useWeeklyReview()
 
@@ -55,6 +58,7 @@ export default function WeeklyReviewScreen() {
   const [answers, setAnswers] = useState<WeeklyAnswer[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   useEffect(() => {
     setAnswers(initialAnswers)
@@ -98,6 +102,7 @@ export default function WeeklyReviewScreen() {
   }
 
   const onSubmit = async () => {
+    if (submitting) return
     const payload =
       answers.length === prompts.length
         ? answers
@@ -111,19 +116,29 @@ export default function WeeklyReviewScreen() {
     const result = await submit(payload)
     setSubmitting(false)
     if (result.error) setSubmitError(result.error)
+    else showToast('Weekly review saved')
   }
 
   return (
-    <Screen style={styles.screen}>
+    <Screen style={styles.screen} keyboard>
       <Text style={styles.title}>Weekly review</Text>
       <Text style={styles.subtitle}>
         {formatDisplayDate(weekStart)} – {formatDisplayDate(weekEnd)} · streak{' '}
         {streak}
       </Text>
 
-      <ErrorText message={error} />
+      {error ? (
+        <StatusPanel
+          message="Couldn't load this week's review."
+          onRetry={() => void refresh()}
+        />
+      ) : null}
 
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Your week at a glance</Text>
           <Text style={styles.summaryLine}>
@@ -193,6 +208,7 @@ export default function WeeklyReviewScreen() {
                   value={answers[index]?.answer ?? ''}
                   onChangeText={(text) => onChangeAnswer(index, text)}
                   placeholder="Your answer"
+                  accessibilityLabel={`${prompt.text} answer`}
                   autoCapitalize="sentences"
                   multiline
                   style={styles.answer}

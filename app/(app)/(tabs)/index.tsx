@@ -11,9 +11,11 @@ import { Redirect, router, useFocusEffect } from 'expo-router'
 import Svg, { Circle } from 'react-native-svg'
 
 import {
+  EmptyState,
   LoadingScreen,
   ScoreMark,
   Screen,
+  StatusPanel,
   StreakChip,
 } from '../../../components/ui'
 import {
@@ -53,7 +55,7 @@ function relativeDay(date: string, today: string): string {
 export default function EntriesScreen() {
   const { profile, partner, isLoading: authLoading } = useAuth()
   const today = localDateString()
-  const { days, isLoading, refresh } = useCheckInHistory()
+  const { days, isLoading, error, refresh } = useCheckInHistory()
   const { mine: todayMine, waitingForPartner } = useTodayCheckIn()
 
   useFocusEffect(
@@ -113,16 +115,16 @@ export default function EntriesScreen() {
             <>
               <Text style={styles.composerTitle}>{todayPrompt.text}</Text>
               <Text style={styles.composerHint}>
-                Log how connected you felt today. Tap to check in.
+                Two minutes. Private until they check in too.
               </Text>
             </>
           ) : waitingForPartner ? (
             <>
               <Text style={styles.composerTitle}>
-                Waiting for {partnerName} to check in
+                Saved. Private until {partnerName} checks in
               </Text>
               <Text style={styles.composerHint}>
-                They can't see yours until they save theirs. Tap to view.
+                No rush. Tap to add a thought only you can see.
               </Text>
             </>
           ) : (
@@ -131,11 +133,34 @@ export default function EntriesScreen() {
                 Today is open for both of you
               </Text>
               <Text style={styles.composerHint}>
-                Tap to reread how you each felt.
+                See the day side by side, then pick one small next step.
               </Text>
             </>
           )}
         </Pressable>
+
+        {error ? (
+          <StatusPanel
+            message="Couldn't load your entries."
+            onRetry={() => void refresh()}
+          />
+        ) : null}
+
+        {!error && feed.length === 0 && todayMine ? (
+          <EmptyState
+            title="Today is saved"
+            body="Your check-in is here. Past days will collect in this feed."
+          />
+        ) : null}
+
+        {!error && feed.length === 0 && !todayMine ? (
+          <EmptyState
+            title="No entries yet"
+            body="Start with today's check-in. Your days together will show up here."
+            actionLabel="Open Check-in"
+            onAction={() => router.push('/(app)/check-in')}
+          />
+        ) : null}
 
         {feed.map((day) => (
           <DayGroup
@@ -249,7 +274,9 @@ function TimelineRow({
       </View>
       <View style={styles.entryBody}>
         {item.tone === 'waiting' || !item.checkIn ? (
-          <Text style={styles.waiting}>Waiting for {item.name} to check in</Text>
+          <Text style={styles.waiting}>
+            {item.name} has not checked in yet. Yours stays private.
+          </Text>
         ) : (
           <EntryCopy name={item.name} checkIn={item.checkIn} />
         )}
@@ -265,7 +292,7 @@ function EntryCopy({
   name: string
   checkIn: DailyCheckIn
 }) {
-  const note = checkIn.prompt_answer?.trim() || checkIn.note?.trim() || ''
+  const note = checkIn.prompt_answer?.trim() || ''
   const activities = checkIn.activities ?? []
   const feeling = SCORE_LABELS[checkIn.score] ?? 'connected'
 
@@ -273,12 +300,12 @@ function EntryCopy({
     <View style={styles.entryCopy}>
       <View
         accessible
-        accessibilityLabel={`${name} feels ${feeling.toLowerCase()}`}
+        accessibilityLabel={`${name} checked in as ${feeling.toLowerCase()}`}
         style={styles.entryLine}
       >
         <Text style={styles.entryMood}>
           <Text style={styles.entryName}>{name}</Text>
-          {' feels '}
+          {' · '}
         </Text>
         <ScoreMark score={checkIn.score} size={22} />
       </View>
@@ -384,7 +411,7 @@ const styles = StyleSheet.create({
   },
   composerKicker: {
     ...type.label,
-    color: colors.accent,
+    color: colors.accentFill,
     marginBottom: 4,
   },
   composerTitle: {

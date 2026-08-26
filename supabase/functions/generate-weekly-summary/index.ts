@@ -20,11 +20,11 @@ type Body = {
 }
 
 const SCORE_LABELS: Record<number, string> = {
-  1: 'Disconnected',
-  2: 'Uneasy & aloof',
-  3: 'Stagnant',
+  1: 'Distant',
+  2: 'A little disconnected',
+  3: 'Neutral',
   4: 'Connected',
-  5: 'Proud & united',
+  5: 'Very connected',
 }
 
 const cors = {

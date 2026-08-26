@@ -118,10 +118,12 @@ export default function BondHubScreen() {
               accessibilityRole="button"
               accessibilityLabel={`${option.title}. ${body}`}
               onPress={() => openSection(option.id)}
-              style={({ pressed }) => [
+              style={(state) => [
                 styles.row,
                 index === HUB_OPTIONS.length - 1 && styles.rowLast,
-                pressed && styles.rowPressed,
+                state.pressed && styles.rowPressed,
+                Boolean((state as { focused?: boolean }).focused) &&
+                  styles.rowFocus,
               ]}
             >
               <View style={styles.iconBadge}>
@@ -154,6 +156,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    minHeight: 44,
     paddingVertical: 16,
     borderBottomWidth: hairlineWidth,
     borderBottomColor: colors.hairline,
@@ -163,6 +166,11 @@ const styles = StyleSheet.create({
   },
   rowPressed: {
     opacity: 0.7,
+  },
+  rowFocus: {
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.ink,
   },
   iconBadge: {
     width: 36,

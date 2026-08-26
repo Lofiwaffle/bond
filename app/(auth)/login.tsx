@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native'
+import { ScrollView, StyleSheet, Text } from 'react-native'
 import { Link, Redirect } from 'expo-router'
 
-import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen } from '../../components/ui'
+import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen, StatusPanel } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { Icon } from '../../lib/icons'
 import { colors, type } from '../../lib/theme'
 
 export default function LoginScreen() {
-  const { session, profile, isLoading, signIn } = useAuth()
+  const { session, profile, isLoading, signIn, sessionError, retrySession } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -24,6 +24,7 @@ export default function LoginScreen() {
   }
 
   const onSubmit = async () => {
+    if (submitting) return
     setError(null)
     setSubmitting(true)
     const result = await signIn(email, password)
@@ -32,59 +33,64 @@ export default function LoginScreen() {
   }
 
   return (
-    <Screen>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
+    <Screen keyboard>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ flexGrow: 1 }}
       >
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ flexGrow: 1 }}
-        >
-          <Icon name="heart" size={28} color={colors.ink} />
-          <Text style={styles.title}>Bond</Text>
-          <Text style={styles.subtitle}>Sign in to check in with your partner.</Text>
-
-          <Label>Email</Label>
-          <Field
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            autoComplete="email"
-            placeholder="you@example.com"
+        <Icon name="heart" size={28} color={colors.ink} />
+        <Text style={styles.title}>Bond</Text>
+        <Text style={styles.subtitle}>
+          Welcome back to your daily ritual.
+        </Text>
+        {sessionError ? (
+          <StatusPanel
+            message="Couldn't restore your session."
+            onRetry={() => void retrySession()}
           />
+        ) : null}
 
-          <Label>Password</Label>
-          <Field
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            textContentType="password"
-            autoComplete="password"
-            placeholder="••••••••"
-          />
+        <Label>Email</Label>
+        <Field
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          autoComplete="email"
+          accessibilityLabel="Email"
+          placeholder="you@example.com"
+        />
 
-          <ErrorText message={error} />
+        <Label>Password</Label>
+        <Field
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          textContentType="password"
+          autoComplete="password"
+          accessibilityLabel="Password"
+          placeholder="••••••••"
+        />
 
-          <PrimaryButton
-            label="Sign in"
-            onPress={onSubmit}
-            loading={submitting}
-            disabled={!email || !password}
-          />
+        <ErrorText message={error} />
 
-          <Link href="/(auth)/signup" style={styles.link}>
-            Need an account? Sign up
-          </Link>
-          <Link href="/connect" style={styles.privacy}>
-            Change server
-          </Link>
-          <Link href="/privacy" style={styles.privacy}>
-            Privacy
-          </Link>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <PrimaryButton
+          label="Sign in"
+          onPress={onSubmit}
+          loading={submitting}
+          disabled={!email || !password}
+        />
+
+        <Link href="/(auth)/signup" style={styles.link}>
+          Create a Bond
+        </Link>
+        <Link href="/connect" style={styles.privacy}>
+          Change server
+        </Link>
+        <Link href="/privacy" style={styles.privacy}>
+          Privacy
+        </Link>
+      </ScrollView>
     </Screen>
   )
 }

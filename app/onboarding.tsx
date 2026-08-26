@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import {
   Pressable,
   ScrollView,
@@ -10,56 +10,44 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native'
 import { router } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import {
+  ActionPreview,
+  CompactScorePicker,
+  ExpectationRow,
+  PromiseVisual,
+  RevealPreview,
+  SAMPLE_PROMPT,
+  UnderstandingPreview,
+} from '../components/OnboardingRitual'
 import { PrimaryButton, TextLink } from '../components/ui'
-import { FaceIcon, Icon, type IconName } from '../lib/icons'
 import { markOnboardingSeen } from '../lib/onboarding'
-import { colors, radii, type } from '../lib/theme'
+import { colors, phoneMaxWidth, radii, type } from '../lib/theme'
 
-type Slide = {
-  id: string
-  icon?: IconName
-  faces?: boolean
-  title: string
-  body: string
-}
-
-const SLIDES: Slide[] = [
-  {
-    id: 'welcome',
-    icon: 'heart',
-    title: 'Welcome to Bond',
-    body: 'A private space for the two of you. No feed, no ads, no one else.',
-  },
-  {
-    id: 'checkin',
-    faces: true,
-    title: 'Check in every day',
-    body: 'Save how connected you felt, answer a shared prompt, and tag what shaped the day.',
-  },
-  {
-    id: 'reveal',
-    icon: 'eye-off',
-    title: 'Hidden until you both show up',
-    body: 'Your partner cannot see your entry until they check in too. Then the day opens for both of you.',
-  },
-  {
-    id: 'pair',
-    icon: 'users',
-    title: 'Pair with a code',
-    body: 'Create an account, generate an invite, and share it with one person. Then achievements, goals, and weekly reviews live here together.',
-  },
-]
+const SLIDE_IDS = [
+  'promise',
+  'reflect',
+  'reveal',
+  'understand',
+  'act',
+] as const
 
 export default function OnboardingScreen() {
-  const { width } = useWindowDimensions()
+  const insets = useSafeAreaInsets()
+  const { width: windowWidth } = useWindowDimensions()
+  const width = Math.min(windowWidth, phoneMaxWidth)
   const [index, setIndex] = useState(0)
+  const [score, setScore] = useState<number | null>(null)
+  const [revealed, setRevealed] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
-  const isLast = index === SLIDES.length - 1
+  const isLast = index === SLIDE_IDS.length - 1
+  const yours = score ?? 4
 
   const goToIndex = (next: number) => {
-    scrollRef.current?.scrollTo({ x: next * width, animated: true })
-    setIndex(next)
+    const clamped = Math.max(0, Math.min(SLIDE_IDS.length - 1, next))
+    scrollRef.current?.scrollTo({ x: clamped * width, animated: true })
+    setIndex(clamped)
   }
 
   const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -72,48 +60,135 @@ export default function OnboardingScreen() {
     router.replace(destination)
   }
 
+  const current = SLIDE_IDS[index]
+  const nextHint =
+    current === 'reflect' && score == null
+      ? 'Continue'
+      : current === 'reveal' && !revealed
+        ? 'See the reveal'
+        : current === 'understand'
+          ? 'Take a step'
+          : 'Next'
+
   return (
-    <View style={styles.screen}>
+    <View
+      style={[
+        styles.screen,
+        {
+          paddingTop: Math.max(insets.top, 12),
+          paddingBottom: Math.max(insets.bottom, 16),
+        },
+      ]}
+    >
       <View style={styles.skipRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Skip introduction"
-          onPress={() => void finish('/(auth)/signup')}
-          hitSlop={12}
-        >
-          <Text style={styles.skipLabel}>Skip</Text>
-        </Pressable>
+        {index > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Skip introduction"
+            onPress={() => void finish('/(auth)/signup')}
+            hitSlop={12}
+            style={styles.skipHit}
+          >
+            <Text style={styles.skipLabel}>Skip</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.skipHit} />
+        )}
       </View>
 
       <ScrollView
         ref={scrollRef}
         horizontal
         pagingEnabled
+        nestedScrollEnabled
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={onMomentumScrollEnd}
         style={styles.carousel}
       >
-        {SLIDES.map((slide) => (
-          <View key={slide.id} style={[styles.slide, { width }]}>
-            {slide.faces ? (
-              <View style={styles.faces}>
-                {[1, 2, 3, 4, 5].map((score) => (
-                  <FaceIcon key={score} score={score} size={36} />
-                ))}
-              </View>
-            ) : (
-              <Icon name={slide.icon ?? 'heart'} size={48} color={colors.ink} />
-            )}
-            <Text style={styles.title}>{slide.title}</Text>
-            <Text style={styles.body}>{slide.body}</Text>
-          </View>
-        ))}
+        <Slide width={width} kicker="Bond" title="Before distance builds">
+          <PromiseVisual />
+          <Text style={styles.promise}>
+            A two-minute daily ritual that helps couples understand each other
+            before distance builds.
+          </Text>
+        </Slide>
+
+        <Slide
+          width={width}
+          kicker="1 · Reflect privately"
+          title="You go first. They cannot see it yet."
+        >
+          <Text style={styles.prompt}>{SAMPLE_PROMPT}</Text>
+          <CompactScorePicker value={score} onChange={setScore} />
+          <Text style={styles.body}>
+            Honest, not performed. Your check-in stays yours until they answer
+            too.
+          </Text>
+        </Slide>
+
+        <Slide
+          width={width}
+          kicker="2 · Reveal when both respond"
+          title="Nothing opens until you both show up."
+        >
+          <RevealPreview
+            yours={yours}
+            revealed={revealed}
+            onReveal={() => setRevealed(true)}
+          />
+          <Text style={styles.body}>
+            {revealed
+              ? 'Same day, side by side. Until they check in, their side stays sealed.'
+              : 'Your answer is already saved. Tap the sealed side to see what happens when they respond.'}
+          </Text>
+        </Slide>
+
+        <Slide
+          width={width}
+          kicker="3 · Understand each other"
+          title="See the same day through both eyes."
+        >
+          <UnderstandingPreview yours={yours} />
+          <Text style={styles.body}>
+            {yours >= 4
+              ? 'You felt close. They felt far. That gap is the point — you can name it while it is still small.'
+              : yours <= 2
+                ? 'You named a hard day. Seeing it together is how you start coming back, without a fight about who is right.'
+                : 'Same day, two different temperatures. Understanding starts when both versions can sit in the open.'}
+          </Text>
+        </Slide>
+
+        <Slide
+          width={width}
+          kicker="4 · One small action"
+          title="Then do one gentle thing together."
+        >
+          <ActionPreview />
+          <ExpectationRow
+            icon="clock"
+            title="Two minutes a day"
+            body="That is the whole habit. Miss a day, come back tomorrow."
+          />
+          <ExpectationRow
+            icon="eye-off"
+            title="Private until you both check in"
+            body="Only the two of you. No one else sees this."
+          />
+          <ExpectationRow
+            icon="bell"
+            title="Reminders are optional"
+            body="An 8pm nudge if you want it. You can leave notifications off."
+          />
+          <Text style={styles.body}>
+            Next, invite the one person this ritual is for.
+          </Text>
+        </Slide>
       </ScrollView>
 
       <View style={styles.dots}>
-        {SLIDES.map((slide, i) => (
+        {SLIDE_IDS.map((id, i) => (
           <View
-            key={slide.id}
+            key={id}
             style={[styles.dot, i === index && styles.dotActive]}
           />
         ))}
@@ -123,7 +198,7 @@ export default function OnboardingScreen() {
         {isLast ? (
           <>
             <PrimaryButton
-              label="Create account"
+              label="Create a Bond"
               onPress={() => void finish('/(auth)/signup')}
             />
             <TextLink
@@ -147,11 +222,17 @@ export default function OnboardingScreen() {
             )}
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Next"
-              onPress={() => goToIndex(index + 1)}
+              accessibilityLabel={nextHint}
+              onPress={() => {
+                if (current === 'reveal' && !revealed) {
+                  setRevealed(true)
+                  return
+                }
+                goToIndex(index + 1)
+              }}
               style={[styles.navButton, styles.navButtonPrimary]}
             >
-              <Text style={styles.navLabelPrimary}>Next</Text>
+              <Text style={styles.navLabelPrimary}>{nextHint}</Text>
             </Pressable>
           </View>
         )}
@@ -160,17 +241,45 @@ export default function OnboardingScreen() {
   )
 }
 
+function Slide({
+  width,
+  kicker,
+  title,
+  children,
+}: {
+  width: number
+  kicker: string
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <ScrollView
+      style={{ width }}
+      contentContainerStyle={styles.slide}
+      showsVerticalScrollIndicator={false}
+    >
+      <Text style={styles.kicker}>{kicker}</Text>
+      <Text style={styles.title}>{title}</Text>
+      {children}
+    </ScrollView>
+  )
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
-    paddingTop: 56,
-    paddingBottom: 24,
   },
   skipRow: {
     alignItems: 'flex-end',
     paddingHorizontal: 20,
-    minHeight: 24,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  skipHit: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 4,
   },
   skipLabel: {
     ...type.body,
@@ -180,27 +289,35 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   slide: {
-    paddingHorizontal: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 36,
-    flex: 1,
-    minHeight: 280,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+    gap: 14,
+    flexGrow: 1,
   },
-  faces: {
-    flexDirection: 'row',
-    gap: 8,
+  kicker: {
+    ...type.label,
+    marginBottom: 0,
   },
   title: {
     ...type.heading,
-    marginTop: 24,
-    marginBottom: 12,
-    textAlign: 'center',
+    fontSize: 22,
+    lineHeight: 28,
+    marginBottom: 4,
+  },
+  prompt: {
+    ...type.body,
+    fontWeight: '500',
+  },
+  promise: {
+    ...type.body,
+    fontSize: 16,
+    lineHeight: 24,
+    color: colors.ink,
   },
   body: {
     ...type.body,
     color: colors.muted,
-    textAlign: 'center',
   },
   dots: {
     flexDirection: 'row',
@@ -229,12 +346,14 @@ const styles = StyleSheet.create({
   },
   navButton: {
     minWidth: 88,
+    minHeight: 44,
     paddingVertical: 14,
     paddingHorizontal: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   navButtonPrimary: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.accentFill,
     borderRadius: radii.pill,
     flex: 1,
     marginLeft: 12,

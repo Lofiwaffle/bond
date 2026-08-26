@@ -1,42 +1,43 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router } from 'expo-router'
 
 import {
-  ActivityChips,
-  Divider,
-  ErrorText,
-  Field,
+  ExtrasStep,
+  RevealMoment,
+  ScoreStep,
+  WaitingMoment,
+  WordsStep,
+} from '../../components/CheckInMoment'
+import {
   IconButton,
   LoadingScreen,
   PrimaryButton,
-  ProgressBar,
-  ReadOnlyChips,
-  ScoreMark,
-  ScoreScale,
   Screen,
-  StreakChip,
+  StatusPanel,
   TextLink,
 } from '../../components/ui'
 import type { ActivityId } from '../../lib/activities'
 import {
-  computeStreak,
-  useCheckInHistory,
   useTodayCheckIn,
 } from '../../hooks/useCheckIn'
-import { useWeeklyReview } from '../../hooks/useWeeklyReview'
 import { useAuth } from '../../lib/auth'
-import { promptForDate } from '../../lib/dailyPrompts'
 import {
-  SCORE_LABELS,
-  formatDisplayDate,
-  localDateString,
-} from '../../lib/dates'
+  clearCheckInDraft,
+  hasSentNudge,
+  loadCheckInDraft,
+  markNudgeSent,
+  saveCheckInDraft,
+  type CheckInDraft,
+} from '../../lib/checkInDraft'
+import { promptForDate } from '../../lib/dailyPrompts'
+import { formatDisplayDate, localDateString } from '../../lib/dates'
 import { syncCheckInReminder } from '../../lib/notifications'
+import { useToast } from '../../lib/toast'
 import { colors, type } from '../../lib/theme'
 
 export default function CheckInScreen() {
-  const { profile, partner, isLoading: authLoading } = useAuth()
+  const { user, profile, partner, isLoading: authLoading } = useAuth()
   const {
     mine,
     partnerCheckIn,
@@ -45,30 +46,61 @@ export default function CheckInScreen() {
     isLoading,
     error,
     submit,
+    refresh,
+    sendNudge,
   } = useTodayCheckIn()
-  const { days } = useCheckInHistory()
-  const { streak: weeklyStreak, unlocked, needsReview } = useWeeklyReview()
+  const { showToast } = useToast()
   const [score, setScore] = useState<number | null>(null)
   const [activities, setActivities] = useState<ActivityId[]>([])
   const [promptAnswer, setPromptAnswer] = useState('')
+  const [noWords, setNoWords] = useState(false)
+  const [step, setStep] = useState<CheckInDraft['step']>('score')
+  const [draftReady, setDraftReady] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [nudged, setNudged] = useState(false)
+  const [nudging, setNudging] = useState(false)
+  const saving = useRef(false)
+  const today = localDateString()
 
-  const streak = useMemo(() => {
-    const today = localDateString()
-    const myDates = days.filter((d) => d.mine).map((d) => d.date)
-    return computeStreak(myDates, today)
-  }, [days])
+  useEffect(() => {
+    if (!user?.id || authLoading || isLoading || mine) {
+      setDraftReady(true)
+      return
+    }
+    void loadCheckInDraft(user.id, today).then((draft) => {
+      setScore(draft.score)
+      setActivities(draft.activities)
+      setPromptAnswer(draft.promptAnswer)
+      setNoWords(draft.noWords)
+      setStep(draft.step)
+      setDraftReady(true)
+    })
+  }, [authLoading, isLoading, mine, today, user?.id])
 
-  const towardReview = weeklyStreak === 0 ? 0 : ((weeklyStreak - 1) % 7) + 1
-  const hasDraft = score != null || activities.length > 0 || promptAnswer.trim().length > 0
+  useEffect(() => {
+    if (!draftReady || !user?.id || mine) return
+    void saveCheckInDraft(user.id, {
+      date: today,
+      score,
+      activities,
+      promptAnswer,
+      noWords,
+      step,
+    })
+  }, [activities, draftReady, mine, noWords, promptAnswer, score, step, today, user?.id])
+
+  useEffect(() => {
+    if (!user?.id || !mine) return
+    void hasSentNudge(user.id, today).then(setNudged)
+  }, [mine, today, user?.id])
 
   useEffect(() => {
     if (isLoading || authLoading) return
     void syncCheckInReminder(Boolean(mine))
   }, [authLoading, isLoading, mine])
 
-  if (authLoading || isLoading) return <LoadingScreen />
+  if (authLoading || isLoading || !draftReady) return <LoadingScreen />
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
 
   if (!partner) {
@@ -76,204 +108,193 @@ export default function CheckInScreen() {
       <Screen>
         <Text style={styles.heading}>Check-in</Text>
         <Text style={styles.mutedBody}>
-          Waiting for your partner to join before check-ins unlock.
+          Invite your person first. Check-ins open when there are two of you.
         </Text>
         <TextLink label="Close" onPress={() => router.back()} />
       </Screen>
     )
   }
 
-  const todayPrompt = promptForDate(profile.couple_id, localDateString())
+  const todayPrompt = promptForDate(profile.couple_id, today)
 
   const resetForm = () => {
     setScore(null)
     setActivities([])
     setPromptAnswer('')
+    setNoWords(false)
+    setStep('score')
     setSubmitError(null)
+    if (user?.id) void clearCheckInDraft(user.id, today)
   }
 
   const onSubmit = async () => {
+    if (saving.current || submitting) return
     if (score == null) {
       setSubmitError('Choose how connected you feel')
+      setStep('score')
       return
     }
     setSubmitError(null)
+    saving.current = true
     setSubmitting(true)
     const result = await submit(score, '', activities, {
       id: todayPrompt.id,
       text: todayPrompt.text,
-      answer: promptAnswer,
+      answer: noWords ? '' : promptAnswer,
     })
+    saving.current = false
     setSubmitting(false)
     if (result.error) {
       setSubmitError(result.error)
       return
     }
-    router.dismissTo('/(app)/(tabs)')
+    if (user?.id) await clearCheckInDraft(user.id, today)
+    showToast('Saved. Private until they check in too.')
   }
 
-  const openWeekly = () => router.push('/(app)/weekly-review')
+  const onNudge = async () => {
+    if (!user?.id || nudged || nudging) return
+    setNudging(true)
+    const result = await sendNudge()
+    setNudging(false)
+    if (result.error) {
+      showToast("Couldn't send a reminder right now.")
+      return
+    }
+    await markNudgeSent(user.id, today)
+    setNudged(true)
+    showToast('Gentle reminder sent')
+  }
 
   return (
-    <Screen style={styles.screen}>
+    <Screen style={styles.screen} keyboard>
       <ScrollView
         contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerRow}>
           <View style={styles.headerCopy}>
             <Text style={styles.heading}>Check-in</Text>
-            <Text style={styles.date}>{formatDisplayDate(localDateString())}</Text>
+            <Text style={styles.date}>{formatDisplayDate(today)}</Text>
           </View>
           <View style={styles.headerMeta}>
-            {hasDraft && !mine ? (
+            {!mine && (score != null || promptAnswer || noWords) ? (
               <IconButton
                 name="rotate-ccw"
-                accessibilityLabel="Reset form"
+                accessibilityLabel="Start over"
                 onPress={resetForm}
               />
             ) : null}
-            <StreakChip streak={streak} />
+            <IconButton
+              name="x"
+              accessibilityLabel="Close"
+              onPress={() => router.back()}
+            />
           </View>
         </View>
 
-        <Pressable
-          accessibilityRole={unlocked ? 'button' : undefined}
-          accessibilityLabel={
-            unlocked
-              ? needsReview
-                ? 'Weekly review unlocked'
-                : 'Open weekly review'
-              : `${towardReview} of 7 days to weekly reflection`
-          }
-          onPress={unlocked ? openWeekly : undefined}
-          disabled={!unlocked}
-          style={styles.progressBlock}
-        >
-          <ProgressBar
-            value={towardReview}
-            max={7}
-            label={`${towardReview}/7 to reflection`}
+        {error ? (
+          <StatusPanel
+            message="Couldn't load today's check-in."
+            onRetry={() => void refresh()}
           />
-        </Pressable>
-
-        <Divider />
-
-        <ErrorText message={error} />
+        ) : null}
 
         {!mine ? (
           <>
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Today's prompt</Text>
-              <Text style={styles.prompt}>{todayPrompt.text}</Text>
-              <Field
+            {step === 'score' ? (
+              <ScoreStep value={score} onChange={setScore} />
+            ) : null}
+            {step === 'words' ? (
+              <WordsStep
+                prompt={todayPrompt.text}
                 value={promptAnswer}
-                onChangeText={setPromptAnswer}
-                placeholder="Answer in a few sentences"
-                autoCapitalize="sentences"
-                multiline
-                maxLength={500}
-                style={styles.note}
+                noWords={noWords}
+                onChange={(text) => {
+                  setNoWords(false)
+                  setPromptAnswer(text)
+                }}
+                onNoWords={() => {
+                  if (noWords) {
+                    setNoWords(false)
+                    return
+                  }
+                  setNoWords(true)
+                  setPromptAnswer('')
+                  setStep('extras')
+                }}
               />
-            </View>
+            ) : null}
+            {step === 'extras' ? (
+              <ExtrasStep
+                value={activities}
+                onChange={setActivities}
+                error={submitError}
+              />
+            ) : null}
 
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>
-                How connected do you feel today?
-              </Text>
-              <ScoreScale value={score} onChange={setScore} />
-            </View>
+            {step === 'score' ? (
+              <PrimaryButton
+                label="Continue"
+                onPress={() => setStep('words')}
+                disabled={score == null}
+              />
+            ) : null}
+            {step === 'words' ? (
+              <PrimaryButton
+                label="Continue"
+                onPress={() => setStep('extras')}
+              />
+            ) : null}
+            {step === 'extras' ? (
+              <PrimaryButton
+                label={activities.length ? 'Save check-in' : 'Skip activities and save'}
+                onPress={() => void onSubmit()}
+                loading={submitting}
+                disabled={score == null}
+              />
+            ) : null}
 
-            <View style={[styles.section, styles.sectionLast]}>
-              <Text style={styles.sectionLabel}>Tap what shaped today</Text>
-              <ActivityChips value={activities} onChange={setActivities} />
-            </View>
-
-            <ErrorText message={submitError} />
-            <PrimaryButton
-              label="Save check-in"
-              onPress={onSubmit}
-              loading={submitting}
-              disabled={score == null}
-            />
-            <TextLink label="Skip for today" onPress={() => router.back()} />
+            {step !== 'score' ? (
+              <TextLink
+                label="Back"
+                onPress={() =>
+                  setStep(step === 'extras' ? 'words' : 'score')
+                }
+              />
+            ) : (
+              <TextLink label="Not today" onPress={() => router.back()} />
+            )}
           </>
         ) : null}
 
         {mine && waitingForPartner ? (
-          <>
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Saved</Text>
-              <Text style={styles.prompt}>
-                Waiting on {partner.display_name}. They can't see this until they
-                check in too.
-              </Text>
-              <ScoreLine score={mine.score} />
-              <ReadOnlyChips ids={mine.activities ?? []} />
-            </View>
-            <View style={[styles.section, styles.sectionLast]}>
-              <PromptAnswer
-                promptText={mine.prompt_text ?? todayPrompt.text}
-                answer={mine.prompt_answer}
-              />
-            </View>
-            <TextLink label="Done" onPress={() => router.back()} />
-          </>
+          <WaitingMoment
+            mine={mine}
+            partnerName={partner.display_name}
+            userId={user?.id ?? ''}
+            nudged={nudged}
+            nudging={nudging}
+            onNudge={() => void onNudge()}
+            onRefresh={() => void refresh()}
+            onDone={() => router.back()}
+          />
         ) : null}
 
-        {bothSubmitted && mine && partnerCheckIn ? (
+        {bothSubmitted && mine && partnerCheckIn && user?.id ? (
           <>
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>You</Text>
-              <ScoreLine score={mine.score} />
-              <ReadOnlyChips ids={mine.activities ?? []} />
-              <PromptAnswer
-                promptText={mine.prompt_text ?? todayPrompt.text}
-                answer={mine.prompt_answer}
-              />
-            </View>
-            <View style={[styles.section, styles.sectionLast]}>
-              <Text style={styles.sectionLabel}>{partner.display_name}</Text>
-              <ScoreLine score={partnerCheckIn.score} />
-              <ReadOnlyChips ids={partnerCheckIn.activities ?? []} />
-              <PromptAnswer
-                promptText={partnerCheckIn.prompt_text ?? todayPrompt.text}
-                answer={partnerCheckIn.prompt_answer}
-              />
-            </View>
+            <RevealMoment
+              mine={mine}
+              partner={partnerCheckIn}
+              partnerName={partner.display_name}
+              userId={user.id}
+            />
             <TextLink label="Done" onPress={() => router.back()} />
           </>
         ) : null}
       </ScrollView>
     </Screen>
-  )
-}
-
-function ScoreLine({ score }: { score: number }) {
-  return (
-    <View style={styles.scoreLine}>
-      <ScoreMark score={score} size={28} />
-      <Text style={styles.body}>
-        {score} · {SCORE_LABELS[score]}
-      </Text>
-    </View>
-  )
-}
-
-function PromptAnswer({
-  promptText,
-  answer,
-}: {
-  promptText: string
-  answer: string | null
-}) {
-  return (
-    <View style={styles.promptBlock}>
-      <Text style={styles.sectionLabel}>{promptText}</Text>
-      <Text style={styles.body}>
-        {answer?.trim() ? answer : 'No answer written.'}
-      </Text>
-    </View>
   )
 }
 
@@ -291,14 +312,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 12,
+    marginBottom: 12,
   },
   headerCopy: {
     flex: 1,
   },
   headerMeta: {
-    alignItems: 'flex-end',
-    gap: 4,
-    paddingTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   heading: {
     ...type.heading,
@@ -312,43 +333,5 @@ const styles = StyleSheet.create({
     ...type.body,
     color: colors.muted,
     marginBottom: 12,
-  },
-  body: {
-    ...type.body,
-  },
-  progressBlock: {
-    marginTop: 16,
-    marginBottom: 16,
-  },
-  section: {
-    paddingVertical: 20,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.hairline,
-  },
-  sectionLast: {
-    borderBottomWidth: 0,
-    marginBottom: 8,
-  },
-  sectionLabel: {
-    ...type.label,
-    marginBottom: 8,
-  },
-  prompt: {
-    ...type.body,
-    marginBottom: 12,
-  },
-  note: {
-    minHeight: 88,
-    textAlignVertical: 'top',
-    marginBottom: 0,
-  },
-  scoreLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
-  },
-  promptBlock: {
-    gap: 6,
   },
 })

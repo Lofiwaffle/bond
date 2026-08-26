@@ -9,6 +9,7 @@ import {
   LoadingScreen,
   PrimaryButton,
   Screen,
+  StatusPanel,
   TextLink,
 } from '../../../components/ui'
 import { useCoupleGoal } from '../../../hooks/useCoupleGoal'
@@ -19,6 +20,7 @@ import {
   openGoogleCalendarDeadline,
 } from '../../../lib/googleCalendar'
 import { Icon } from '../../../lib/icons'
+import { useToast } from '../../../lib/toast'
 import {
   DEADLINE_PRESETS,
   deadlineFromPreset,
@@ -80,6 +82,7 @@ export default function BondGoalsScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [addToCalendar, setAddToCalendar] = useState(true)
   const [calendarMarks, setCalendarMarks] = useState<Record<string, true>>({})
+  const { showToast } = useToast()
   const showForm = composing || (activeGoals.length === 0 && completed.length === 0)
 
   const partnerName = partner?.display_name ?? 'your partner'
@@ -107,6 +110,7 @@ export default function BondGoalsScreen() {
   }
 
   const onSetGoal = async () => {
+    if (saving) return
     setFormError(null)
     setSaving(true)
     const result = await setGoal(draft)
@@ -137,10 +141,11 @@ export default function BondGoalsScreen() {
     setAddToCalendar(true)
     setComposing(false)
     setSelectedId(created.id)
+    showToast('Goal saved')
   }
 
   const onAddReview = async () => {
-    if (!selected) return
+    if (!selected || saving) return
     setFormError(null)
     setSaving(true)
     const result = await addReview(selected.id, review)
@@ -150,10 +155,11 @@ export default function BondGoalsScreen() {
       return
     }
     setReview('')
+    showToast('Review saved')
   }
 
   const onComplete = async () => {
-    if (!selected) return
+    if (!selected || completing) return
     setFormError(null)
     setCompleting(true)
     const result = await completeGoal(selected.id)
@@ -163,6 +169,7 @@ export default function BondGoalsScreen() {
       return
     }
     setReview('')
+    showToast('Goal marked complete')
   }
 
   const onAddToCalendar = async (goal: CoupleGoal) => {
@@ -196,8 +203,11 @@ export default function BondGoalsScreen() {
   const hasGoals = activeGoals.length > 0 || completed.length > 0
 
   return (
-    <Screen style={styles.screen}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+    <Screen style={styles.screen} keyboard>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <BondSectionHeader
           title="Goals"
           subtitle={`Keep more than one SMART goal going${
@@ -205,7 +215,9 @@ export default function BondGoalsScreen() {
           }. Deadlines can go straight to Google Calendar.`}
         />
 
-        <ErrorText message={error} />
+        {error ? (
+          <StatusPanel message="Couldn't load your goals." />
+        ) : null}
         <ErrorText message={formError} />
 
         {hasGoals && !showForm ? (
@@ -239,6 +251,7 @@ export default function BondGoalsScreen() {
               value={draft.outcome}
               onChangeText={(value) => updateDraft('outcome', value)}
               placeholder="Book a weekend trip just for us"
+              accessibilityLabel="Specific outcome"
               autoCapitalize="sentences"
               maxLength={140}
             />
@@ -251,6 +264,7 @@ export default function BondGoalsScreen() {
               value={draft.successCriteria}
               onChangeText={(value) => updateDraft('successCriteria', value)}
               placeholder="Dates booked, paid, and on the calendar"
+              accessibilityLabel="Success criteria"
               autoCapitalize="sentences"
               multiline
               style={styles.shortArea}
@@ -266,6 +280,7 @@ export default function BondGoalsScreen() {
               value={draft.realisticPlan}
               onChangeText={(value) => updateDraft('realisticPlan', value)}
               placeholder="Two evenings to research and a set budget"
+              accessibilityLabel="Achievable plan"
               autoCapitalize="sentences"
               multiline
               style={styles.shortArea}
@@ -280,6 +295,7 @@ export default function BondGoalsScreen() {
               value={draft.why}
               onChangeText={(value) => updateDraft('why', value)}
               placeholder="More unhurried time together this season"
+              accessibilityLabel="Why this goal matters"
               autoCapitalize="sentences"
               multiline
               style={styles.shortArea}
@@ -298,11 +314,15 @@ export default function BondGoalsScreen() {
                   <Pressable
                     key={preset.id}
                     accessibilityRole="button"
+                    accessibilityLabel={preset.label}
                     accessibilityState={{ selected: isSelected }}
                     onPress={() => updateDraft('deadline', value)}
-                    style={[
+                    style={(state) => [
                       styles.presetChip,
                       isSelected && styles.presetChipSelected,
+                      state.pressed && { opacity: 0.8 },
+                      Boolean((state as { focused?: boolean }).focused) &&
+                        styles.presetFocus,
                     ]}
                   >
                     <Text
@@ -321,6 +341,7 @@ export default function BondGoalsScreen() {
               value={draft.deadline}
               onChangeText={(value) => updateDraft('deadline', value)}
               placeholder="YYYY-MM-DD"
+              accessibilityLabel="Deadline"
               autoCapitalize="none"
               keyboardType="numbers-and-punctuation"
               maxLength={10}
@@ -783,12 +804,18 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: colors.border,
     borderRadius: radii.pill,
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   presetChipSelected: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
+    backgroundColor: colors.accentFill,
+    borderColor: colors.accentFill,
+  },
+  presetFocus: {
+    borderWidth: 2,
+    borderColor: colors.ink,
   },
   presetLabel: {
     ...type.label,
@@ -802,6 +829,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    minHeight: 44,
     paddingVertical: 10,
     marginBottom: 8,
   },

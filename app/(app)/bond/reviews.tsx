@@ -11,9 +11,9 @@ import { router, useFocusEffect } from 'expo-router'
 
 import { BondSectionHeader } from '../../../components/BondSectionHeader'
 import {
-  ErrorText,
   LoadingScreen,
   Screen,
+  StatusPanel,
   TextLink,
 } from '../../../components/ui'
 import {
@@ -58,7 +58,12 @@ export default function BondReviewsScreen() {
           }.`}
         />
 
-        <ErrorText message={error} />
+        {error ? (
+          <StatusPanel
+            message="Couldn't load weekly reviews."
+            onRetry={() => void refresh()}
+          />
+        ) : null}
 
         {unlocked ? (
           <View style={styles.cta}>

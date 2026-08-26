@@ -12,7 +12,11 @@ function CheckInFab() {
       accessibilityRole="button"
       accessibilityLabel="Check-in"
       onPress={() => router.push('/(app)/check-in')}
-      style={({ pressed }) => [styles.fabWrap, pressed && styles.fabPressed]}
+      style={(state) => [
+        styles.fabWrap,
+        state.pressed && styles.fabPressed,
+        Boolean((state as { focused?: boolean }).focused) && styles.fabFocus,
+      ]}
     >
       <View style={styles.fab}>
         <Feather name="plus" size={26} color={colors.onAccent} />
@@ -107,7 +111,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: radii.pill,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.accentFill,
     alignItems: 'center',
     justifyContent: 'center',
     ...elevation.fab,
@@ -120,5 +124,10 @@ const styles = StyleSheet.create({
   },
   fabPressed: {
     transform: [{ scale: 0.96 }],
+  },
+  fabFocus: {
+    borderRadius: radii.pill,
+    borderWidth: 2,
+    borderColor: colors.ink,
   },
 })

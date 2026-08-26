@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../lib/auth'
 import { addDays, localDateString } from '../lib/dates'
+import { reportError } from '../lib/monitor'
 import { supabase } from '../lib/supabase'
 import {
   promptsForWeek,
@@ -250,6 +251,9 @@ export function useWeeklyReview() {
       if (!user?.id || !profile?.couple_id) {
         return { error: 'You must be paired' }
       }
+      if (mine) {
+        return { error: null }
+      }
       if (answers.some((a) => a.answer.trim().length === 0)) {
         return { error: 'Please answer every prompt' }
       }
@@ -262,11 +266,18 @@ export function useWeeklyReview() {
         answers,
       })
 
-      if (insertError) return { error: insertError.message }
+      if (insertError) {
+        if (insertError.code === '23505') {
+          await refresh()
+          return { error: null }
+        }
+        reportError('supabase', insertError.message, { op: 'weekly-review' })
+        return { error: insertError.message }
+      }
       await refresh()
       return { error: null }
     },
-    [profile?.couple_id, refresh, user?.id, weekEnd, weekStart],
+    [mine, profile?.couple_id, refresh, user?.id, weekEnd, weekStart],
   )
 
   const bothSubmitted = Boolean(mine && partner && partnerReview)

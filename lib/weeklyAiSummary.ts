@@ -52,7 +52,7 @@ export function buildFallbackWeeklySummary(input: {
   if (myScores.length) {
     const avg = myScores.reduce((a, b) => a + b, 0) / myScores.length
     lines.push(
-      `Your average connection was ${avg.toFixed(1)} (${SCORE_LABELS[Math.round(avg)] ?? 'Stagnant'}) across ${myScores.length} check-in${myScores.length === 1 ? '' : 's'}.`,
+      `Your average connection was ${avg.toFixed(1)} (${SCORE_LABELS[Math.round(avg)] ?? 'Neutral'}) across ${myScores.length} check-in${myScores.length === 1 ? '' : 's'}.`,
     )
   } else {
     lines.push('You have no daily check-ins logged for this week yet.')
@@ -61,7 +61,7 @@ export function buildFallbackWeeklySummary(input: {
   if (partnerScores.length) {
     const avg = partnerScores.reduce((a, b) => a + b, 0) / partnerScores.length
     lines.push(
-      `${partnerName}'s revealed average was ${avg.toFixed(1)} (${SCORE_LABELS[Math.round(avg)] ?? 'Stagnant'}).`,
+      `${partnerName}'s revealed average was ${avg.toFixed(1)} (${SCORE_LABELS[Math.round(avg)] ?? 'Neutral'}).`,
     )
   }
 

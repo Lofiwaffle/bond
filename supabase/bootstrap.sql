@@ -1151,3 +1151,17 @@ create policy "habit_completions_update_own"
     and couple_id = public.current_couple_id()
   );
 
+-- 20260825120000_checkin_waiting_nudge.sql
+grant insert on public.partner_signals to authenticated;
+
+drop policy if exists "partner_signals_insert_nudge" on public.partner_signals;
+create policy "partner_signals_insert_nudge"
+  on public.partner_signals
+  for insert
+  to authenticated
+  with check (
+    actor_id = (select auth.uid())
+    and couple_id = public.current_couple_id()
+    and event_type = 'check_in_nudge'
+  );
+

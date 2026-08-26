@@ -10,6 +10,7 @@ import {
 import { AppState } from 'react-native'
 
 import { useAuth } from '../lib/auth'
+import { reportError } from '../lib/monitor'
 import { localDateString } from '../lib/dates'
 import { supabase } from '../lib/supabase'
 import type { DailyCheckIn } from '../types/database'
@@ -40,6 +41,7 @@ type CheckInContextValue = {
     activities?: string[],
     prompt?: SubmitPrompt,
   ) => Promise<{ error: string | null }>
+  sendNudge: () => Promise<{ error: string | null }>
 }
 
 const CheckInContext = createContext<CheckInContextValue | undefined>(
@@ -57,14 +59,19 @@ function groupDays(rows: DailyCheckIn[], userId: string): HistoryDay[] {
     }
     if (row.user_id === userId) existing.mine = row
     else existing.partner = row
-    existing.revealed = Boolean(existing.mine && existing.partner)
     byDate.set(row.check_in_date, existing)
+  }
+  for (const day of byDate.values()) {
+    // RLS should already hide a partner row until both have submitted.
+    // Drop it anyway if ours is missing so the UI cannot leak it.
+    if (!day.mine) day.partner = null
+    day.revealed = Boolean(day.mine && day.partner)
   }
   return [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date))
 }
 
 export function CheckInProvider({ children }: { children: ReactNode }) {
-  const { user, profile, partner } = useAuth()
+  const { user, profile } = useAuth()
   const [days, setDays] = useState<HistoryDay[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -85,6 +92,7 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
       .limit(400)
 
     if (fetchError) {
+      reportError('supabase', fetchError.message, { op: 'check-ins' })
       setError(fetchError.message)
       setIsLoading(false)
       return
@@ -105,20 +113,6 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
     })
     return () => sub.remove()
   }, [refresh])
-
-  const waitingForPartner = useMemo(() => {
-    if (!partner) return false
-    const today = days.find((day) => day.date === localDateString())
-    return Boolean(today?.mine && !today.revealed)
-  }, [days, partner])
-
-  useEffect(() => {
-    if (!waitingForPartner) return
-    const id = setInterval(() => {
-      void refresh()
-    }, 8000)
-    return () => clearInterval(id)
-  }, [refresh, waitingForPartner])
 
   useEffect(() => {
     if (!user?.id || !profile?.couple_id) return
@@ -161,6 +155,11 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
       }
       if (activities.length > 5) {
         return { error: 'Pick up to 5 activity tags' }
+      }
+
+      const today = days.find((day) => day.date === localDateString())
+      if (today?.mine) {
+        return { error: null }
       }
 
       const trimmed = note.trim()
@@ -207,14 +206,37 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
           return { error: null }
         }
 
+        if (insertError.code === '23505') {
+          await refresh()
+          return { error: null }
+        }
+
+        reportError('supabase', insertError.message, { op: 'check-in-save' })
         return { error: insertError.message }
       }
 
       await refresh()
       return { error: null }
     },
-    [profile?.couple_id, refresh, user?.id],
+    [days, profile?.couple_id, refresh, user?.id],
   )
+
+  const sendNudge = useCallback(async () => {
+    if (!user?.id || !profile?.couple_id) {
+      return { error: 'You must be paired' }
+    }
+    const { error: insertError } = await supabase.from('partner_signals').insert({
+      couple_id: profile.couple_id,
+      actor_id: user.id,
+      event_type: 'check_in_nudge',
+      summary: 'saved today, whenever you have a minute',
+    })
+    if (insertError) {
+      reportError('supabase', insertError.message, { op: 'check-in-nudge' })
+      return { error: insertError.message }
+    }
+    return { error: null }
+  }, [profile?.couple_id, user?.id])
 
   const value = useMemo(
     () => ({
@@ -223,8 +245,9 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
       error,
       refresh,
       submit,
+      sendNudge,
     }),
-    [days, error, isLoading, refresh, submit],
+    [days, error, isLoading, refresh, sendNudge, submit],
   )
 
   return (
@@ -242,7 +265,8 @@ function useCheckInContext(): CheckInContextValue {
 
 export function useTodayCheckIn() {
   const { partner } = useAuth()
-  const { days, isLoading, error, refresh, submit } = useCheckInContext()
+  const { days, isLoading, error, refresh, submit, sendNudge } =
+    useCheckInContext()
   const today = days.find((day) => day.date === localDateString())
   const mine = today?.mine ?? null
   const partnerCheckIn = today?.revealed ? today.partner : null
@@ -256,6 +280,7 @@ export function useTodayCheckIn() {
     error,
     refresh,
     submit,
+    sendNudge,
   }
 }
 

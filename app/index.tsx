@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Redirect } from 'expo-router'
 
-import { LoadingScreen } from '../components/ui'
+import { LoadingScreen, Screen, StatusPanel } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { hasSeenOnboarding } from '../lib/onboarding'
 import { supabaseConfigured } from '../lib/supabase'
 
 export default function Index() {
-  const { session, profile, isLoading } = useAuth()
+  const { session, profile, isLoading, sessionError, retrySession } = useAuth()
   const [onboardingSeen, setOnboardingSeen] = useState<boolean | null>(null)
 
   useEffect(() => {
@@ -17,6 +17,17 @@ export default function Index() {
 
   if (isLoading) {
     return <LoadingScreen />
+  }
+
+  if (sessionError && (!session || !profile)) {
+    return (
+      <Screen>
+        <StatusPanel
+          message="Couldn't restore your session. Check your connection and try again."
+          onRetry={() => void retrySession()}
+        />
+      </Screen>
+    )
   }
 
   if (!supabaseConfigured) {
@@ -30,7 +41,7 @@ export default function Index() {
     if (!onboardingSeen) {
       return <Redirect href="/onboarding" />
     }
-    return <Redirect href="/(auth)/login" />
+    return <Redirect href="/(auth)/signup" />
   }
 
   if (!profile?.couple_id) {

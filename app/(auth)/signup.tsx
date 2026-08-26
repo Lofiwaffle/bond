@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native'
+import { ScrollView, StyleSheet, Text } from 'react-native'
 import { Link, Redirect } from 'expo-router'
 
 import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen } from '../../components/ui'
@@ -25,6 +25,7 @@ export default function SignUpScreen() {
   }
 
   const onSubmit = async () => {
+    if (submitting) return
     setError(null)
     if (password.length < 6) {
       setError('Password must be at least 6 characters')
@@ -37,68 +38,69 @@ export default function SignUpScreen() {
   }
 
   return (
-    <Screen>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
+    <Screen keyboard>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ flexGrow: 1 }}
       >
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ flexGrow: 1 }}
-        >
-          <Icon name="heart" size={28} color={colors.ink} />
-          <Text style={styles.title}>Create account</Text>
-          <Text style={styles.subtitle}>Start pairing with your partner in Bond.</Text>
+        <Icon name="heart" size={28} color={colors.ink} />
+        <Text style={styles.title}>Create a Bond</Text>
+        <Text style={styles.subtitle}>
+          Two minutes a day, just the two of you. You'll invite them after
+          this.
+        </Text>
 
-          <Label>Display name</Label>
-          <Field
-            value={displayName}
-            onChangeText={setDisplayName}
-            autoCapitalize="words"
-            textContentType="name"
-            placeholder="Alex"
-          />
+        <Label>Display name</Label>
+        <Field
+          value={displayName}
+          onChangeText={setDisplayName}
+          autoCapitalize="words"
+          textContentType="name"
+          accessibilityLabel="Display name"
+          placeholder="Alex"
+        />
 
-          <Label>Email</Label>
-          <Field
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            autoComplete="email"
-            placeholder="you@example.com"
-          />
+        <Label>Email</Label>
+        <Field
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          autoComplete="email"
+          accessibilityLabel="Email"
+          placeholder="you@example.com"
+        />
 
-          <Label>Password</Label>
-          <Field
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            textContentType="newPassword"
-            autoComplete="new-password"
-            placeholder="At least 6 characters"
-          />
+        <Label>Password</Label>
+        <Field
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          textContentType="newPassword"
+          autoComplete="new-password"
+          accessibilityLabel="Password"
+          placeholder="At least 6 characters"
+        />
 
-          <ErrorText message={error} />
+        <ErrorText message={error} />
 
-          <PrimaryButton
-            label="Sign up"
-            onPress={onSubmit}
-            loading={submitting}
-            disabled={!email || !password || !displayName}
-          />
+        <PrimaryButton
+          label="Create a Bond"
+          onPress={onSubmit}
+          loading={submitting}
+          disabled={!email || !password || !displayName}
+        />
 
-          <Link href="/(auth)/login" style={styles.link}>
-            Already have an account? Sign in
-          </Link>
-          <Link href="/connect" style={styles.privacy}>
-            Change server
-          </Link>
-          <Link href="/privacy" style={styles.privacy}>
-            Privacy
-          </Link>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <Link href="/(auth)/login" style={styles.link}>
+          I already have an account
+        </Link>
+        <Link href="/connect" style={styles.privacy}>
+          Change server
+        </Link>
+        <Link href="/privacy" style={styles.privacy}>
+          Privacy
+        </Link>
+      </ScrollView>
     </Screen>
   )
 }

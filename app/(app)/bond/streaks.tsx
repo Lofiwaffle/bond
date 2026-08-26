@@ -7,6 +7,7 @@ import {
   LoadingScreen,
   PrimaryButton,
   Screen,
+  StatusPanel,
 } from '../../../components/ui'
 import {
   computeStreak,
@@ -26,7 +27,7 @@ import { SCORE_LABELS, colors, hairlineWidth, radii, scoreColors, type } from '.
 
 export default function BondStreaksScreen() {
   const { profile, partner, isLoading: authLoading } = useAuth()
-  const { days, isLoading } = useCheckInHistory()
+  const { days, isLoading, error, refresh } = useCheckInHistory()
   const { mine: todayMine } = useTodayCheckIn()
   const now = useMemo(() => new Date(), [])
   const year = now.getFullYear()
@@ -73,6 +74,12 @@ export default function BondStreaksScreen() {
           title="Streaks"
           subtitle="Keep showing up. The streak is its own game."
         />
+        {error ? (
+          <StatusPanel
+            message="Couldn't load your streak."
+            onRetry={() => void refresh()}
+          />
+        ) : null}
 
         <View style={styles.section}>
           <Text style={styles.heroEyebrow}>Together streak</Text>

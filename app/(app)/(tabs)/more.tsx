@@ -16,6 +16,7 @@ import {
   LoadingScreen,
   PrimaryButton,
   Screen,
+  StatusPanel,
   TextLink,
 } from '../../../components/ui'
 import { computeStreak, useCheckInHistory } from '../../../hooks/useCheckIn'
@@ -30,7 +31,8 @@ import {
   enableNotifications,
   syncCheckInReminder,
 } from '../../../lib/notifications'
-import { colors, hairlineWidth, type } from '../../../lib/theme'
+import { useToast } from '../../../lib/toast'
+import { colors, hairlineWidth, hit, type } from '../../../lib/theme'
 
 function initialOf(name: string): string {
   return name.trim().slice(0, 1).toUpperCase() || '?'
@@ -101,7 +103,7 @@ export default function MoreScreen() {
     refreshProfile,
     deleteAccount,
   } = useAuth()
-  const { days, isLoading: historyLoading, refresh: refreshHistory } =
+  const { days, isLoading: historyLoading, error: historyError, refresh: refreshHistory } =
     useCheckInHistory()
   const {
     counts,
@@ -115,6 +117,7 @@ export default function MoreScreen() {
   const [notifyOn, setNotifyOn] = useState(false)
   const [notifyBusy, setNotifyBusy] = useState(false)
   const [notifyError, setNotifyError] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   useEffect(() => {
     void areNotificationsEnabled().then(setNotifyOn)
@@ -144,6 +147,7 @@ export default function MoreScreen() {
     if (!couple?.invite_code) return
     await Clipboard.setStringAsync(couple.invite_code)
     setCopied(true)
+    showToast('Invite code copied')
     setTimeout(() => setCopied(false), 2000)
   }
 
@@ -154,6 +158,7 @@ export default function MoreScreen() {
   }
 
   const onToggleNotifications = async () => {
+    if (notifyBusy) return
     setNotifyError(null)
     setNotifyBusy(true)
     if (notifyOn) {
@@ -177,6 +182,7 @@ export default function MoreScreen() {
   }
 
   const onDeleteAccount = async () => {
+    if (deleting) return
     setDeleteError(null)
     setDeleting(true)
     const result = await deleteAccount()
@@ -198,6 +204,12 @@ export default function MoreScreen() {
         <Text style={styles.label}>Couple portfolio</Text>
         <Text style={styles.heroTitle}>{coupleTitle}</Text>
         <Text style={styles.heroSub}>{since}</Text>
+        {historyError ? (
+          <StatusPanel
+            message="Couldn't refresh your couple stats."
+            onRetry={refreshAll}
+          />
+        ) : null}
 
         <View style={styles.avatarRow}>
           <View style={styles.avatar}>
@@ -287,11 +299,14 @@ export default function MoreScreen() {
             <Pressable
               key={item.id}
               accessibilityRole="button"
+              accessibilityLabel={`${item.title}. ${item.body}`}
               onPress={() => router.push(item.href)}
-              style={({ pressed }) => [
+              style={(state) => [
                 styles.linkRow,
                 index === LINKS.length - 1 && styles.linkRowLast,
-                pressed && styles.linkRowPressed,
+                state.pressed && styles.linkRowPressed,
+                Boolean((state as { focused?: boolean }).focused) &&
+                  styles.linkFocus,
               ]}
             >
               <Icon name={item.icon} size={18} color={colors.ink} />
@@ -333,6 +348,7 @@ export default function MoreScreen() {
                   : 'Turn notifications on'
             }
             onPress={() => void onToggleNotifications()}
+            disabled={notifyBusy}
           />
           {notifyError ? <ErrorText message={notifyError} /> : null}
 
@@ -494,9 +510,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  chipOn: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
+    chipOn: {
+    backgroundColor: colors.accentFill,
+    borderColor: colors.accentFill,
   },
   chipName: {
     ...type.label,
@@ -515,6 +531,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    minHeight: hit,
     paddingVertical: 14,
     borderBottomWidth: hairlineWidth,
     borderBottomColor: colors.hairline,
@@ -524,6 +541,11 @@ const styles = StyleSheet.create({
   },
   linkRowPressed: {
     opacity: 0.7,
+  },
+  linkFocus: {
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.ink,
   },
   linkTitle: {
     ...type.body,
@@ -549,7 +571,9 @@ const styles = StyleSheet.create({
   },
   deleteBtn: {
     alignSelf: 'flex-start',
-    paddingVertical: 8,
+    minHeight: hit,
+    justifyContent: 'center',
+    paddingVertical: 12,
   },
   deleteBtnPressed: {
     opacity: 0.6,

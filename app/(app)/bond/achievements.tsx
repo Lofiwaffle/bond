@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { BondSectionHeader } from '../../../components/BondSectionHeader'
 import {
   AchievementCalendar,
+  EmptyState,
   ErrorText,
   Field,
   LoadingScreen,
@@ -21,6 +22,7 @@ import {
 } from '../../../lib/badges'
 import { formatDisplayDate, localDateString } from '../../../lib/dates'
 import { Icon } from '../../../lib/icons'
+import { useToast } from '../../../lib/toast'
 import { colors, hairlineWidth, radii, type } from '../../../lib/theme'
 import type { HabitCompletion } from '../../../types/database'
 
@@ -46,6 +48,7 @@ export default function BondAchievementsScreen() {
   const [editDraft, setEditDraft] = useState('')
   const [editError, setEditError] = useState<string | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
+  const { showToast } = useToast()
 
   const memories = useMemo(() => {
     return completions.filter((row) => {
@@ -77,7 +80,7 @@ export default function BondAchievementsScreen() {
   }
 
   const onLogAchievement = async () => {
-    if (!activeHabitId) return
+    if (!activeHabitId || submitting) return
     setSubmitting(true)
     const result = await logHabit(activeHabitId, habitNote)
     setSubmitting(false)
@@ -85,6 +88,7 @@ export default function BondAchievementsScreen() {
       setError(result.error)
       return
     }
+    showToast('Achievement saved')
     setSelectedDate(localDateString())
     setMemoryFilter('all')
     closeAchievement()
@@ -104,7 +108,7 @@ export default function BondAchievementsScreen() {
   }
 
   const saveEdit = async () => {
-    if (!editingId) return
+    if (!editingId || savingEdit) return
     setSavingEdit(true)
     const result = await updateNote(editingId, editDraft)
     setSavingEdit(false)
@@ -112,11 +116,12 @@ export default function BondAchievementsScreen() {
       setEditError(result.error)
       return
     }
+    showToast('Memory updated')
     cancelEdit()
   }
 
   return (
-    <Screen style={styles.screen}>
+    <Screen style={styles.screen} keyboard>
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -181,6 +186,7 @@ export default function BondAchievementsScreen() {
               value={habitNote}
               onChangeText={setHabitNote}
               placeholder="What happened? This note becomes a memory."
+              accessibilityLabel="Achievement note"
               autoCapitalize="sentences"
               autoCorrect
               multiline
@@ -218,11 +224,18 @@ export default function BondAchievementsScreen() {
             ))}
           </View>
           {memories.length === 0 ? (
-            <Text style={styles.sectionHint}>
-              {memoryFilter === 'all'
-                ? 'Log an achievement to start this collection.'
-                : `No ${BADGE_BY_ID[memoryFilter].label} memories yet.`}
-            </Text>
+            <EmptyState
+              title={
+                memoryFilter === 'all'
+                  ? 'No memories yet'
+                  : `No ${BADGE_BY_ID[memoryFilter].label} memories`
+              }
+              body={
+                memoryFilter === 'all'
+                  ? 'Log an achievement to start this collection.'
+                  : 'Try another filter, or log this achievement from the calendar.'
+              }
+            />
           ) : (
             memories.map((completion) => {
               const isOwn = completion.user_id === user?.id
@@ -337,6 +350,7 @@ function AchievementNote({
             accessibilityLabel="Edit memory"
             onPress={onEdit}
             hitSlop={8}
+            style={styles.editHit}
           >
             <Text style={styles.editLabel}>Edit</Text>
           </Pressable>
@@ -408,12 +422,14 @@ const styles = StyleSheet.create({
     borderWidth: hairlineWidth,
     borderColor: colors.border,
     borderRadius: radii.pill,
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   chipSelected: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
+    backgroundColor: colors.accentFill,
+    borderColor: colors.accentFill,
   },
   chipLabel: {
     ...type.label,
@@ -457,8 +473,14 @@ const styles = StyleSheet.create({
   },
   editLabel: {
     ...type.label,
-    color: colors.accent,
+    color: colors.accentFill,
     marginBottom: 0,
+  },
+  editHit: {
+    minHeight: 44,
+    minWidth: 44,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   noteBody: {
     ...type.body,

@@ -1,6 +1,6 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { colors, radii, type } from '../lib/theme'
+import { colors, hit, radii, type } from '../lib/theme'
 
 export function ConfirmDialog({
   visible,
@@ -29,6 +29,7 @@ export function ConfirmDialog({
       transparent
       animationType="fade"
       onRequestClose={onCancel}
+      accessibilityViewIsModal
     >
       <View style={styles.backdrop}>
         <Pressable
@@ -37,18 +38,25 @@ export function ConfirmDialog({
           style={StyleSheet.absoluteFill}
           onPress={busy ? undefined : onCancel}
         />
-        <View style={styles.sheet}>
+        <View style={styles.sheet} accessibilityRole="alert">
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.body}>{body}</Text>
           <Pressable
             accessibilityRole="button"
-            onPress={onConfirm}
+            accessibilityLabel={busy ? 'Working' : confirmLabel}
+            accessibilityState={{ disabled: Boolean(busy), busy: Boolean(busy) }}
+            onPress={() => {
+              if (busy) return
+              onConfirm()
+            }}
             disabled={busy}
-            style={({ pressed }) => [
+            style={(state) => [
               styles.confirm,
               destructive && styles.confirmDanger,
-              pressed && styles.pressed,
+              state.pressed && !busy && styles.pressed,
               busy && styles.disabled,
+              Boolean((state as { focused?: boolean }).focused) &&
+                styles.focusRing,
             ]}
           >
             <Text
@@ -62,10 +70,15 @@ export function ConfirmDialog({
           </Pressable>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel={cancelLabel}
             onPress={onCancel}
             disabled={busy}
-            hitSlop={8}
-            style={styles.cancel}
+            style={(state) => [
+              styles.cancel,
+              state.pressed && !busy && styles.pressed,
+              Boolean((state as { focused?: boolean }).focused) &&
+                styles.focusRing,
+            ]}
           >
             <Text style={styles.cancelLabel}>{cancelLabel}</Text>
           </Pressable>
@@ -98,10 +111,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   confirm: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.accentFill,
     borderRadius: radii.pill,
-    paddingVertical: 14,
+    minHeight: hit,
+    paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   confirmDanger: {
     backgroundColor: colors.danger,
@@ -116,7 +131,9 @@ const styles = StyleSheet.create({
   },
   cancel: {
     alignItems: 'center',
-    paddingTop: 14,
+    justifyContent: 'center',
+    minHeight: hit,
+    paddingTop: 4,
   },
   cancelLabel: {
     ...type.body,
@@ -127,5 +144,9 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.55,
+  },
+  focusRing: {
+    borderWidth: 2,
+    borderColor: colors.ink,
   },
 })

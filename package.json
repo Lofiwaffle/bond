@@ -20,6 +20,7 @@
     "react-dom": "19.2.3",
     "react-native": "0.86.2",
     "react-native-gesture-handler": "~2.32.0",
+    "react-native-qrcode-svg": "^6.3.21",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-svg": "15.15.4",
@@ -29,6 +30,7 @@
   "devDependencies": {
     "@types/react": "~19.2.2",
     "babel-preset-expo": "^57.0.5",
+    "playwright": "^1.62.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -37,6 +39,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "export:web": "expo export --platform web",
+    "test:onboarding": "npx --yes tsx scripts/screenshot-onboarding.ts",
     "build:android": "eas build --platform android --profile production",
     "submit:android": "eas submit --platform android --profile production"
   },

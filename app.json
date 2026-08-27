@@ -31,6 +31,20 @@
       "RECEIVE_BOOT_COMPLETED",
       "VIBRATE"
     ],
+    "intentFilters": [
+      {
+        "action": "VIEW",
+        "autoVerify": false,
+        "data": [
+          {
+            "scheme": "https",
+            "host": "lofiwaffle.github.io",
+            "pathPrefix": "/bond"
+          }
+        ],
+        "category": ["BROWSABLE", "DEFAULT"]
+      }
+    ],
     "blockedPermissions": [
       "android.permission.READ_EXTERNAL_STORAGE",
       "android.permission.WRITE_EXTERNAL_STORAGE",

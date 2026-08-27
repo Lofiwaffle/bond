@@ -33,6 +33,20 @@ export type WeeklyAnswer = {
   prompt_id: string
   prompt_text: string
   answer: string
+  skipped?: boolean
+}
+
+export const NO_WORDS_THIS_WEEK = 'No words this week.'
+
+export function displayWeeklyAnswer(answer: WeeklyAnswer | undefined): string {
+  if (!answer) return ''
+  if (answer.skipped) return NO_WORDS_THIS_WEEK
+  return answer.answer.trim()
+}
+
+export function weeklyAnswerIsComplete(answer: WeeklyAnswer | undefined): boolean {
+  if (!answer) return false
+  return Boolean(answer.skipped || answer.answer.trim())
 }
 
 export function promptsForWeek(_coupleId?: string, _weekStart?: string): WeeklyPrompt[] {
@@ -53,5 +67,7 @@ export function summarizeScores(scores: number[]): {
 }
 
 export function intentionAnswers(answers: WeeklyAnswer[]): string {
-  return answers.find((item) => item.prompt_id === 'intention')?.answer?.trim() ?? ''
+  const row = answers.find((item) => item.prompt_id === 'intention')
+  if (!row || row.skipped) return ''
+  return row.answer.trim()
 }

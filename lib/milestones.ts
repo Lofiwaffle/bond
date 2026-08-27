@@ -5,6 +5,7 @@ export type MilestoneId =
   | 'seven_days'
   | 'first_review'
   | 'first_goal'
+  | 'first_shared_action'
 
 export type Milestone = {
   id: MilestoneId
@@ -44,6 +45,11 @@ export const MILESTONES: Array<Omit<Milestone, 'earnedOn'>> = [
     title: 'First shared goal achieved',
     body: 'You marked a goal you set together as done.',
   },
+  {
+    id: 'first_shared_action',
+    title: 'First small action completed',
+    body: 'You both followed through on one small thing.',
+  },
 ]
 
 export type MilestoneInput = {
@@ -54,6 +60,7 @@ export type MilestoneInput = {
   firstSevenDate: string | null
   firstReviewDate: string | null
   firstGoalDate: string | null
+  firstSharedActionDate: string | null
 }
 
 export function milestonesFrom(input: MilestoneInput): Milestone[] {
@@ -64,6 +71,7 @@ export function milestonesFrom(input: MilestoneInput): Milestone[] {
     seven_days: input.checkInCount >= 7 ? input.firstSevenDate : null,
     first_review: input.firstReviewDate,
     first_goal: input.firstGoalDate,
+    first_shared_action: input.firstSharedActionDate,
   }
 
   return MILESTONES.map((item) => ({

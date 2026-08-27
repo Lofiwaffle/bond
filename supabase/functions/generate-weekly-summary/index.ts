@@ -96,9 +96,10 @@ Deno.serve(async (req: Request) => {
       .eq('couple_id', coupleId)
       .eq('week_start', weekStart)
       .maybeSingle()
-    if (existing?.summary && !existing.dismissed_at) {
+    if (existing?.summary) {
+      const original = existing.original_summary ?? existing.summary
       return json({
-        summary: existing.summary,
+        summary: original,
         source: existing.source,
         model: existing.model,
         cached: true,
@@ -191,7 +192,9 @@ Deno.serve(async (req: Request) => {
       reflectionBlock += `${name}:\n`
       for (const raw of answers) {
         const a = raw as Record<string, unknown>
-        reflectionBlock += `- ${String(a.prompt_text ?? '')}: ${String(a.answer ?? '')}\n`
+        reflectionBlock += `- ${String(a.prompt_text ?? '')}: ${
+          a.skipped ? 'No words this week.' : String(a.answer ?? '')
+        }\n`
       }
     }
   }
@@ -268,8 +271,6 @@ ${reflectionBlock}`
       original_summary: summary,
       source,
       model,
-      dismissed_at: null,
-      dismissed_by: null,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'couple_id,week_start' },

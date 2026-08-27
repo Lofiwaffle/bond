@@ -5,7 +5,7 @@
 import { SCORE_LABELS } from './theme'
 import { activityById } from './activities'
 import { formatDisplayDate } from './dates'
-import type { WeeklyAnswer } from './weeklyPrompts'
+import { displayWeeklyAnswer, type WeeklyAnswer } from './weeklyPrompts'
 
 export type WeekCheckInSlice = {
   date: string
@@ -76,12 +76,12 @@ export function buildFallbackWeeklySummary(input: {
     ? input.mineAnswers
     : input.partnerAnswers ?? []
   if (prompts.length && input.mineAnswers && input.partnerAnswers) {
-    lines.push('Your words from this week’s review:')
+    lines.push('Your words from last week’s review:')
     for (let i = 0; i < prompts.length; i++) {
       const prompt = prompts[i]?.prompt_text?.trim()
       if (!prompt) continue
-      const yours = input.mineAnswers[i]?.answer?.trim()
-      const theirs = input.partnerAnswers[i]?.answer?.trim()
+      const yours = displayWeeklyAnswer(input.mineAnswers[i])
+      const theirs = displayWeeklyAnswer(input.partnerAnswers[i])
       lines.push(prompt)
       if (yours) lines.push(`You: ${yours}`)
       if (theirs) lines.push(`${partnerName}: ${theirs}`)
@@ -111,8 +111,8 @@ export function buildCompletedReviewSummary(input: {
   for (let i = 0; i < prompts.length; i++) {
     const prompt = prompts[i]?.prompt_text?.trim()
     if (!prompt) continue
-    const yours = input.mine[i]?.answer?.trim()
-    const theirs = input.partner[i]?.answer?.trim()
+    const yours = displayWeeklyAnswer(input.mine[i])
+    const theirs = displayWeeklyAnswer(input.partner[i])
     lines.push(prompt)
     if (yours) lines.push(`${input.myName}: ${yours}`)
     if (theirs) lines.push(`${input.partnerName}: ${theirs}`)

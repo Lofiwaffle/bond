@@ -2,37 +2,49 @@ import { useMemo } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { BondSectionHeader } from '../../../components/BondSectionHeader'
+import { GrowthObservations } from '../../../components/GrowthObservations'
 import {
   LoadingScreen,
   Screen,
   StatusPanel,
 } from '../../../components/ui'
-import { useCheckInHistory } from '../../../hooks/useCheckIn'
+import { useCheckInIndex } from '../../../hooks/useCheckIn'
 import { useAuth } from '../../../lib/auth'
 import { localDateString } from '../../../lib/dates'
+import {
+  OBSERVATION_MIN_REVEALED,
+  buildGrowthObservations,
+  observationDaysFromIndex,
+} from '../../../lib/growthObservations'
 import { describeRhythm, welcomeBackCopy } from '../../../lib/rhythm'
 import { SCORE_LABELS, colors, hairlineWidth, radii, scoreColors, type } from '../../../lib/theme'
 
 export default function BondRhythmScreen() {
   const { isLoading: authLoading } = useAuth()
-  const { days, isLoading, error, refresh } = useCheckInHistory()
+  const { days, isLoading, error, refresh } = useCheckInIndex()
   const now = useMemo(() => new Date(), [])
   const year = now.getFullYear()
 
   const stats = useMemo(() => {
     const today = localDateString()
-    const myDates = days.filter((d) => d.mine).map((d) => d.date)
+    const myDates = days.filter((d) => d.mineScore != null).map((d) => d.date)
     const revealedDates = days.filter((d) => d.revealed).map((d) => d.date)
     const rhythm = describeRhythm(myDates, revealedDates, today)
     const yearMine = [0, 0, 0, 0, 0]
     for (const day of days) {
       if (!day.date.startsWith(String(year))) continue
-      if (day.mine?.score) yearMine[day.mine.score - 1] += 1
+      if (day.mineScore) yearMine[day.mineScore - 1] += 1
     }
+    const observations = buildGrowthObservations(
+      observationDaysFromIndex(days),
+      today,
+    )
     return {
       rhythm,
       yearMine,
       mineTotal: yearMine.reduce((a, n) => a + n, 0),
+      revealedCount: revealedDates.length,
+      observations,
     }
   }, [days, year])
 
@@ -78,13 +90,22 @@ export default function BondRhythmScreen() {
           </View>
         </View>
 
-        <View style={styles.sectionLast}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>How your days felt</Text>
           <Text style={styles.meta}>
             Your labels only. Not a ranking, and not a health score.
           </Text>
           <DistributionBars counts={stats.yearMine} total={stats.mineTotal} />
         </View>
+
+        <GrowthObservations
+          observations={stats.observations}
+          lockedHint={
+            stats.revealedCount < OBSERVATION_MIN_REVEALED
+              ? 'Observations about opened days appear after 14 days you both completed.'
+              : undefined
+          }
+        />
       </ScrollView>
     </Screen>
   )
@@ -130,9 +151,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: hairlineWidth,
     borderBottomColor: colors.hairline,
-  },
-  sectionLast: {
-    paddingVertical: 16,
   },
   heroEyebrow: {
     ...type.label,

@@ -1,6 +1,6 @@
 # Privacy Policy for Bond
 
-Last updated: 20 August 2026
+Last updated: 26 August 2026
 
 Bond is a couples check-in app. This policy describes what we collect and why.
 
@@ -11,10 +11,12 @@ Bond (“we”) provides a paired daily check-in space for two partners.
 ## Data we collect
 
 - Account: email, password (stored by our auth provider, not in plain text), display name
-- Couple pairing: invite codes and the link between two accounts
+- Couple pairing: invite codes, invite links, and the link between two accounts
 - Check-ins: connection scores, optional notes, activity tags, prompt answers, timestamps
 - Shared content you choose to save: achievements, goals, weekly reviews, and summaries of completed weeks
+- Your own hide or edit choice for an optional weekly suggestion
 - Device: check-in reminder and partner activity notifications if you allow them
+- Drafts of a check-in or weekly review stay on this device until you save
 
 We do not collect precise location, contacts, photos, microphone, or advertising IDs.
 
@@ -24,7 +26,7 @@ We use this data to run the app: sign you in, pair you with your partner, show s
 
 ## Sharing
 
-Your partner can see shared couple data according to in-app rules (for example, a daily check-in is hidden from them until they check in that day). We use infrastructure providers (hosting, authentication, database) only to operate Bond.
+Your partner can see shared couple data according to in-app rules (for example, a daily check-in is hidden from them until they check in that day, and hiding a weekly suggestion only hides it for you). We use infrastructure providers (hosting, authentication, database) only to operate Bond.
 
 ## Retention and deletion
 

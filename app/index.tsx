@@ -1,14 +1,25 @@
 import { useEffect, useState } from 'react'
-import { Redirect } from 'expo-router'
+import { Redirect, type Href } from 'expo-router'
 
 import { LoadingScreen, Screen, StatusPanel } from '../components/ui'
 import { useAuth } from '../lib/auth'
+import { captureInviteFromUrl, loadPendingInvite } from '../lib/invite'
 import { hasSeenOnboarding } from '../lib/onboarding'
 import { supabaseConfigured } from '../lib/supabase'
 
 export default function Index() {
-  const { session, profile, isLoading, sessionError, retrySession } = useAuth()
+  const { session, profile, isLoading, sessionError, retrySession, passwordRecovery, authLinkExpired, authLinkExpiredKind } = useAuth()
   const [onboardingSeen, setOnboardingSeen] = useState<boolean | null>(null)
+  const [pendingInvite, setPendingInvite] = useState<string | null | undefined>(undefined)
+
+  useEffect(() => {
+    void (async () => {
+      if (typeof window !== 'undefined') {
+        await captureInviteFromUrl(window.location.href)
+      }
+      setPendingInvite(await loadPendingInvite())
+    })()
+  }, [])
 
   useEffect(() => {
     if (session || isLoading) return
@@ -17,6 +28,22 @@ export default function Index() {
 
   if (isLoading) {
     return <LoadingScreen />
+  }
+
+  if (passwordRecovery) {
+    return <Redirect href={'/update-password' as Href} />
+  }
+
+  if (authLinkExpired && !session) {
+    return (
+      <Redirect
+        href={
+          (authLinkExpiredKind === 'recovery'
+            ? '/update-password'
+            : '/(auth)/signup') as Href
+        }
+      />
+    )
   }
 
   if (sessionError && (!session || !profile)) {
@@ -35,8 +62,13 @@ export default function Index() {
   }
 
   if (!session) {
-    if (onboardingSeen === null) {
+    if (pendingInvite === undefined || onboardingSeen === null) {
       return <LoadingScreen />
+    }
+    if (pendingInvite) {
+      return (
+        <Redirect href={`/join?invite=${pendingInvite}` as Href} />
+      )
     }
     if (!onboardingSeen) {
       return <Redirect href="/onboarding" />

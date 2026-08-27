@@ -17,12 +17,39 @@ import { formatDisplayDate } from '../../lib/dates'
 import { useToast } from '../../lib/toast'
 import { colors, hairlineWidth, type } from '../../lib/theme'
 import {
+  displayWeeklyAnswer,
   intentionAnswers,
+  NO_WORDS_THIS_WEEK,
+  weeklyAnswerIsComplete,
   type WeeklyAnswer,
 } from '../../lib/weeklyPrompts'
+import {
+  loadWeeklyReviewDraft,
+  saveWeeklyReviewDraft,
+} from '../../lib/weeklyReviewDraft'
+
+function mergeDraft(
+  prompts: { id: string; text: string }[],
+  draft: { answers: WeeklyAnswer[]; step: number } | null,
+): { answers: WeeklyAnswer[]; step: number } {
+  const answers = prompts.map((prompt, index) => {
+    const fromDraft =
+      draft?.answers.find((item) => item.prompt_id === prompt.id) ??
+      draft?.answers[index]
+    return {
+      prompt_id: prompt.id,
+      prompt_text: prompt.text,
+      answer: fromDraft?.answer ?? '',
+      skipped: Boolean(fromDraft?.skipped),
+    }
+  })
+  const maxStep = Math.max(0, prompts.length - 1)
+  const step = Math.min(Math.max(draft?.step ?? 0, 0), maxStep)
+  return { answers, step }
+}
 
 export default function WeeklyReviewScreen() {
-  const { partner, profile, isLoading: authLoading } = useAuth()
+  const { user, partner, profile, isLoading: authLoading } = useAuth()
   const {
     unlocked,
     needsReview,
@@ -60,6 +87,7 @@ export default function WeeklyReviewScreen() {
   )
   const [answers, setAnswers] = useState<WeeklyAnswer[]>([])
   const [step, setStep] = useState(0)
+  const [draftReady, setDraftReady] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [editingSummary, setEditingSummary] = useState(false)
@@ -67,11 +95,38 @@ export default function WeeklyReviewScreen() {
   const [summaryBusy, setSummaryBusy] = useState(false)
 
   useEffect(() => {
-    setAnswers(initialAnswers)
-    setStep(0)
-  }, [initialAnswers])
+    if (!user?.id || !weekStart) {
+      setAnswers(initialAnswers)
+      setStep(0)
+      setDraftReady(true)
+      return
+    }
+    if (mine) {
+      setAnswers(initialAnswers)
+      setStep(0)
+      setDraftReady(true)
+      return
+    }
+    let cancelled = false
+    setDraftReady(false)
+    void loadWeeklyReviewDraft(user.id, weekStart).then((draft) => {
+      if (cancelled) return
+      const next = mergeDraft(prompts, draft)
+      setAnswers(next.answers.length ? next.answers : initialAnswers)
+      setStep(next.step)
+      setDraftReady(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id, weekStart, initialAnswers, mine, prompts])
 
-  if (authLoading || isLoading) return <LoadingScreen />
+  useEffect(() => {
+    if (!draftReady || !user?.id || mine || !weekStart || !answers.length) return
+    void saveWeeklyReviewDraft(user.id, { weekStart, step, answers })
+  }, [answers, step, draftReady, user?.id, weekStart, mine])
+
+  if (authLoading || isLoading || !draftReady) return <LoadingScreen />
   if (!partner) return <Redirect href="/(app)/setup" />
   if (!unlocked) {
     const remaining = Math.max(0, 7 - daysConnected)
@@ -92,9 +147,27 @@ export default function WeeklyReviewScreen() {
     setAnswers((prev) => {
       const next = [...prev]
       const base = next[index] ?? initialAnswers[index]
-      next[index] = { ...base, answer: text }
+      next[index] = {
+        ...base,
+        answer: text,
+        skipped: false,
+      }
       return next
     })
+  }
+
+  const onSkip = (index: number) => {
+    setAnswers((prev) => {
+      const next = [...prev]
+      const base = next[index] ?? initialAnswers[index]
+      next[index] = {
+        ...base,
+        answer: '',
+        skipped: true,
+      }
+      return next
+    })
+    if (index < prompts.length - 1) setStep((n) => n + 1)
   }
 
   const onSubmit = async () => {
@@ -106,6 +179,7 @@ export default function WeeklyReviewScreen() {
             prompt_id: p.id,
             prompt_text: p.text,
             answer: answers[i]?.answer ?? '',
+            skipped: Boolean(answers[i]?.skipped),
           }))
     setSubmitting(true)
     setSubmitError(null)
@@ -123,6 +197,7 @@ export default function WeeklyReviewScreen() {
   const theirIntention = partnerReview
     ? intentionAnswers(partnerReview.answers)
     : ''
+  const canAdvance = weeklyAnswerIsComplete(answers[step])
 
   const onGenerate = async () => {
     setSummaryBusy(true)
@@ -140,26 +215,27 @@ export default function WeeklyReviewScreen() {
       return
     }
     setEditingSummary(false)
-    showToast('Summary updated')
+    showToast('Saved for you. The original stays for both of you.')
   }
 
   const onDismiss = async () => {
     setSummaryBusy(true)
     const result = await dismissSummary()
     setSummaryBusy(false)
-    if (result.error) showToast("Couldn't dismiss that summary.")
+    if (result.error) showToast("Couldn't hide that summary.")
+    else showToast('Hidden for you. Your partner can still see it.')
   }
 
   return (
     <Screen style={styles.screen} keyboard>
       <Text style={styles.title}>Weekly review</Text>
       <Text style={styles.subtitle}>
-        {formatDisplayDate(weekStart)} – {formatDisplayDate(weekEnd)}
+        Last week · {formatDisplayDate(weekStart)} – {formatDisplayDate(weekEnd)}
       </Text>
 
       {error ? (
         <StatusPanel
-          message="Couldn't load this week's review."
+          message="Couldn't load last week's review."
           onRetry={() => void refresh()}
         />
       ) : null}
@@ -170,11 +246,11 @@ export default function WeeklyReviewScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>This week</Text>
+          <Text style={styles.sectionTitle}>Last week</Text>
           <Text style={styles.hint}>
-            Participation, not a score. You checked in {myDays} day
-            {myDays === 1 ? '' : 's'}. {openDays} day{openDays === 1 ? '' : 's'}{' '}
-            opened for both of you.
+            Sunday through Saturday that already ended. Participation, not a
+            score. You checked in {myDays} day{myDays === 1 ? '' : 's'}.{' '}
+            {openDays} day{openDays === 1 ? '' : 's'} opened for both of you.
           </Text>
         </View>
 
@@ -186,30 +262,38 @@ export default function WeeklyReviewScreen() {
             <Text style={styles.sectionTitle}>{current.text}</Text>
             <Text style={styles.hint}>
               Answer on your own. {partner.display_name} will not see this until
-              you both finish.
+              you both finish. Closing this keeps your draft on this device; it
+              is lost if you clear Bond’s storage. You can finish until next
+              Sunday.
             </Text>
             <Field
-              value={answers[step]?.answer ?? ''}
+              value={answers[step]?.skipped ? '' : answers[step]?.answer ?? ''}
               onChangeText={(text) => onChangeAnswer(step, text)}
-              placeholder="A few sentences"
+              placeholder={
+                answers[step]?.skipped ? NO_WORDS_THIS_WEEK : 'A few sentences'
+              }
               accessibilityLabel={current.text}
               autoCapitalize="sentences"
               multiline
               style={styles.answer}
             />
             <ErrorText message={submitError} />
+            <TextLink
+              label={NO_WORDS_THIS_WEEK}
+              onPress={() => onSkip(step)}
+            />
             {step < prompts.length - 1 ? (
               <PrimaryButton
                 label="Continue"
                 onPress={() => setStep((n) => n + 1)}
-                disabled={!answers[step]?.answer.trim()}
+                disabled={!canAdvance}
               />
             ) : (
               <PrimaryButton
                 label="Save weekly review"
                 onPress={() => void onSubmit()}
                 loading={submitting}
-                disabled={!answers[step]?.answer.trim()}
+                disabled={!canAdvance}
               />
             )}
             {step > 0 ? (
@@ -226,12 +310,13 @@ export default function WeeklyReviewScreen() {
               Saved. Waiting on {partner.display_name}.
             </Text>
             <Text style={styles.hint}>
-              They cannot see your answers yet. There is no rush.
+              They cannot see your answers yet. There is no rush. These answers
+              cannot be changed.
             </Text>
             {mine.answers.map((a) => (
               <View key={a.prompt_id} style={styles.promptBlock}>
                 <Text style={styles.promptText}>{a.prompt_text}</Text>
-                <Text style={styles.answerText}>{a.answer}</Text>
+                <Text style={styles.answerText}>{displayWeeklyAnswer(a)}</Text>
               </View>
             ))}
             <TextLink label="Done" onPress={() => router.back()} />
@@ -247,17 +332,17 @@ export default function WeeklyReviewScreen() {
                 <View key={a.prompt_id} style={styles.promptBlock}>
                   <Text style={styles.promptText}>{a.prompt_text}</Text>
                   <Text style={styles.metaLabel}>{myName}</Text>
-                  <Text style={styles.answerText}>{a.answer}</Text>
+                  <Text style={styles.answerText}>{displayWeeklyAnswer(a)}</Text>
                   <Text style={styles.metaLabel}>{partner.display_name}</Text>
                   <Text style={styles.answerText}>
-                    {theirs?.answer ?? ''}
+                    {displayWeeklyAnswer(theirs)}
                   </Text>
                 </View>
               )
             })}
 
             <View style={styles.intention}>
-              <Text style={styles.metaLabel}>This week's intention</Text>
+              <Text style={styles.metaLabel}>Last week's intention</Text>
               {myIntention ? (
                 <Text style={styles.answerText}>{myName}: {myIntention}</Text>
               ) : null}
@@ -279,7 +364,7 @@ export default function WeeklyReviewScreen() {
             <Text style={styles.sectionTitle}>Suggested reading</Text>
             <Text style={styles.hint}>
               Optional. Clearly not a diagnosis. Your answers above are the
-              record.
+              record and cannot be rewritten. Hide or edit applies only to you.
             </Text>
             {aiSummary && !aiSummary.dismissed ? (
               <>
@@ -287,10 +372,7 @@ export default function WeeklyReviewScreen() {
                   {aiSummary.source === 'ai'
                     ? 'Generated suggestion'
                     : 'Local suggestion'}
-                  {aiSummary.originalSummary &&
-                  aiSummary.originalSummary !== aiSummary.summary
-                    ? ' · edited'
-                    : ''}
+                  {aiSummary.personallyEdited ? ' · edited for you' : ''}
                 </Text>
                 {editingSummary ? (
                   <Field
@@ -307,13 +389,13 @@ export default function WeeklyReviewScreen() {
                 <ErrorText message={aiError} />
                 {editingSummary ? (
                   <PrimaryButton
-                    label="Save this reading"
+                    label="Save this reading for you"
                     onPress={() => void onSaveEdit()}
                     loading={summaryBusy}
                   />
                 ) : (
                   <TextLink
-                    label="Edit this reading"
+                    label="Edit this reading for you"
                     onPress={() => {
                       setSummaryDraft(aiSummary.summary)
                       setEditingSummary(true)
@@ -335,7 +417,8 @@ export default function WeeklyReviewScreen() {
               <>
                 {aiSummary?.dismissed ? (
                   <Text style={styles.hint}>
-                    The suggestion is hidden. Your original words stay.
+                    Hidden for you. Your original words stay, and your partner
+                    can still see the suggestion.
                   </Text>
                 ) : null}
                 <PrimaryButton

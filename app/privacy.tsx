@@ -74,7 +74,12 @@ export default function PrivacyScreen() {
             Reminders and partner alerts never include scores, shared words, or
             names. On Android, the lock screen hides the message body. iOS
             still shows the title and body, so both are generic: “Bond” and
-            “Open the app when you have a minute.”
+            “Open the app when you have a minute.” Reminders stay off until you
+            opt in. You can set one daily time, a separate “Our reveal is
+            ready” alert, quiet hours, and an optional one-hour snooze. Bond
+            will not remind you after today’s check-in is saved, and it will
+            not interrupt you with a popup while you are using another part of
+            the app.
           </Text>
         </View>
 

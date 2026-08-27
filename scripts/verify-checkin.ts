@@ -80,6 +80,29 @@ async function main() {
     throw new Error(`Expected A to see 1 row, got ${(beforeA.data ?? []).length}`)
   }
 
+  const reviseA = await a
+    .from('daily_check_ins')
+    .update({ score: 2, note: 'Corrected' })
+    .eq('user_id', signUpA.data.user!.id)
+    .eq('check_in_date', date)
+    .select('score, note, revised_at')
+    .single()
+  if (reviseA.error) throw reviseA.error
+  if (reviseA.data.score !== 2 || !reviseA.data.revised_at) {
+    throw new Error('Owner revise failed while waiting')
+  }
+
+  const steal = await b
+    .from('daily_check_ins')
+    .update({ score: 1 })
+    .eq('user_id', signUpA.data.user!.id)
+    .eq('check_in_date', date)
+    .select('id')
+  if (steal.error) throw steal.error
+  if ((steal.data ?? []).length !== 0) {
+    throw new Error('Partner updated owner row while waiting')
+  }
+
   const insertB = await b.from('daily_check_ins').insert({
     couple_id: coupleId,
     user_id: signUpB.data.user!.id,
@@ -104,6 +127,19 @@ async function main() {
     throw new Error(
       `Reveal failed: A=${(afterA.data ?? []).length} B=${(afterB.data ?? []).length}`,
     )
+  }
+
+  const locked = await a
+    .from('daily_check_ins')
+    .update({ score: 1, note: 'too late' })
+    .eq('user_id', signUpA.data.user!.id)
+    .eq('check_in_date', date)
+    .select('id')
+  if (locked.error && locked.error.code !== 'P0001') {
+    throw locked.error
+  }
+  if ((locked.data ?? []).length !== 0) {
+    throw new Error('Lock failed: A updated after B submitted')
   }
 
   console.log('✅ Blind-then-reveal OK for', date)

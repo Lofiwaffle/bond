@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Linking, ScrollView, StyleSheet, Text } from 'react-native'
+import { useRef, useState } from 'react'
+import { Linking, ScrollView, StyleSheet, Text, type TextInput } from 'react-native'
 import { Redirect, router } from 'expo-router'
 
 import {
@@ -12,6 +12,7 @@ import {
 } from '../components/ui'
 import { Icon } from '../lib/icons'
 import { saveSupabaseConfig, supabaseConfigured } from '../lib/supabase'
+import { focusFirstInvalid } from '../lib/formFocus'
 import { colors, type } from '../lib/theme'
 
 export default function ConnectScreen() {
@@ -19,6 +20,8 @@ export default function ConnectScreen() {
   const [key, setKey] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const urlRef = useRef<TextInput>(null)
+  const keyRef = useRef<TextInput>(null)
 
   if (supabaseConfigured) {
     return <Redirect href="/" />
@@ -26,12 +29,26 @@ export default function ConnectScreen() {
 
   const onSave = async () => {
     if (saving) return
+    const urlMissing = !url.trim()
+    const keyMissing = !key.trim()
+    if (urlMissing || keyMissing) {
+      setError(urlMissing ? 'Enter a project URL' : 'Enter a publishable key')
+      focusFirstInvalid([
+        { ref: urlRef, invalid: urlMissing },
+        { ref: keyRef, invalid: keyMissing },
+      ])
+      return
+    }
     setError(null)
     setSaving(true)
     const result = await saveSupabaseConfig(url, key)
     setSaving(false)
     if (result.error) {
       setError(result.error)
+      focusFirstInvalid([
+        { ref: urlRef, invalid: true },
+        { ref: keyRef, invalid: false },
+      ])
       return
     }
     router.replace('/')
@@ -52,6 +69,7 @@ export default function ConnectScreen() {
 
         <Label>Project URL</Label>
         <Field
+          ref={urlRef}
           value={url}
           onChangeText={setUrl}
           autoCapitalize="none"
@@ -63,6 +81,7 @@ export default function ConnectScreen() {
 
         <Label>Publishable key</Label>
         <Field
+          ref={keyRef}
           value={key}
           onChangeText={setKey}
           autoCapitalize="none"
@@ -71,13 +90,12 @@ export default function ConnectScreen() {
           placeholder="sb_publishable_… or anon jwt"
         />
 
-        <ErrorText message={error} />
+        <ErrorText nativeID="connect-error" message={error} />
 
         <PrimaryButton
           label="Connect"
           onPress={() => void onSave()}
           loading={saving}
-          disabled={!url.trim() || !key.trim()}
         />
 
         <TextLink

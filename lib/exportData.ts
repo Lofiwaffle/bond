@@ -11,14 +11,17 @@ type ExportBundle = {
   profile: unknown
   couple: unknown
   daily_check_ins: unknown[]
+  daily_actions: unknown[]
   weekly_reviews: unknown[]
   weekly_ai_summaries: unknown[]
+  weekly_ai_summary_prefs: unknown[]
   couple_goals: unknown[]
   couple_goal_reviews: unknown[]
   habit_completions: unknown[]
   bid_logs: unknown[]
   appreciations: unknown[]
   rituals: unknown[]
+  notification_preferences: unknown
 }
 
 async function rows(table: string): Promise<unknown[]> {
@@ -50,24 +53,30 @@ export async function buildExportBundle(userId: string): Promise<ExportBundle> {
 
   const [
     daily_check_ins,
+    daily_actions,
     weekly_reviews,
     weekly_ai_summaries,
+    weekly_ai_summary_prefs,
     couple_goals,
     couple_goal_reviews,
     habit_completions,
     bid_logs,
     appreciations,
     rituals,
+    prefsRow,
   ] = await Promise.all([
     rows('daily_check_ins'),
+    rows('daily_actions'),
     rows('weekly_reviews'),
     rows('weekly_ai_summaries'),
+    rows('weekly_ai_summary_prefs'),
     rows('couple_goals'),
     rows('couple_goal_reviews'),
     rows('habit_completions'),
     rows('bid_logs'),
     rows('appreciations'),
     rows('rituals'),
+    rows('notification_preferences'),
   ])
 
   return {
@@ -76,14 +85,17 @@ export async function buildExportBundle(userId: string): Promise<ExportBundle> {
     profile,
     couple,
     daily_check_ins,
+    daily_actions,
     weekly_reviews,
     weekly_ai_summaries,
+    weekly_ai_summary_prefs,
     couple_goals,
     couple_goal_reviews,
     habit_completions,
     bid_logs,
     appreciations,
     rituals,
+    notification_preferences: prefsRow[0] ?? null,
   }
 }
 

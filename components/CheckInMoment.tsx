@@ -12,27 +12,25 @@ import {
   TextLink,
 } from './ui'
 import type { ActivityId } from '../lib/activities'
-import {
-  loadPrivateThought,
-  loadRevealAction,
-  savePrivateThought,
-  saveRevealAction,
-  type SavedRevealAction,
-} from '../lib/checkInDraft'
+import { loadPrivateThought, savePrivateThought } from '../lib/checkInDraft'
 import {
   REVEAL_ACTIONS,
   displaySharedWords,
   revealReflection,
   type RevealActionId,
 } from '../lib/checkInReveal'
+import { useDailyAction } from '../hooks/useDailyAction'
+import { useAuth } from '../lib/auth'
+import { DEVICE_ONLY_THOUGHTS } from '../lib/privacy'
+import { useToast } from '../lib/toast'
 import { SCORE_LABELS, colors, hairlineWidth, hit, radii, type } from '../lib/theme'
-import type { DailyCheckIn } from '../types/database'
+import type { DailyAction, DailyCheckIn } from '../types/database'
 
 export function PrivacyLine() {
   return (
     <Text style={styles.privacy}>
-      Private until you both check in. Then only the two of you. Private
-      thoughts stay on this device.
+      Private until you both check in. Then only the two of you.{' '}
+      {DEVICE_ONLY_THOUGHTS}
     </Text>
   )
 }
@@ -59,6 +57,7 @@ export function WaitingMoment({
   nudging,
   onNudge,
   onRefresh,
+  onEdit,
   onDone,
 }: {
   mine: DailyCheckIn
@@ -68,6 +67,7 @@ export function WaitingMoment({
   nudging: boolean
   onNudge: () => void
   onRefresh: () => void
+  onEdit?: () => void
   onDone?: () => void
 }) {
   const [thought, setThought] = useState('')
@@ -90,7 +90,8 @@ export function WaitingMoment({
       <Text style={styles.kicker}>Saved</Text>
       <Text style={styles.title}>It's with you until {partnerName} is ready.</Text>
       <Text style={styles.body}>
-        Your entry is saved. They cannot see it yet. There is no rush.
+        Your entry is saved. They cannot see it yet. There is no rush. You can
+        correct it until they check in.
       </Text>
 
       <View style={styles.pair}>
@@ -113,15 +114,20 @@ export function WaitingMoment({
       <Field
         value={thought}
         onChangeText={setThought}
-        placeholder="Optional. Stays on this device."
+        placeholder="Optional. This device only — lost if storage is cleared."
         accessibilityLabel="Private thought"
         autoCapitalize="sentences"
         multiline
         maxLength={500}
         style={styles.note}
       />
-      <Text style={styles.hint}>They will not see this, even after the day opens.</Text>
+      <Text style={styles.hint}>
+        They will not see this, even after the day opens. {DEVICE_ONLY_THOUGHTS}
+      </Text>
 
+      {onEdit ? (
+        <TextLink label="Edit my check-in" onPress={onEdit} />
+      ) : null}
       {nudged ? (
         <Text style={styles.hint}>
           A gentle note is on its way. No follow-up from us.
@@ -143,40 +149,70 @@ export function RevealMoment({
   mine,
   partner,
   partnerName,
-  userId,
 }: {
   mine: DailyCheckIn
   partner: DailyCheckIn
   partnerName: string
-  userId: string
 }) {
   const insight = revealReflection(mine, partner, partnerName)
-  const [actionId, setActionId] = useState<RevealActionId | null>(
+  const { actionForDate, propose, respond, complete } = useDailyAction()
+  const { showToast } = useToast()
+  const action = actionForDate(mine.check_in_date)
+  const [actionId, setActionId] = useState<RevealActionId>(
     insight.suggestedAction,
   )
   const [actionText, setActionText] = useState('')
-  const [saved, setSaved] = useState<SavedRevealAction | null>(null)
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    void loadRevealAction(userId, mine.check_in_date).then((value) => {
-      if (!value) return
-      setSaved(value)
-      setActionId(value.id)
-      setActionText(value.text)
-    })
-  }, [mine.check_in_date, userId])
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const active = REVEAL_ACTIONS.find((item) => item.id === actionId) ?? null
 
-  const onSaveAction = async () => {
-    if (!actionId || saving) return
-    const text = actionText.trim() || active?.prompt || ''
+  const onPropose = async () => {
+    if (!active || saving) return
+    const text = actionText.trim()
+    if (!text) {
+      setActionError('Write one small thing first')
+      return
+    }
     setSaving(true)
-    const next = { id: actionId, text }
-    await saveRevealAction(userId, next, mine.check_in_date)
-    setSaved(next)
+    setActionError(null)
+    const result = await propose(actionId, text, mine.check_in_date)
     setSaving(false)
+    if (result.error) {
+      setActionError(result.error)
+      return
+    }
+    showToast('Offered. They will not see your private thought.')
+  }
+
+  const onRespond = async (status: 'accepted' | 'skipped') => {
+    if (!action || saving) return
+    setSaving(true)
+    setActionError(null)
+    const result = await respond(action.id, status)
+    setSaving(false)
+    if (result.error) {
+      setActionError(result.error)
+      return
+    }
+    showToast(
+      status === 'accepted'
+        ? 'Accepted. It will stay on Today until you mark it done.'
+        : 'Passed for tonight. No follow-up from Bond.',
+    )
+  }
+
+  const onComplete = async () => {
+    if (!action || saving) return
+    setSaving(true)
+    setActionError(null)
+    const result = await complete(action.id)
+    setSaving(false)
+    if (result.error) {
+      setActionError(result.error)
+      return
+    }
+    showToast('Saved as a moment you shared.')
   }
 
   return (
@@ -219,53 +255,240 @@ export function RevealMoment({
         that you have to talk it through.
       </Text>
 
+      <OneSmallAction
+        partnerName={partnerName}
+        action={action}
+        actionId={actionId}
+        actionText={actionText}
+        active={active}
+        saving={saving}
+        error={actionError}
+        onSelectKind={setActionId}
+        onChangeText={setActionText}
+        onPropose={() => void onPropose()}
+        onAccept={() => void onRespond('accepted')}
+        onSkip={() => void onRespond('skipped')}
+        onComplete={() => void onComplete()}
+      />
+    </View>
+  )
+}
+
+function OneSmallAction({
+  partnerName,
+  action,
+  actionId,
+  actionText,
+  active,
+  saving,
+  error,
+  onSelectKind,
+  onChangeText,
+  onPropose,
+  onAccept,
+  onSkip,
+  onComplete,
+}: {
+  partnerName: string
+  action: DailyAction | null
+  actionId: RevealActionId
+  actionText: string
+  active: { id: RevealActionId; label: string; prompt: string } | null
+  saving: boolean
+  error: string | null
+  onSelectKind: (id: RevealActionId) => void
+  onChangeText: (text: string) => void
+  onPropose: () => void
+  onAccept: () => void
+  onSkip: () => void
+  onComplete: () => void
+}) {
+  const kindLabel =
+    REVEAL_ACTIONS.find((item) => item.id === action?.kind)?.label ?? 'Action'
+
+  return (
+    <View>
       <Text style={styles.sectionLabel}>One small action</Text>
-      <View style={styles.actionRow}>
-        {REVEAL_ACTIONS.map((item) => {
-          const selected = item.id === actionId
-          return (
-            <Pressable
-              key={item.id}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              accessibilityLabel={item.label}
-              onPress={() => {
-                setActionId(item.id)
-                if (!actionText.trim()) setActionText('')
-              }}
-              style={[styles.actionChip, selected && styles.actionChipOn]}
-            >
-              <Text
-                style={[styles.actionChipLabel, selected && styles.actionChipLabelOn]}
-              >
-                {item.label}
-              </Text>
-            </Pressable>
-          )
-        })}
-      </View>
-      {active ? (
+      {!action ? (
         <>
-          <Field
-            value={actionText}
-            onChangeText={setActionText}
-            placeholder={active.prompt}
-            accessibilityLabel={active.prompt}
-            autoCapitalize="sentences"
-            multiline
-            maxLength={280}
-            style={styles.note}
-          />
+          <Text style={styles.body}>
+            Offer one thing. {partnerName} can accept or pass. Your private
+            thought stays on this device and is lost if you clear Bond’s
+            storage.
+          </Text>
+          <View style={styles.actionRow}>
+            {REVEAL_ACTIONS.map((item) => {
+              const selected = item.id === actionId
+              return (
+                <Pressable
+                  key={item.id}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={item.label}
+                  onPress={() => onSelectKind(item.id)}
+                  style={[styles.actionChip, selected && styles.actionChipOn]}
+                >
+                  <Text
+                    style={[
+                      styles.actionChipLabel,
+                      selected && styles.actionChipLabelOn,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </View>
+          {active ? (
+            <Field
+              value={actionText}
+              onChangeText={onChangeText}
+              placeholder={active.prompt}
+              accessibilityLabel={active.prompt}
+              autoCapitalize="sentences"
+              multiline
+              maxLength={280}
+              style={styles.note}
+            />
+          ) : null}
           <PrimaryButton
-            label={saved ? 'Update this action' : 'Keep this for tonight'}
-            onPress={() => void onSaveAction()}
+            label="Offer this"
+            onPress={onPropose}
             loading={saving}
           />
-          {saved ? (
-            <Text style={styles.hint}>Saved on this device. Say it when you are together.</Text>
-          ) : null}
         </>
       ) : null}
+
+      {action?.status === 'proposed' ? (
+        <ProposedAction
+          action={action}
+          partnerName={partnerName}
+          saving={saving}
+          onAccept={onAccept}
+          onSkip={onSkip}
+        />
+      ) : null}
+
+      {action?.status === 'accepted' ? (
+        <>
+          <Text style={styles.body}>
+            {kindLabel}: {action.text}
+          </Text>
+          <Text style={styles.hint}>
+            This stays on Today until one of you marks it done.
+          </Text>
+          <PrimaryButton
+            label="We did it"
+            onPress={onComplete}
+            loading={saving}
+          />
+        </>
+      ) : null}
+
+      {action?.status === 'skipped' ? (
+        <Text style={styles.hint}>
+          Passed for tonight. Bond will not follow up.
+        </Text>
+      ) : null}
+
+      {action?.status === 'completed' ? (
+        <Text style={styles.hint}>
+          You marked this done. It is a moment you shared.
+        </Text>
+      ) : null}
+
+      <ErrorText message={error} />
+    </View>
+  )
+}
+
+function ProposedAction({
+  action,
+  partnerName,
+  saving,
+  onAccept,
+  onSkip,
+}: {
+  action: DailyAction
+  partnerName: string
+  saving: boolean
+  onAccept: () => void
+  onSkip: () => void
+}) {
+  const { user } = useAuth()
+  const kindLabel =
+    REVEAL_ACTIONS.find((item) => item.id === action.kind)?.label ?? 'Action'
+
+  if (action.proposed_by === user?.id) {
+    return (
+      <Text style={styles.hint}>
+        Offered to {partnerName}. Waiting. They will not see your private
+        thought.
+      </Text>
+    )
+  }
+
+  return (
+    <>
+      <Text style={styles.body}>
+        {partnerName} offered: {kindLabel.toLowerCase()}. {action.text}
+      </Text>
+      <PrimaryButton
+        label="Yes, tonight"
+        onPress={onAccept}
+        loading={saving}
+      />
+      <TextLink
+        label="Not tonight"
+        onPress={onSkip}
+        disabled={saving}
+      />
+    </>
+  )
+}
+
+export function SharedActionCard({
+  action,
+  partnerName,
+  userId,
+}: {
+  action: DailyAction
+  partnerName: string
+  userId: string
+}) {
+  const { complete } = useDailyAction()
+  const { showToast } = useToast()
+  const [saving, setSaving] = useState(false)
+  const kindLabel =
+    REVEAL_ACTIONS.find((item) => item.id === action.kind)?.label ?? 'Action'
+  const fromMe = action.proposed_by === userId
+
+  const onComplete = async () => {
+    if (saving) return
+    setSaving(true)
+    const result = await complete(action.id)
+    setSaving(false)
+    if (result.error) {
+      showToast(result.error)
+      return
+    }
+    showToast('Saved as a moment you shared.')
+  }
+
+  return (
+    <View style={styles.sharedCard}>
+      <Text style={styles.kicker}>Tonight</Text>
+      <Text style={styles.title}>One small action</Text>
+      <Text style={styles.body}>
+        {fromMe ? `You offered` : `${partnerName} offered`}: {kindLabel.toLowerCase()}.{' '}
+        {action.text}
+      </Text>
+      <PrimaryButton
+        label="We did it"
+        onPress={() => void onComplete()}
+        loading={saving}
+      />
     </View>
   )
 }
@@ -467,5 +690,12 @@ const styles = StyleSheet.create({
   },
   actionChipLabelOn: {
     color: colors.onAccent,
+  },
+  sharedCard: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: radii.md,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 12,
   },
 })

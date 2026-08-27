@@ -3,16 +3,21 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native
 import { Redirect, router, useFocusEffect } from 'expo-router'
 
 import { NextStepCard } from '../../../components/NextStepCard'
-import { RevealMoment, WaitingMoment } from '../../../components/CheckInMoment'
-import { LoadingScreen, Screen, StatusPanel } from '../../../components/ui'
-import { useTodayCheckIn, useCheckInHistory } from '../../../hooks/useCheckIn'
+import { RevealMoment, SharedActionCard, WaitingMoment } from '../../../components/CheckInMoment'
+import { LoadingScreen, Screen, StatusPanel, TextLink } from '../../../components/ui'
+import { useTodayCheckIn, useCheckInGrowth } from '../../../hooks/useCheckIn'
+import { useDailyAction } from '../../../hooks/useDailyAction'
+import { useNotificationPreferences } from '../../../hooks/useNotificationPreferences'
 import { useAuth } from '../../../lib/auth'
 import { hasSentNudge, markNudgeSent } from '../../../lib/checkInDraft'
 import { promptForDate } from '../../../lib/dailyPrompts'
 import { formatDisplayDate, localDateString } from '../../../lib/dates'
+import { useQueuedCheckIn } from '../../../lib/checkInOutbox'
 import { todayPhase } from '../../../lib/nextStep'
-import { describeRhythm, welcomeBackCopy } from '../../../lib/rhythm'
+import { welcomeBackCopy } from '../../../lib/rhythm'
+import { useToast } from '../../../lib/toast'
 import { colors, type } from '../../../lib/theme'
+import { formatClockLabel } from '../../../lib/notificationSchedule'
 
 export default function TodayScreen() {
   const { user, profile, partner, isLoading: authLoading } = useAuth()
@@ -26,10 +31,15 @@ export default function TodayScreen() {
     refresh,
     sendNudge,
   } = useTodayCheckIn()
-  const { days } = useCheckInHistory()
+  const { myCheckIns, lastDate } = useCheckInGrowth()
+  const { accepted } = useDailyAction()
+  const { remindInOneHour } = useNotificationPreferences()
+  const { showToast } = useToast()
   const [nudged, setNudged] = useState(false)
   const [nudging, setNudging] = useState(false)
+  const [snoozing, setSnoozing] = useState(false)
   const today = localDateString()
+  const queued = useQueuedCheckIn(user?.id, today)
 
   useFocusEffect(
     useCallback(() => {
@@ -52,12 +62,26 @@ export default function TodayScreen() {
     bothSubmitted,
   })
   const prompt = promptForDate(profile.couple_id, today)
-  const rhythm = describeRhythm(
-    days.filter((d) => d.mine).map((d) => d.date),
-    days.filter((d) => d.revealed).map((d) => d.date),
-    today,
-  )
-  const returning = !mine ? welcomeBackCopy(rhythm) : null
+  const gapDays = lastDate
+    ? Math.max(
+        0,
+        Math.round(
+          (Date.parse(`${today}T00:00:00`) -
+            Date.parse(`${lastDate}T00:00:00`)) /
+            86400000,
+        ),
+      )
+    : 0
+  const returning = !mine
+    ? welcomeBackCopy({
+        daysConnected: myCheckIns,
+        daysOpen: 0,
+        stretch: 0,
+        lastDate,
+        gapDays,
+        welcomeBack: gapDays >= 2,
+      })
+    : null
 
   const onNudge = async () => {
     if (!user?.id || nudged || nudging) return
@@ -67,6 +91,20 @@ export default function TodayScreen() {
     if (result.error) return
     await markNudgeSent(user.id, today)
     setNudged(true)
+  }
+
+  const onSnooze = async () => {
+    if (snoozing || mine) return
+    setSnoozing(true)
+    const result = await remindInOneHour()
+    setSnoozing(false)
+    if (result.error) {
+      showToast(result.error)
+      return
+    }
+    if (result.when) {
+      showToast(`We'll nudge you around ${formatClockLabel(result.when)}.`)
+    }
   }
 
   return (
@@ -93,17 +131,41 @@ export default function TodayScreen() {
           />
         ) : null}
 
+        {accepted
+          .filter(
+            (action) => phase !== 'reveal' || action.check_in_date !== today,
+          )
+          .map((action) => (
+            <SharedActionCard
+              key={action.id}
+              action={action}
+              partnerName={partnerName}
+              userId={user?.id ?? ''}
+            />
+          ))}
+
         {phase === 'compose' ? (
-          <NextStepCard
-            kicker="What now"
-            title={prompt.text}
-            body={
-              returning ??
-              'Two minutes. Private until you both check in.'
-            }
-            actionLabel="Check in"
-            onAction={() => router.push('/(app)/check-in')}
-          />
+          <>
+            <NextStepCard
+              kicker="What now"
+              title={prompt.text}
+              body={
+                queued
+                  ? 'Today is queued on this device. It is not in the relationship until Bond confirms it.'
+                  : returning ??
+                    'Two minutes. Private until you both check in.'
+              }
+              actionLabel={queued ? 'Review check-in' : 'Check in'}
+              onAction={() => router.push('/(app)/check-in')}
+            />
+            <TextLink
+              label={
+                snoozing ? 'Setting reminder...' : 'Remind me in one hour'
+              }
+              onPress={() => void onSnooze()}
+              disabled={snoozing}
+            />
+          </>
         ) : null}
 
         {phase === 'waiting' && mine && partner ? (
@@ -115,6 +177,7 @@ export default function TodayScreen() {
             nudging={nudging}
             onNudge={() => void onNudge()}
             onRefresh={() => void refresh()}
+            onEdit={() => router.push('/(app)/check-in?edit=1')}
           />
         ) : null}
 
@@ -131,7 +194,6 @@ export default function TodayScreen() {
             mine={mine}
             partner={partnerCheckIn}
             partnerName={partnerName}
-            userId={user.id}
           />
         ) : null}
       </ScrollView>

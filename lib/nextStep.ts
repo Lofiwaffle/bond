@@ -1,3 +1,5 @@
+import { OBSERVATION_MIN_REVEALED } from './growthObservations'
+
 export type TodayPhase = 'compose' | 'waiting' | 'reveal'
 
 export function todayPhase({
@@ -51,23 +53,31 @@ export type GrowthDestination = {
     | '/(app)/bond/reviews'
 }
 
+function rhythmBody(revealedDays: number): string {
+  return revealedDays >= OBSERVATION_MIN_REVEALED
+    ? 'Opened days, similar labels, and quiet patterns — not a verdict.'
+    : 'Days connected, without a punishment for missing one.'
+}
+
 export function pickGrowthNext({
   unlocks,
   needsReview,
   activeGoalCount,
   myCheckIns,
+  revealedDays = 0,
 }: {
   unlocks: GrowthUnlocks
   needsReview: boolean
   activeGoalCount: number
   myCheckIns: number
+  revealedDays?: number
 }): { next: GrowthDestination | null; remaining: number } {
   if (unlocks.weeklyReview && needsReview) {
     return {
       next: {
         id: 'weekly',
         title: 'Weekly review',
-        body: 'Look back in your own words, then pick one small intention.',
+        body: 'Look back at last week in your own words, then pick one small intention.',
         href: '/(app)/weekly-review',
       },
       remaining: 0,
@@ -86,7 +96,7 @@ export function pickGrowthNext({
       next: {
         id: 'goals',
         title: 'Goals',
-        body: 'Name one shared aim now that you have a rhythm.',
+        body: 'Offer a shared aim. It becomes yours together after they agree.',
         href: '/(app)/bond/goals',
       },
       remaining: 0,
@@ -97,20 +107,26 @@ export function pickGrowthNext({
     next: {
       id: 'patterns',
       title: 'Rhythm',
-      body: 'Days connected, without a punishment for missing one.',
+      body: rhythmBody(revealedDays),
       href: '/(app)/bond/streaks',
     },
     remaining: 0,
   }
 }
 
-export function unlockedGrowthItems(unlocks: GrowthUnlocks): GrowthDestination[] {
+export function unlockedGrowthItems(
+  unlocks: GrowthUnlocks,
+  { revealedDays = 0 }: { revealedDays?: number } = {},
+): GrowthDestination[] {
   const items: GrowthDestination[] = []
   if (unlocks.patterns) {
     items.push({
       id: 'patterns',
       title: 'Rhythm',
-      body: 'Days connected',
+      body:
+        revealedDays >= OBSERVATION_MIN_REVEALED
+          ? 'What you both labeled, without a verdict'
+          : 'Days connected',
       href: '/(app)/bond/streaks',
     })
   }

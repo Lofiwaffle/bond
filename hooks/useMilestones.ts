@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 
-import { useCheckInHistory } from './useCheckIn'
+import { useCheckInIndex } from './useCheckIn'
 import { useCoupleGoal } from './useCoupleGoal'
+import { useDailyAction } from './useDailyAction'
 import { useWeeklyReviewHistory } from './useWeeklyReview'
 import { milestonesFrom, type Milestone } from '../lib/milestones'
 
@@ -10,22 +11,25 @@ export function useMilestones(): {
   earnedCount: number
   isLoading: boolean
 } {
-  const { days, isLoading: daysLoading } = useCheckInHistory()
+  const { days, isLoading: daysLoading } = useCheckInIndex()
   const { weeks, isLoading: weeksLoading } = useWeeklyReviewHistory()
   const { completed, isLoading: goalsLoading } = useCoupleGoal()
+  const { firstCompletedDate, isLoading: actionsLoading } = useDailyAction()
 
   const milestones = useMemo(() => {
     const mineDays = days
-      .filter((d) => d.mine)
+      .filter((d) => d.mineScore != null)
       .map((d) => d.date)
       .sort()
-    const revealed = days.filter((d) => d.revealed).sort((a, b) => a.date.localeCompare(b.date))
+    const revealed = days
+      .filter((d) => d.revealed)
+      .sort((a, b) => a.date.localeCompare(b.date))
     const firstRevealDate = revealed[0]?.date ?? null
 
     let firstRepairDate: string | null = null
     for (const day of revealed) {
-      const mineScore = day.mine?.score
-      const partnerScore = day.partner?.score
+      const mineScore = day.mineScore
+      const partnerScore = day.partnerScore
       if (
         (typeof mineScore === 'number' && mineScore <= 2) ||
         (typeof partnerScore === 'number' && partnerScore <= 2)
@@ -70,12 +74,15 @@ export function useMilestones(): {
       firstSevenDate,
       firstReviewDate,
       firstGoalDate,
+      firstSharedActionDate: firstCompletedDate
+        ? firstCompletedDate.slice(0, 10)
+        : null,
     })
-  }, [completed, days, weeks])
+  }, [completed, days, firstCompletedDate, weeks])
 
   return {
     milestones,
     earnedCount: milestones.filter((item) => item.earnedOn).length,
-    isLoading: daysLoading || weeksLoading || goalsLoading,
+    isLoading: daysLoading || weeksLoading || goalsLoading || actionsLoading,
   }
 }

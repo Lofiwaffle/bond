@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useMemo, useState } from 'react'
+import { forwardRef, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -90,10 +90,14 @@ export function Label({ children }: { children: ReactNode }) {
   return <Text style={styles.label}>{children}</Text>
 }
 
-export function Field(props: TextInputProps) {
+export const Field = forwardRef<TextInput, TextInputProps>(function Field(
+  props,
+  ref,
+) {
   const [focused, setFocused] = useState(false)
   return (
     <TextInput
+      ref={ref}
       placeholderTextColor={colors.muted}
       autoCapitalize="none"
       autoCorrect={false}
@@ -109,6 +113,26 @@ export function Field(props: TextInputProps) {
       }}
       style={[styles.input, focused && styles.inputFocus, props.style]}
     />
+  )
+})
+
+export function ErrorText({
+  message,
+  nativeID,
+}: {
+  message: string | null
+  nativeID?: string
+}) {
+  if (!message) return null
+  return (
+    <Text
+      nativeID={nativeID}
+      accessibilityRole="alert"
+      accessibilityLiveRegion="assertive"
+      style={styles.error}
+    >
+      {message}
+    </Text>
   )
 }
 
@@ -213,11 +237,6 @@ export function IconButton({
       <Icon name={name} size={18} color={color} />
     </Pressable>
   )
-}
-
-export function ErrorText({ message }: { message: string | null }) {
-  if (!message) return null
-  return <Text style={styles.error}>{message}</Text>
 }
 
 export function LoadingScreen({ label = 'Loading Bond' }: { label?: string }) {

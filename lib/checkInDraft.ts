@@ -32,10 +32,6 @@ function nudgeKey(userId: string, date: string): string {
   return `bond.checkin.nudge.${userId}.${date}`
 }
 
-function actionKey(userId: string, date: string): string {
-  return `bond.checkin.action.${userId}.${date}`
-}
-
 export async function loadCheckInDraft(
   userId: string,
   date = localDateString(),
@@ -102,30 +98,4 @@ export async function markNudgeSent(
   date = localDateString(),
 ): Promise<void> {
   await AsyncStorage.setItem(nudgeKey(userId, date), 'true')
-}
-
-export type SavedRevealAction = {
-  id: 'appreciate' | 'support' | 'plan'
-  text: string
-}
-
-export async function loadRevealAction(
-  userId: string,
-  date = localDateString(),
-): Promise<SavedRevealAction | null> {
-  const raw = await AsyncStorage.getItem(actionKey(userId, date))
-  if (!raw) return null
-  try {
-    return JSON.parse(raw) as SavedRevealAction
-  } catch {
-    return null
-  }
-}
-
-export async function saveRevealAction(
-  userId: string,
-  action: SavedRevealAction,
-  date = localDateString(),
-): Promise<void> {
-  await AsyncStorage.setItem(actionKey(userId, date), JSON.stringify(action))
 }

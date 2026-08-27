@@ -8,9 +8,17 @@ import {
   type ReactNode,
 } from 'react'
 import { AppState } from 'react-native'
+import * as Linking from 'expo-linking'
 import type { Session, User } from '@supabase/supabase-js'
 
+import { consumeAuthUrl } from './authCallback'
+import {
+  RESET_REQUESTED_MESSAGE,
+  authRedirectUrl,
+} from './authRedirect'
+import { captureInviteFromUrl, clearPendingInvite } from './invite'
 import { reportError } from './monitor'
+import { cancelAllBondNotifications } from './notifications'
 import { clearOnboarding } from './onboarding'
 import { supabase, supabaseConfigured, supabaseConfigError } from './supabase'
 import type { Couple, Profile } from '../types/database'
@@ -23,16 +31,25 @@ type AuthContextValue = {
   partner: Profile | null
   isLoading: boolean
   sessionError: string | null
+  passwordRecovery: boolean
+  authLinkExpired: boolean
+  authLinkExpiredKind: 'recovery' | 'signup' | null
   retrySession: () => Promise<void>
   signUp: (
     email: string,
     password: string,
     displayName: string,
-  ) => Promise<{ error: string | null }>
+  ) => Promise<{ error: string | null; needsConfirmation: boolean }>
   signIn: (
     email: string,
     password: string,
-  ) => Promise<{ error: string | null }>
+  ) => Promise<{ error: string | null; emailNotConfirmed: boolean }>
+  requestPasswordReset: (
+    email: string,
+  ) => Promise<{ error: string | null; message: string }>
+  updatePassword: (password: string) => Promise<{ error: string | null }>
+  resendConfirmation: (email: string) => Promise<{ error: string | null }>
+  clearAuthLinkExpired: () => void
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   createCouple: () => Promise<{ couple: Couple | null; error: string | null }>
@@ -102,6 +119,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [partner, setPartner] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [sessionError, setSessionError] = useState<string | null>(null)
+  const [passwordRecovery, setPasswordRecovery] = useState(false)
+  const [authLinkExpired, setAuthLinkExpired] = useState(false)
+  const [authLinkExpiredKind, setAuthLinkExpiredKind] = useState<
+    'recovery' | 'signup' | null
+  >(null)
 
   const loadCoupleState = useCallback(async (userId: string) => {
     try {
@@ -180,8 +202,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted) return
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
+      if (event === 'SIGNED_OUT') {
+        setPasswordRecovery(false)
+        setAuthLinkExpired(false)
+        setAuthLinkExpiredKind(null)
+      }
       setSession(nextSession)
       if (nextSession?.user) {
         void loadCoupleState(nextSession.user.id).catch((error) => {
@@ -194,6 +222,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCouple(null)
         setPartner(null)
       }
+    })
+
+    const applyIncomingUrl = (url: string | null) => {
+      void captureInviteFromUrl(url)
+      void consumeAuthUrl(url).then((result) => {
+        if (!mounted) return
+        if (result.recovery) setPasswordRecovery(true)
+        if (result.expired) {
+          setAuthLinkExpired(true)
+          setAuthLinkExpiredKind(result.expiredKind)
+        }
+      })
+    }
+    void Linking.getInitialURL().then(applyIncomingUrl)
+    const linking = Linking.addEventListener('url', (event) => {
+      applyIncomingUrl(event.url)
     })
 
     const app = AppState.addEventListener('change', (state) => {
@@ -215,6 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false
       subscription.unsubscribe()
+      linking.remove()
       app.remove()
     }
   }, [loadCoupleState, restoreSession])
@@ -222,40 +267,112 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = useCallback(
     async (email: string, password: string, displayName: string) => {
       if (!supabaseConfigured) {
-        return { error: supabaseConfigError }
+        return { error: supabaseConfigError, needsConfirmation: false }
       }
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
           data: { display_name: displayName.trim() },
+          emailRedirectTo: authRedirectUrl('app'),
         },
       })
       if (error) {
+        const already =
+          /already registered|already been registered|user already/i.test(
+            error.message,
+          )
+        if (already) {
+          return { error: null, needsConfirmation: true }
+        }
         reportError('auth', error.message, { op: 'signup' })
-        return { error: error.message }
+        return { error: error.message, needsConfirmation: false }
       }
-      return { error: null }
+      return { error: null, needsConfirmation: !data.session }
     },
     [],
   )
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!supabaseConfigured) {
-      return { error: supabaseConfigError }
+      return { error: supabaseConfigError, emailNotConfirmed: false }
     }
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     })
     if (error) {
-      reportError('auth', error.message, { op: 'signin' })
+      const emailNotConfirmed = /not confirmed|confirm your email/i.test(
+        error.message,
+      )
+      if (!emailNotConfirmed) {
+        reportError('auth', error.message, { op: 'signin' })
+      }
+      return {
+        error: emailNotConfirmed
+          ? 'Confirm this email first. We can send another link.'
+          : error.message,
+        emailNotConfirmed,
+      }
+    }
+    return { error: null, emailNotConfirmed: false }
+  }, [])
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    if (!supabaseConfigured) {
+      return { error: supabaseConfigError, message: '' }
+    }
+    const trimmed = email.trim()
+    const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
+      redirectTo: authRedirectUrl('update-password'),
+    })
+    if (error) {
+      const rateLimited = /rate limit|too many/i.test(error.message)
+      if (rateLimited) {
+        return { error: error.message, message: '' }
+      }
+      reportError('auth', error.message, { op: 'reset' })
+    }
+    return { error: null, message: RESET_REQUESTED_MESSAGE }
+  }, [])
+
+  const updatePassword = useCallback(async (password: string) => {
+    if (!supabaseConfigured) {
+      return { error: supabaseConfigError }
+    }
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) {
+      reportError('auth', error.message, { op: 'update-password' })
       return { error: error.message }
+    }
+    setPasswordRecovery(false)
+    return { error: null }
+  }, [])
+
+  const resendConfirmation = useCallback(async (email: string) => {
+    if (!supabaseConfigured) {
+      return { error: supabaseConfigError }
+    }
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: { emailRedirectTo: authRedirectUrl('app') },
+    })
+    if (error) {
+      const rateLimited = /rate limit|too many/i.test(error.message)
+      if (rateLimited) return { error: error.message }
+      reportError('auth', error.message, { op: 'resend' })
     }
     return { error: null }
   }, [])
 
+  const clearAuthLinkExpired = useCallback(() => {
+    setAuthLinkExpired(false)
+    setAuthLinkExpiredKind(null)
+  }, [])
+
   const signOut = useCallback(async () => {
+    await cancelAllBondNotifications()
     await supabase.auth.signOut()
     setProfile(null)
     setCouple(null)
@@ -287,6 +404,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         reportError('auth', error.message, { op: 'join-couple' })
         return { couple: null, error: error.message }
       }
+      await clearPendingInvite()
       await refreshProfile()
       return { couple: data, error: null }
     },
@@ -302,6 +420,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       reportError('auth', error.message, { op: 'leave-couple' })
       return { error: error.message }
     }
+    await cancelAllBondNotifications()
     await refreshProfile()
     return { error: null }
   }, [refreshProfile])
@@ -315,6 +434,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       reportError('auth', error.message, { op: 'delete-account' })
       return { error: error.message }
     }
+    await cancelAllBondNotifications()
     try {
       await supabase.auth.signOut({ scope: 'local' })
     } catch {
@@ -359,9 +479,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       partner,
       isLoading,
       sessionError,
+      passwordRecovery,
+      authLinkExpired,
+      authLinkExpiredKind,
       retrySession: restoreSession,
       signUp,
       signIn,
+      requestPasswordReset,
+      updatePassword,
+      resendConfirmation,
+      clearAuthLinkExpired,
       signOut,
       refreshProfile,
       createCouple,
@@ -377,9 +504,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       partner,
       isLoading,
       sessionError,
+      passwordRecovery,
+      authLinkExpired,
+      authLinkExpiredKind,
       restoreSession,
       signUp,
       signIn,
+      requestPasswordReset,
+      updatePassword,
+      resendConfirmation,
+      clearAuthLinkExpired,
       signOut,
       refreshProfile,
       createCouple,

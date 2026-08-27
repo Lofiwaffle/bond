@@ -4,11 +4,19 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { colors, phoneMaxWidth, radii, type } from '../lib/theme'
 import { useOnline } from '../lib/network'
 import { useToast } from '../lib/toast'
+import {
+  OFFLINE_DRAFT_BANNER,
+  OFFLINE_QUEUED_BANNER,
+  useQueuedCheckIn,
+} from '../lib/checkInOutbox'
+import { useAuth } from '../lib/auth'
 
 export const PHONE_MAX_WIDTH = phoneMaxWidth
 
 export function PhoneShell({ children }: { children: ReactNode }) {
   const online = useOnline()
+  const { user } = useAuth()
+  const queued = useQueuedCheckIn(user?.id)
   const { message, clearToast } = useToast()
 
   useEffect(() => {
@@ -19,7 +27,7 @@ export function PhoneShell({ children }: { children: ReactNode }) {
 
   return (
     <View style={styles.outer} accessibilityRole="none">
-      <View style={styles.frame}>
+      <View style={styles.frame} testID="phone-frame" accessibilityRole="none">
         {!online ? (
           <View
             accessibilityLiveRegion="polite"
@@ -27,7 +35,7 @@ export function PhoneShell({ children }: { children: ReactNode }) {
             style={styles.offline}
           >
             <Text style={styles.offlineText}>
-              You're offline. Changes will retry when you're back.
+              {queued ? OFFLINE_QUEUED_BANNER : OFFLINE_DRAFT_BANNER}
             </Text>
           </View>
         ) : null}

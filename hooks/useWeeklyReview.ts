@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../lib/auth'
-import { addDays, endOfWeek, startOfWeek, localDateString } from '../lib/dates'
+import { localDateString, previousCompletedWeek } from '../lib/dates'
 import { reportError } from '../lib/monitor'
-import { describeRhythm } from '../lib/rhythm'
+import { isOnlineNow } from '../lib/network'
 import { supabase } from '../lib/supabase'
+import { clearWeeklyReviewDraft } from '../lib/weeklyReviewDraft'
 import {
   promptsForWeek,
   summarizeScores,
+  weeklyAnswerIsComplete,
   type WeeklyAnswer,
 } from '../lib/weeklyPrompts'
 import { buildCompletedReviewSummary, buildFallbackWeeklySummary } from '../lib/weeklyAiSummary'
-import { useCheckInHistory } from './useCheckIn'
+import { useCheckInGrowth, useCheckInRange } from './useCheckIn'
 
 export type WeeklyReviewRow = {
   id: string
@@ -30,6 +32,12 @@ export type WeeklyAiSummaryState = {
   cached: boolean
   originalSummary: string | null
   dismissed: boolean
+  personallyEdited: boolean
+}
+
+type SummaryPrefRow = {
+  hidden: boolean
+  edited_summary: string | null
 }
 
 function parseAnswers(raw: unknown): WeeklyAnswer[] {
@@ -40,14 +48,41 @@ function parseAnswers(raw: unknown): WeeklyAnswer[] {
       prompt_id: String(row.prompt_id ?? ''),
       prompt_text: String(row.prompt_text ?? ''),
       answer: String(row.answer ?? ''),
+      skipped: Boolean(row.skipped),
     }
   })
 }
 
+function overlaySummary(
+  shared: {
+    summary: string
+    source: 'ai' | 'fallback'
+    model: string | null
+    cached: boolean
+    originalSummary: string | null
+  },
+  pref: SummaryPrefRow | null,
+): WeeklyAiSummaryState {
+  const original = shared.originalSummary ?? shared.summary
+  const edited = pref?.edited_summary?.trim() || null
+  return {
+    summary: edited ?? original,
+    source: shared.source,
+    model: shared.model,
+    cached: shared.cached,
+    originalSummary: original,
+    dismissed: Boolean(pref?.hidden),
+    personallyEdited: Boolean(edited),
+  }
+}
+
 export function useWeeklyReview() {
   const { user, profile, partner } = useAuth()
-  const { days, isLoading: historyLoading, refresh: refreshHistory } =
-    useCheckInHistory()
+  const {
+    myCheckIns,
+    isLoading: growthLoading,
+    refresh: refreshGrowth,
+  } = useCheckInGrowth()
   const [mine, setMine] = useState<WeeklyReviewRow | null>(null)
   const [partnerReview, setPartnerReview] = useState<WeeklyReviewRow | null>(
     null,
@@ -59,34 +94,20 @@ export function useWeeklyReview() {
   const [error, setError] = useState<string | null>(null)
 
   const today = localDateString()
-  const myDates = useMemo(
-    () => days.filter((d) => d.mine).map((d) => d.date),
-    [days],
-  )
-  const revealedDates = useMemo(
-    () => days.filter((d) => d.revealed).map((d) => d.date),
-    [days],
-  )
-  const rhythm = useMemo(
-    () => describeRhythm(myDates, revealedDates, today),
-    [myDates, revealedDates, today],
-  )
-
-  const weekStart = startOfWeek(today)
-  const weekEnd = endOfWeek(today)
-  const unlocked = myDates.length >= 7
+  const { weekStart, weekEnd } = previousCompletedWeek(today)
+  const {
+    days: weekDays,
+    isLoading: weekLoading,
+    refresh: refreshWeek,
+  } = useCheckInRange(weekStart, weekEnd)
+  const unlocked = myCheckIns >= 7
 
   const prompts = useMemo(() => {
     if (!profile?.couple_id) return []
     return promptsForWeek(profile.couple_id, weekStart)
   }, [profile?.couple_id, weekStart])
 
-  const weekCheckIns = useMemo(() => {
-    const keys = new Set(
-      Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
-    )
-    return days.filter((d) => keys.has(d.date))
-  }, [days, weekStart])
+  const weekCheckIns = weekDays
 
   const myWeekScores = weekCheckIns
     .map((d) => d.mine?.score)
@@ -98,6 +119,38 @@ export function useWeeklyReview() {
   const mySummary = summarizeScores(myWeekScores)
   const partnerSummary = summarizeScores(partnerWeekScores)
 
+  const writePref = useCallback(
+    async (patch: { hidden?: boolean; edited_summary?: string | null }) => {
+      if (!user?.id || !profile?.couple_id) {
+        return { error: 'You must be paired' }
+      }
+      const { data: existing } = await supabase
+        .from('weekly_ai_summary_prefs')
+        .select('hidden, edited_summary')
+        .eq('user_id', user.id)
+        .eq('week_start', weekStart)
+        .maybeSingle()
+      const { error: upsertError } = await supabase
+        .from('weekly_ai_summary_prefs')
+        .upsert(
+          {
+            user_id: user.id,
+            couple_id: profile.couple_id,
+            week_start: weekStart,
+            hidden: patch.hidden ?? existing?.hidden ?? false,
+            edited_summary:
+              patch.edited_summary !== undefined
+                ? patch.edited_summary
+                : existing?.edited_summary ?? null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,week_start' },
+        )
+      return { error: upsertError?.message ?? null }
+    },
+    [profile?.couple_id, user?.id, weekStart],
+  )
+
   const refresh = useCallback(async () => {
     if (!user?.id || !profile?.couple_id || !unlocked) {
       setMine(null)
@@ -108,7 +161,7 @@ export function useWeeklyReview() {
     }
 
     setError(null)
-    const [{ data, error: fetchError }, { data: summaryRow }] =
+    const [{ data, error: fetchError }, { data: summaryRow }, { data: prefRow }] =
       await Promise.all([
         supabase
           .from('weekly_reviews')
@@ -117,8 +170,14 @@ export function useWeeklyReview() {
           .eq('week_start', weekStart),
         supabase
           .from('weekly_ai_summaries')
-          .select('summary, source, model, original_summary, dismissed_at')
+          .select('summary, source, model, original_summary')
           .eq('couple_id', profile.couple_id)
+          .eq('week_start', weekStart)
+          .maybeSingle(),
+        supabase
+          .from('weekly_ai_summary_prefs')
+          .select('hidden, edited_summary')
+          .eq('user_id', user.id)
           .eq('week_start', weekStart)
           .maybeSingle(),
       ])
@@ -137,14 +196,18 @@ export function useWeeklyReview() {
     setMine(rows.find((r) => r.user_id === user.id) ?? null)
     setPartnerReview(rows.find((r) => r.user_id !== user.id) ?? null)
     if (summaryRow?.summary) {
-      setAiSummary({
-        summary: summaryRow.summary,
-        source: (summaryRow.source as 'ai' | 'fallback') ?? 'fallback',
-        model: summaryRow.model ?? null,
-        cached: true,
-        originalSummary: summaryRow.original_summary ?? summaryRow.summary,
-        dismissed: Boolean(summaryRow.dismissed_at),
-      })
+      setAiSummary(
+        overlaySummary(
+          {
+            summary: summaryRow.summary,
+            source: (summaryRow.source as 'ai' | 'fallback') ?? 'fallback',
+            model: summaryRow.model ?? null,
+            cached: true,
+            originalSummary: summaryRow.original_summary ?? summaryRow.summary,
+          },
+          prefRow,
+        ),
+      )
     } else {
       setAiSummary(null)
     }
@@ -171,8 +234,28 @@ export function useWeeklyReview() {
         },
       )
 
+      const applyShared = async (shared: {
+        summary: string
+        source: 'ai' | 'fallback'
+        model: string | null
+        cached: boolean
+      }) => {
+        await writePref({ edited_summary: null })
+        setAiSummary((current) =>
+          overlaySummary(
+            {
+              ...shared,
+              originalSummary: shared.summary,
+            },
+            {
+              hidden: current?.dismissed ?? false,
+              edited_summary: null,
+            },
+          ),
+        )
+      }
+
       if (fnError) {
-        // Local fallback so the screen still shows a full check-in walkthrough
         const fallback = buildFallbackWeeklySummary({
           weekStart,
           weekEnd,
@@ -200,13 +283,11 @@ export function useWeeklyReview() {
           mineAnswers: mine?.answers,
           partnerAnswers: partnerReview?.answers,
         })
-        setAiSummary({
+        await applyShared({
           summary: fallback,
           source: 'fallback',
           model: null,
           cached: false,
-          originalSummary: fallback,
-          dismissed: false,
         })
         await supabase.from('weekly_ai_summaries').upsert(
           {
@@ -217,8 +298,6 @@ export function useWeeklyReview() {
             original_summary: fallback,
             source: 'fallback',
             model: null,
-            dismissed_at: null,
-            dismissed_by: null,
           },
           { onConflict: 'couple_id,week_start' },
         )
@@ -227,20 +306,23 @@ export function useWeeklyReview() {
         return { error: fnError.message }
       }
 
-      const payload = data as WeeklyAiSummaryState | null
+      const payload = data as {
+        summary?: string
+        source?: 'ai' | 'fallback'
+        model?: string | null
+        cached?: boolean
+      } | null
       if (!payload?.summary) {
         setAiLoading(false)
         setAiError('No summary returned')
         return { error: 'No summary returned' }
       }
 
-      setAiSummary({
+      await applyShared({
         summary: payload.summary,
         source: payload.source ?? 'ai',
         model: payload.model ?? null,
         cached: Boolean(payload.cached),
-        originalSummary: payload.summary,
-        dismissed: false,
       })
       setAiLoading(false)
       return { error: null }
@@ -255,6 +337,7 @@ export function useWeeklyReview() {
       weekStart,
       mine?.answers,
       partnerReview?.answers,
+      writePref,
     ],
   )
 
@@ -271,8 +354,14 @@ export function useWeeklyReview() {
       if (mine) {
         return { error: null }
       }
-      if (answers.some((a) => a.answer.trim().length === 0)) {
-        return { error: 'Please answer every prompt' }
+      if (answers.some((a) => !weeklyAnswerIsComplete(a))) {
+        return { error: 'Please answer or skip every prompt' }
+      }
+      if (!isOnlineNow()) {
+        return {
+          error:
+            'Reconnect to submit. Last week is not in the relationship until Bond confirms it.',
+        }
       }
 
       const { error: insertError } = await supabase.from('weekly_reviews').insert({
@@ -286,11 +375,13 @@ export function useWeeklyReview() {
       if (insertError) {
         if (insertError.code === '23505') {
           await refresh()
+          await clearWeeklyReviewDraft(user.id, weekStart)
           return { error: null }
         }
         reportError('supabase', insertError.message, { op: 'weekly-review' })
         return { error: insertError.message }
       }
+      await clearWeeklyReviewDraft(user.id, weekStart)
       await refresh()
       return { error: null }
     },
@@ -303,49 +394,38 @@ export function useWeeklyReview() {
         return { error: 'You must be paired' }
       }
       const trimmed = text.trim()
-      if (!trimmed) return { error: 'Write a short note, or dismiss instead.' }
-      const { error: updateError } = await supabase
-        .from('weekly_ai_summaries')
-        .update({
-          summary: trimmed,
-          dismissed_at: null,
-          dismissed_by: null,
-        })
-        .eq('couple_id', profile.couple_id)
-        .eq('week_start', weekStart)
-      if (updateError) return { error: updateError.message }
+      if (!trimmed) return { error: 'Write a short note, or hide it instead.' }
+      const result = await writePref({
+        hidden: false,
+        edited_summary: trimmed,
+      })
+      if (result.error) return result
       setAiSummary((current) =>
         current
           ? {
               ...current,
               summary: trimmed,
               dismissed: false,
+              personallyEdited: true,
             }
           : current,
       )
       return { error: null }
     },
-    [profile?.couple_id, user?.id, weekStart],
+    [profile?.couple_id, user?.id, writePref],
   )
 
   const dismissSummary = useCallback(async () => {
     if (!user?.id || !profile?.couple_id) {
       return { error: 'You must be paired' }
     }
-    const { error: updateError } = await supabase
-      .from('weekly_ai_summaries')
-      .update({
-        dismissed_at: new Date().toISOString(),
-        dismissed_by: user.id,
-      })
-      .eq('couple_id', profile.couple_id)
-      .eq('week_start', weekStart)
-    if (updateError) return { error: updateError.message }
+    const result = await writePref({ hidden: true })
+    if (result.error) return result
     setAiSummary((current) =>
       current ? { ...current, dismissed: true } : current,
     )
     return { error: null }
-  }, [profile?.couple_id, user?.id, weekStart])
+  }, [profile?.couple_id, user?.id, writePref])
 
   const restoreSummary = useCallback(async () => {
     if (!user?.id || !profile?.couple_id) {
@@ -353,35 +433,36 @@ export function useWeeklyReview() {
     }
     const original = aiSummary?.originalSummary ?? aiSummary?.summary
     if (!original) return { error: null }
-    const { error: updateError } = await supabase
-      .from('weekly_ai_summaries')
-      .update({
-        summary: original,
-        dismissed_at: null,
-        dismissed_by: null,
-      })
-      .eq('couple_id', profile.couple_id)
-      .eq('week_start', weekStart)
-    if (updateError) return { error: updateError.message }
+    const result = await writePref({
+      hidden: false,
+      edited_summary: null,
+    })
+    if (result.error) return result
     setAiSummary((current) =>
       current
         ? {
             ...current,
             summary: original,
             dismissed: false,
+            personallyEdited: false,
           }
         : current,
     )
     return { error: null }
-  }, [aiSummary?.originalSummary, aiSummary?.summary, profile?.couple_id, user?.id, weekStart])
+  }, [
+    aiSummary?.originalSummary,
+    aiSummary?.summary,
+    profile?.couple_id,
+    user?.id,
+    writePref,
+  ])
 
   const bothSubmitted = Boolean(mine && partner && partnerReview)
   const waitingForPartner = Boolean(mine && partner && !partnerReview)
   const needsReview = Boolean(unlocked && partner && !mine)
 
   return {
-    rhythm,
-    daysConnected: rhythm.daysConnected,
+    daysConnected: myCheckIns,
     unlocked,
     needsReview,
     weekStart,
@@ -401,10 +482,11 @@ export function useWeeklyReview() {
     saveEditedSummary,
     dismissSummary,
     restoreSummary,
-    isLoading: isLoading || historyLoading,
+    isLoading: isLoading || growthLoading || weekLoading,
     error,
     refresh: async () => {
-      await refreshHistory()
+      await refreshGrowth()
+      await refreshWeek()
       await refresh()
     },
     submit,
@@ -492,8 +574,9 @@ export function useWeeklyReviewHistory() {
         mine: null,
         partnerReview: null,
       }
-      if (summary.summary?.trim()) {
-        existing.summary = summary.summary
+      const original = summary.original_summary ?? summary.summary
+      if (original?.trim()) {
+        existing.summary = original
         existing.source = (summary.source as 'ai' | 'fallback') ?? 'fallback'
       }
       if (!existing.weekEnd) existing.weekEnd = summary.week_end

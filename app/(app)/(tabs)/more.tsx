@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   Pressable,
   RefreshControl,
@@ -6,30 +6,27 @@ import {
   StyleSheet,
   Text,
   View,
+  type TextInput,
 } from 'react-native'
 import { Redirect, router, type Href } from 'expo-router'
-import * as Clipboard from 'expo-clipboard'
 
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
+import { InviteShare } from '../../../components/InviteShare'
+import { NotificationSettings } from '../../../components/NotificationSettings'
 import {
   ErrorText,
+  Field,
   LoadingScreen,
   PrimaryButton,
   Screen,
   StatusPanel,
   TextLink,
 } from '../../../components/ui'
-import { useCheckInHistory } from '../../../hooks/useCheckIn'
+import { useTodayCheckIn } from '../../../hooks/useCheckIn'
 import { useAuth } from '../../../lib/auth'
-import { localDateString } from '../../../lib/dates'
 import { buildExportBundle, shareExportBundle } from '../../../lib/exportData'
-import {
-  areNotificationsEnabled,
-  disableNotifications,
-  enableNotifications,
-  syncCheckInReminder,
-} from '../../../lib/notifications'
 import { DELETE_SEMANTICS, UNPAIR_SEMANTICS } from '../../../lib/privacy'
+import { focusInput } from '../../../lib/formFocus'
 import { useToast } from '../../../lib/toast'
 import { colors, hairlineWidth, hit, type } from '../../../lib/theme'
 
@@ -54,14 +51,19 @@ export default function UsScreen() {
     partner,
     user,
     isLoading,
+    updateDisplayName,
     signOut,
     refreshProfile,
     deleteAccount,
     leaveCouple,
   } = useAuth()
-  const { days, isLoading: historyLoading, error: historyError, refresh: refreshHistory } =
-    useCheckInHistory()
-  const [copied, setCopied] = useState(false)
+  const { isLoading: historyLoading, error: historyError, refresh: refreshHistory } =
+    useTodayCheckIn()
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState(profile?.display_name?.trim() ?? '')
+  const [savingName, setSavingName] = useState(false)
+  const [nameError, setNameError] = useState<string | null>(null)
+  const nameRef = useRef<TextInput>(null)
   const [deleting, setDeleting] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -70,14 +72,7 @@ export default function UsScreen() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [leaveError, setLeaveError] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
-  const [notifyOn, setNotifyOn] = useState(false)
-  const [notifyBusy, setNotifyBusy] = useState(false)
-  const [notifyError, setNotifyError] = useState<string | null>(null)
   const { showToast } = useToast()
-
-  useEffect(() => {
-    void areNotificationsEnabled().then(setNotifyOn)
-  }, [])
 
   if (isLoading || historyLoading) return <LoadingScreen />
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
@@ -87,41 +82,29 @@ export default function UsScreen() {
   const coupleTitle = partnerName ? `${myName} & ${partnerName}` : myName
   const since = togetherSinceLabel(couple?.paired_at ?? couple?.created_at)
 
-  const copyInviteCode = async () => {
-    if (!couple?.invite_code) return
-    await Clipboard.setStringAsync(couple.invite_code)
-    setCopied(true)
-    showToast('Invite code copied')
-    setTimeout(() => setCopied(false), 2000)
+  const onSaveName = async () => {
+    if (savingName) return
+    if (!nameDraft.trim()) {
+      setNameError('Enter a display name')
+      focusInput(nameRef)
+      return
+    }
+    setNameError(null)
+    setSavingName(true)
+    const result = await updateDisplayName(nameDraft)
+    setSavingName(false)
+    if (result.error) {
+      setNameError(result.error)
+      focusInput(nameRef)
+      return
+    }
+    setEditingName(false)
+    showToast('Name saved')
   }
 
   const refreshAll = () => {
     void refreshProfile()
     void refreshHistory()
-  }
-
-  const onToggleNotifications = async () => {
-    if (notifyBusy) return
-    setNotifyError(null)
-    setNotifyBusy(true)
-    if (notifyOn) {
-      await disableNotifications()
-      setNotifyOn(false)
-      setNotifyBusy(false)
-      return
-    }
-    const granted = await enableNotifications(user?.id)
-    setNotifyOn(granted)
-    setNotifyBusy(false)
-    if (!granted) {
-      setNotifyError(
-        'Allow notifications in your browser or phone settings to get reminders.',
-      )
-      return
-    }
-    const today = localDateString()
-    const hasCompletedToday = days.some((day) => day.date === today && day.mine)
-    await syncCheckInReminder(Boolean(hasCompletedToday))
   }
 
   const onExport = async () => {
@@ -214,39 +197,59 @@ export default function UsScreen() {
           </View>
         </View>
 
+        {editingName ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Your name</Text>
+            <Field
+              ref={nameRef}
+              value={nameDraft}
+              onChangeText={setNameDraft}
+              autoCapitalize="words"
+              accessibilityLabel="Display name"
+              placeholder="Alex"
+            />
+            <ErrorText nativeID="name-error" message={nameError} />
+            <PrimaryButton
+              label="Save name"
+              onPress={() => void onSaveName()}
+              loading={savingName}
+            />
+            <TextLink
+              label="Cancel"
+              onPress={() => {
+                setEditingName(false)
+                setNameDraft(myName === 'You' ? '' : myName)
+                setNameError(null)
+              }}
+            />
+          </View>
+        ) : (
+          <TextLink
+            label="Edit my name"
+            onPress={() => {
+              setNameDraft(profile.display_name?.trim() ?? '')
+              setEditingName(true)
+            }}
+          />
+        )}
+
         {!partner && couple?.invite_code ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Pairing</Text>
             <Text style={styles.sectionHint}>
-              Share this code so your person can join.
+              Share the link, show the QR, or send the code.
             </Text>
-            <Text style={styles.code}>{couple.invite_code}</Text>
-            <PrimaryButton
-              label={copied ? 'Copied' : 'Copy invite code'}
-              onPress={() => void copyInviteCode()}
+            <InviteShare
+              code={couple.invite_code}
+              fromName={profile.display_name}
+              onCopied={(message) => showToast(message)}
             />
           </View>
         ) : null}
 
         <View style={styles.accountBlock}>
           <Text style={styles.label}>Notifications</Text>
-          <Text style={styles.sectionHint}>
-            Daily reminder at 8:00 PM, plus an alert when your partner checks
-            in. Lock screens never show scores, words, or names — only a generic
-            Bond notice.
-          </Text>
-          <TextLink
-            label={
-              notifyBusy
-                ? 'Working...'
-                : notifyOn
-                  ? 'Turn notifications off'
-                  : 'Turn notifications on'
-            }
-            onPress={() => void onToggleNotifications()}
-            disabled={notifyBusy}
-          />
-          {notifyError ? <ErrorText message={notifyError} /> : null}
+          <NotificationSettings />
 
           <Text style={[styles.label, styles.accountLabel]}>Privacy & safety</Text>
           <Text style={styles.sectionHint}>

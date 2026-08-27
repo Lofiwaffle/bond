@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
-import { Redirect, router } from 'expo-router'
+import { Redirect, router, useLocalSearchParams } from 'expo-router'
 
 import {
   ExtrasStep,
@@ -20,6 +20,7 @@ import {
 import type { ActivityId } from '../../lib/activities'
 import {
   useTodayCheckIn,
+  OPENED_WHILE_EDITING,
 } from '../../hooks/useCheckIn'
 import { useAuth } from '../../lib/auth'
 import {
@@ -32,7 +33,12 @@ import {
 } from '../../lib/checkInDraft'
 import { promptForDate } from '../../lib/dailyPrompts'
 import { formatDisplayDate, localDateString } from '../../lib/dates'
-import { syncCheckInReminder } from '../../lib/notifications'
+import {
+  clearQueuedCheckIn,
+  loadQueuedCheckIn,
+  QUEUED_TOAST,
+  useQueuedCheckIn,
+} from '../../lib/checkInOutbox'
 import { useToast } from '../../lib/toast'
 import { colors, type } from '../../lib/theme'
 
@@ -46,10 +52,15 @@ export default function CheckInScreen() {
     isLoading,
     error,
     submit,
+    revise,
     refresh,
     sendNudge,
   } = useTodayCheckIn()
   const { showToast } = useToast()
+  const params = useLocalSearchParams<{ edit?: string | string[] }>()
+  const wantEdit = (Array.isArray(params.edit) ? params.edit[0] : params.edit) === '1'
+  const today = localDateString()
+  const queued = useQueuedCheckIn(user?.id, today)
   const [score, setScore] = useState<number | null>(null)
   const [activities, setActivities] = useState<ActivityId[]>([])
   const [promptAnswer, setPromptAnswer] = useState('')
@@ -60,20 +71,40 @@ export default function CheckInScreen() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [nudged, setNudged] = useState(false)
   const [nudging, setNudging] = useState(false)
+  const [editing, setEditing] = useState(false)
   const saving = useRef(false)
-  const today = localDateString()
+  const openedWhileEditing = useRef(false)
+  const startedFromQuery = useRef(false)
 
   useEffect(() => {
     if (!user?.id || authLoading || isLoading || mine) {
       setDraftReady(true)
       return
     }
-    void loadCheckInDraft(user.id, today).then((draft) => {
-      setScore(draft.score)
-      setActivities(draft.activities)
-      setPromptAnswer(draft.promptAnswer)
-      setNoWords(draft.noWords)
-      setStep(draft.step)
+    void Promise.all([
+      loadCheckInDraft(user.id, today),
+      loadQueuedCheckIn(user.id, today),
+    ]).then(([draft, queuedEntry]) => {
+      const emptyDraft =
+        draft.score == null &&
+        !draft.promptAnswer &&
+        !draft.noWords &&
+        draft.step === 'score'
+      const source =
+        emptyDraft && queuedEntry
+          ? {
+              score: queuedEntry.score,
+              activities: queuedEntry.activities as ActivityId[],
+              promptAnswer: queuedEntry.prompt_answer ?? '',
+              noWords: !queuedEntry.prompt_answer,
+              step: 'extras' as const,
+            }
+          : draft
+      setScore(source.score)
+      setActivities(source.activities)
+      setPromptAnswer(source.promptAnswer)
+      setNoWords(source.noWords)
+      setStep(source.step)
       setDraftReady(true)
     })
   }, [authLoading, isLoading, mine, today, user?.id])
@@ -95,10 +126,31 @@ export default function CheckInScreen() {
     void hasSentNudge(user.id, today).then(setNudged)
   }, [mine, today, user?.id])
 
+  const beginEdit = useCallback(() => {
+    if (!mine || !waitingForPartner) return
+    openedWhileEditing.current = false
+    setScore(mine.score)
+    setActivities((mine.activities ?? []) as ActivityId[])
+    setPromptAnswer(mine.prompt_answer ?? '')
+    setNoWords(!(mine.prompt_answer && mine.prompt_answer.length > 0))
+    setStep('score')
+    setSubmitError(null)
+    setEditing(true)
+  }, [mine, waitingForPartner])
+
   useEffect(() => {
-    if (isLoading || authLoading) return
-    void syncCheckInReminder(Boolean(mine))
-  }, [authLoading, isLoading, mine])
+    if (!wantEdit || startedFromQuery.current || editing) return
+    if (!mine || !waitingForPartner) return
+    startedFromQuery.current = true
+    beginEdit()
+  }, [beginEdit, editing, mine, waitingForPartner, wantEdit])
+
+  useEffect(() => {
+    if (!editing || !bothSubmitted || openedWhileEditing.current) return
+    openedWhileEditing.current = true
+    setEditing(false)
+    showToast(OPENED_WHILE_EDITING)
+  }, [bothSubmitted, editing, showToast])
 
   if (authLoading || isLoading || !draftReady) return <LoadingScreen />
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
@@ -124,7 +176,10 @@ export default function CheckInScreen() {
     setNoWords(false)
     setStep('score')
     setSubmitError(null)
-    if (user?.id) void clearCheckInDraft(user.id, today)
+    if (user?.id) {
+      void clearCheckInDraft(user.id, today)
+      void clearQueuedCheckIn(user.id, today)
+    }
   }
 
   const onSubmit = async () => {
@@ -137,18 +192,37 @@ export default function CheckInScreen() {
     setSubmitError(null)
     saving.current = true
     setSubmitting(true)
-    const result = await submit(score, '', activities, {
-      id: todayPrompt.id,
-      text: todayPrompt.text,
-      answer: noWords ? '' : promptAnswer,
-    })
+    const result = editing
+      ? await revise(score, '', activities, {
+          id: todayPrompt.id,
+          text: todayPrompt.text,
+          answer: noWords ? '' : promptAnswer,
+        })
+      : await submit(score, '', activities, {
+          id: todayPrompt.id,
+          text: todayPrompt.text,
+          answer: noWords ? '' : promptAnswer,
+        })
     saving.current = false
     setSubmitting(false)
     if (result.error) {
       setSubmitError(result.error)
       return
     }
+    if ('opened' in result && result.opened) {
+      if (!openedWhileEditing.current) {
+        openedWhileEditing.current = true
+        showToast(OPENED_WHILE_EDITING)
+      }
+      setEditing(false)
+      return
+    }
+    if ('queued' in result && result.queued) {
+      showToast(QUEUED_TOAST)
+      return
+    }
     if (user?.id) await clearCheckInDraft(user.id, today)
+    setEditing(false)
     showToast('Saved. Private until they check in too.')
   }
 
@@ -166,6 +240,8 @@ export default function CheckInScreen() {
     showToast('Gentle reminder sent')
   }
 
+  const composing = (!mine || editing) && !bothSubmitted
+
   return (
     <Screen style={styles.screen} keyboard>
       <ScrollView
@@ -175,7 +251,9 @@ export default function CheckInScreen() {
       >
         <View style={styles.headerRow}>
           <View style={styles.headerCopy}>
-            <Text style={styles.heading}>Check-in</Text>
+            <Text style={styles.heading}>
+              {editing ? 'Correct check-in' : 'Check-in'}
+            </Text>
             <Text style={styles.date}>{formatDisplayDate(today)}</Text>
           </View>
           <View style={styles.headerMeta}>
@@ -201,7 +279,7 @@ export default function CheckInScreen() {
           />
         ) : null}
 
-        {!mine ? (
+        {composing ? (
           <>
             {step === 'score' ? (
               <ScoreStep value={score} onChange={setScore} />
@@ -248,12 +326,28 @@ export default function CheckInScreen() {
               />
             ) : null}
             {step === 'extras' ? (
-              <PrimaryButton
-                label={activities.length ? 'Save check-in' : 'Skip activities and save'}
-                onPress={() => void onSubmit()}
-                loading={submitting}
-                disabled={score == null}
-              />
+              <>
+                {queued && !editing ? (
+                  <Text style={styles.queuedHint}>
+                    Still on this device only. Bond will send it when you
+                    reconnect.
+                  </Text>
+                ) : null}
+                <PrimaryButton
+                  label={
+                    editing
+                      ? 'Save correction'
+                      : queued
+                        ? 'Update what will send'
+                        : activities.length
+                          ? 'Save check-in'
+                          : 'Skip activities and save'
+                  }
+                  onPress={() => void onSubmit()}
+                  loading={submitting}
+                  disabled={score == null}
+                />
+              </>
             ) : null}
 
             {step !== 'score' ? (
@@ -263,13 +357,21 @@ export default function CheckInScreen() {
                   setStep(step === 'extras' ? 'words' : 'score')
                 }
               />
+            ) : editing ? (
+              <TextLink
+                label="Keep what I saved"
+                onPress={() => {
+                  setEditing(false)
+                  setSubmitError(null)
+                }}
+              />
             ) : (
               <TextLink label="Not today" onPress={() => router.back()} />
             )}
           </>
         ) : null}
 
-        {mine && waitingForPartner ? (
+        {mine && waitingForPartner && !editing ? (
           <WaitingMoment
             mine={mine}
             partnerName={partner.display_name}
@@ -278,6 +380,7 @@ export default function CheckInScreen() {
             nudging={nudging}
             onNudge={() => void onNudge()}
             onRefresh={() => void refresh()}
+            onEdit={beginEdit}
             onDone={() => router.back()}
           />
         ) : null}
@@ -288,7 +391,6 @@ export default function CheckInScreen() {
               mine={mine}
               partner={partnerCheckIn}
               partnerName={partner.display_name}
-              userId={user.id}
             />
             <TextLink label="Done" onPress={() => router.back()} />
           </>
@@ -331,6 +433,11 @@ const styles = StyleSheet.create({
   },
   mutedBody: {
     ...type.body,
+    color: colors.muted,
+    marginBottom: 12,
+  },
+  queuedHint: {
+    ...type.label,
     color: colors.muted,
     marginBottom: 12,
   },

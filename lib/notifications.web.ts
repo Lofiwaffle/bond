@@ -1,10 +1,10 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'
-
 import { reportError } from './monitor'
 import { LOCK_SCREEN_BODY, LOCK_SCREEN_TITLE } from './notificationCopy'
-
-const ENABLED_KEY = 'bond.notifications.enabled'
-const WEB_REMINDER_DATE_KEY = 'bond.checkin.webReminderDate'
+import {
+  type NotificationPrefs,
+  nextDailyReminderAt,
+  nextSnoozeAt,
+} from './notificationSchedule'
 
 export const CHECK_IN_REMINDER_HOUR = 20
 export const CHECK_IN_REMINDER_MINUTE = 0
@@ -22,9 +22,8 @@ function webNotificationApi(): WebNotificationApi | null {
   return ctor ?? null
 }
 
-export async function areNotificationsEnabled(): Promise<boolean> {
-  const value = await AsyncStorage.getItem(ENABLED_KEY)
-  return value === 'true'
+function pageIsVisible(): boolean {
+  return typeof document !== 'undefined' && document.visibilityState === 'visible'
 }
 
 export async function requestNotificationPermission(): Promise<boolean> {
@@ -41,21 +40,23 @@ export async function requestNotificationPermission(): Promise<boolean> {
   }
 }
 
+export async function areNotificationsEnabled(): Promise<boolean> {
+  const NotificationApi = webNotificationApi()
+  return NotificationApi?.permission === 'granted'
+}
+
 export async function enableNotifications(
   _userId?: string | null,
 ): Promise<boolean> {
-  const granted = await requestNotificationPermission()
-  await AsyncStorage.setItem(ENABLED_KEY, granted ? 'true' : 'false')
-  return granted
-}
-
-export async function disableNotifications(): Promise<void> {
-  await AsyncStorage.setItem(ENABLED_KEY, 'false')
-  clearWebReminder()
+  return requestNotificationPermission()
 }
 
 export async function registerPushToken(_userId: string): Promise<void> {
   // Expo push tokens are not supported in the web install.
+}
+
+export async function clearPushToken(_userId: string): Promise<void> {
+  // No remote token on web.
 }
 
 export async function showLocalNotification(
@@ -63,9 +64,7 @@ export async function showLocalNotification(
   _body?: string,
   _channelId = 'partner-activity',
 ): Promise<void> {
-  const enabled = await areNotificationsEnabled()
-  if (!enabled) return
-
+  if (pageIsVisible()) return
   try {
     const granted = await requestNotificationPermission()
     if (!granted) return
@@ -89,43 +88,83 @@ export async function showLocalNotification(
   }
 }
 
-let webReminderTimer: ReturnType<typeof setTimeout> | null = null
+let dailyTimer: ReturnType<typeof setTimeout> | null = null
+let snoozeTimer: ReturnType<typeof setTimeout> | null = null
 
-function clearWebReminder() {
-  if (!webReminderTimer) return
-  clearTimeout(webReminderTimer)
-  webReminderTimer = null
-}
-
-function msUntilDailyReminder(): number {
-  const now = new Date()
-  const fire = new Date()
-  fire.setHours(CHECK_IN_REMINDER_HOUR, CHECK_IN_REMINDER_MINUTE, 0, 0)
-  if (fire.getTime() <= now.getTime()) {
-    fire.setDate(fire.getDate() + 1)
+function clearTimer(
+  slot: 'daily' | 'snooze',
+): void {
+  if (slot === 'daily' && dailyTimer) {
+    clearTimeout(dailyTimer)
+    dailyTimer = null
   }
-  return fire.getTime() - now.getTime()
+  if (slot === 'snooze' && snoozeTimer) {
+    clearTimeout(snoozeTimer)
+    snoozeTimer = null
+  }
 }
 
-export async function syncCheckInReminder(
-  hasCompletedToday: boolean,
+export async function cancelAllBondNotifications(): Promise<void> {
+  clearTimer('daily')
+  clearTimer('snooze')
+}
+
+export async function disableNotifications(): Promise<void> {
+  await cancelAllBondNotifications()
+}
+
+function arm(
+  slot: 'daily' | 'snooze',
+  when: Date,
+): void {
+  clearTimer(slot)
+  const wait = Math.max(1000, when.getTime() - Date.now())
+  const timer = setTimeout(() => {
+    void showLocalNotification()
+  }, wait)
+  if (slot === 'daily') dailyTimer = timer
+  else snoozeTimer = timer
+}
+
+export async function syncLocalReminder(
+  prefs: NotificationPrefs,
+  options: { paired: boolean; completedToday: boolean },
 ): Promise<void> {
-  const enabled = await areNotificationsEnabled()
-  clearWebReminder()
-  if (!enabled || hasCompletedToday) return
+  clearTimer('daily')
+  if (options.completedToday) clearTimer('snooze')
+  const next = nextDailyReminderAt(new Date(), prefs, options)
+  if (!next) return
   const granted = await requestNotificationPermission()
   if (!granted) return
-  webReminderTimer = setTimeout(() => {
-    void (async () => {
-      try {
-        const today = new Date().toISOString().slice(0, 10)
-        const shown = await AsyncStorage.getItem(WEB_REMINDER_DATE_KEY)
-        if (shown === today) return
-        await AsyncStorage.setItem(WEB_REMINDER_DATE_KEY, today)
-        await showLocalNotification()
-      } catch (error) {
-        reportError('notifications', error, { platform: 'web' })
-      }
-    })()
-  }, msUntilDailyReminder())
+  arm('daily', next)
+}
+
+export async function scheduleOneHourReminder(
+  prefs: NotificationPrefs,
+  completedToday: boolean,
+): Promise<{ error: string | null; when: Date | null }> {
+  if (completedToday) {
+    return { error: "Today's check-in is already saved.", when: null }
+  }
+  const granted = await requestNotificationPermission()
+  if (!granted) {
+    return {
+      error: 'Allow notifications to set a one-hour reminder.',
+      when: null,
+    }
+  }
+  const when = nextSnoozeAt(new Date(), prefs)
+  arm('snooze', when)
+  return { error: null, when }
+}
+
+export function subscribeNotificationTaps(_handlers: {
+  onOpen: (url: string) => void
+  onSnooze: () => void
+}): () => void {
+  return () => {}
+}
+
+export function expoGoAndroidRemoteUnsupported(): boolean {
+  return false
 }

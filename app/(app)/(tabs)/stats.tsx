@@ -2,12 +2,18 @@ import { useMemo } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router } from 'expo-router'
 
+import { GrowthObservations } from '../../../components/GrowthObservations'
 import { NextStepCard } from '../../../components/NextStepCard'
 import { LoadingScreen, Screen } from '../../../components/ui'
-import { useCheckInHistory } from '../../../hooks/useCheckIn'
+import { useCheckInGrowth, useCheckInIndex } from '../../../hooks/useCheckIn'
 import { useCoupleGoal } from '../../../hooks/useCoupleGoal'
 import { useWeeklyReview } from '../../../hooks/useWeeklyReview'
 import { useAuth } from '../../../lib/auth'
+import { localDateString } from '../../../lib/dates'
+import {
+  buildGrowthObservations,
+  observationDaysFromIndex,
+} from '../../../lib/growthObservations'
 import { Icon } from '../../../lib/icons'
 import {
   growthUnlocks,
@@ -19,11 +25,18 @@ import { colors, hairlineWidth, type } from '../../../lib/theme'
 export default function GrowthScreen() {
   const { profile, isLoading } = useAuth()
   const { activeGoals, isLoading: goalsLoading } = useCoupleGoal()
-  const { days, isLoading: checkInLoading } = useCheckInHistory()
+  const { myCheckIns, revealedDays, isLoading: checkInLoading } =
+    useCheckInGrowth()
+  const { days, isLoading: indexLoading } = useCheckInIndex()
   const { needsReview, unlocked: weeklyUnlocked } = useWeeklyReview()
-
-  const myCheckIns = days.filter((d) => d.mine).length
-  const revealedDays = days.filter((d) => d.revealed).length
+  const observations = useMemo(
+    () =>
+      buildGrowthObservations(
+        observationDaysFromIndex(days),
+        localDateString(),
+      ),
+    [days],
+  )
 
   const unlocks = useMemo(
     () =>
@@ -40,13 +53,14 @@ export default function GrowthScreen() {
     needsReview,
     activeGoalCount: activeGoals.length,
     myCheckIns,
+    revealedDays,
   })
 
-  const items = unlockedGrowthItems(unlocks).filter(
+  const items = unlockedGrowthItems(unlocks, { revealedDays }).filter(
     (item) => item.id !== next?.id,
   )
 
-  if (isLoading || goalsLoading || checkInLoading) {
+  if (isLoading || goalsLoading || checkInLoading || indexLoading) {
     return <LoadingScreen />
   }
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
@@ -78,6 +92,8 @@ export default function GrowthScreen() {
           onAction={() => router.push('/(app)/(tabs)')}
         />
       )}
+
+      <GrowthObservations observations={observations} />
 
       {items.length > 0 ? (
         <View style={styles.list}>

@@ -24,6 +24,7 @@ import { useAuth } from '../../../lib/auth'
 import { formatDisplayDate } from '../../../lib/dates'
 import { Icon } from '../../../lib/icons'
 import { colors, hairlineWidth, type } from '../../../lib/theme'
+import { displayWeeklyAnswer } from '../../../lib/weeklyPrompts'
 
 export default function BondReviewsScreen() {
   const { partner, isLoading: authLoading } = useAuth()
@@ -68,15 +69,15 @@ export default function BondReviewsScreen() {
         {unlocked ? (
           <View style={styles.cta}>
             <Text style={styles.ctaTitle}>
-              {needsReview ? "This week's review is ready" : 'This week'}
+              {needsReview ? "Last week's review is ready" : 'Last week'}
             </Text>
             <Text style={styles.ctaBody}>
               {needsReview
-                ? 'Write this week’s reflection. The summary shows up here after you both finish.'
-                : 'Open the current weekly review, or look back on weeks you’ve already completed.'}
+                ? 'Look back at the Sunday–Saturday that already ended. The summary shows up here after you both finish.'
+                : 'Open last week’s review, or look back on weeks you’ve already completed.'}
             </Text>
             <TextLink
-              label={needsReview ? 'Start this week’s review' : 'Open weekly review'}
+              label={needsReview ? "Start last week’s review" : 'Open weekly review'}
               onPress={() => router.push('/(app)/weekly-review')}
             />
           </View>
@@ -130,8 +131,9 @@ export default function BondReviewsScreen() {
                     {formatDisplayDate(week.weekEnd)}
                   </Text>
                   <Text style={styles.weekHint} numberOfLines={expanded ? 0 : 2}>
-                    {week.mine?.answers.find((a) => a.prompt_id === 'intention')
-                      ?.answer || week.summary}
+                    {displayWeeklyAnswer(
+                      week.mine?.answers.find((a) => a.prompt_id === 'intention'),
+                    ) || week.summary}
                   </Text>
                 </View>
                 <Icon
@@ -145,10 +147,13 @@ export default function BondReviewsScreen() {
                   {week.mine?.answers.map((answer, index) => (
                     <View key={answer.prompt_id} style={styles.prompt}>
                       <Text style={styles.detailKicker}>{answer.prompt_text}</Text>
-                      <Text style={styles.detailBody}>You: {answer.answer}</Text>
-                      {week.partnerReview?.answers[index]?.answer ? (
+                      <Text style={styles.detailBody}>
+                        You: {displayWeeklyAnswer(answer)}
+                      </Text>
+                      {week.partnerReview?.answers[index] ? (
                         <Text style={styles.detailBody}>
-                          {partnerName}: {week.partnerReview.answers[index].answer}
+                          {partnerName}:{' '}
+                          {displayWeeklyAnswer(week.partnerReview.answers[index])}
                         </Text>
                       ) : null}
                     </View>

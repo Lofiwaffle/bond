@@ -1314,4 +1314,1271 @@ alter function public.delete_own_account() owner to postgres;
 revoke all on function public.delete_own_account() from public;
 grant execute on function public.delete_own_account() to authenticated;
 
+-- Owner-only reminder preferences. Off by default.
+create table if not exists public.notification_preferences (
+  user_id uuid primary key references public.profiles (id) on delete cascade,
+  daily_enabled boolean not null default false,
+  daily_time time not null default '20:00:00',
+  reveal_enabled boolean not null default false,
+  timezone text not null default 'UTC',
+  quiet_hours_enabled boolean not null default false,
+  quiet_hours_start smallint not null default 22
+    check (quiet_hours_start >= 0 and quiet_hours_start <= 23),
+  quiet_hours_end smallint not null default 8
+    check (quiet_hours_end >= 0 and quiet_hours_end <= 23),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.notification_preferences enable row level security;
+
+grant select, insert, update on public.notification_preferences to authenticated;
+grant select on public.notification_preferences to service_role;
+
+drop policy if exists "notification_preferences_select_own" on public.notification_preferences;
+create policy "notification_preferences_select_own"
+  on public.notification_preferences
+  for select
+  to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists "notification_preferences_insert_own" on public.notification_preferences;
+create policy "notification_preferences_insert_own"
+  on public.notification_preferences
+  for insert
+  to authenticated
+  with check (user_id = (select auth.uid()));
+
+drop policy if exists "notification_preferences_update_own" on public.notification_preferences;
+create policy "notification_preferences_update_own"
+  on public.notification_preferences
+  for update
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
+create or replace function public.ensure_notification_preferences()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.notification_preferences (user_id)
+  values (new.id)
+  on conflict (user_id) do nothing;
+  return new;
+end;
+$$;
+
+alter function public.ensure_notification_preferences() owner to postgres;
+revoke all on function public.ensure_notification_preferences() from public;
+
+drop trigger if exists on_profile_notification_prefs on public.profiles;
+create trigger on_profile_notification_prefs
+  after insert on public.profiles
+  for each row
+  execute function public.ensure_notification_preferences();
+
+insert into public.notification_preferences (user_id)
+select id from public.profiles
+on conflict (user_id) do nothing;
+
+-- 20260826190000_checkin_revise_before_open.sql
+-- Owner may correct a check-in until the partner submits that day.
+
+alter table public.daily_check_ins
+  add column if not exists revised_at timestamptz;
+
+create or replace function public.partner_has_check_in(
+  p_couple_id uuid,
+  p_date date
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.daily_check_ins
+    where couple_id = p_couple_id
+      and check_in_date = p_date
+      and user_id is distinct from auth.uid()
+  );
+$$;
+
+revoke all on function public.partner_has_check_in(uuid, date) from public;
+grant execute on function public.partner_has_check_in(uuid, date) to authenticated;
+
+create or replace function private.enforce_check_in_revision()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.id is distinct from old.id
+     or new.user_id is distinct from old.user_id
+     or new.couple_id is distinct from old.couple_id
+     or new.check_in_date is distinct from old.check_in_date then
+    raise exception 'Cannot reassign a check-in';
+  end if;
+
+  if exists (
+    select 1
+    from public.daily_check_ins
+    where couple_id = old.couple_id
+      and check_in_date = old.check_in_date
+      and user_id is distinct from old.user_id
+  ) then
+    raise exception 'Today already opened';
+  end if;
+
+  new.created_at := old.created_at;
+  new.revised_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists daily_check_ins_enforce_revision on public.daily_check_ins;
+create trigger daily_check_ins_enforce_revision
+  before update on public.daily_check_ins
+  for each row
+  execute function private.enforce_check_in_revision();
+
+revoke all on table public.daily_check_ins from anon, authenticated;
+grant select, insert, update on table public.daily_check_ins to authenticated;
+
+drop policy if exists "daily_check_ins_update_own_while_waiting" on public.daily_check_ins;
+create policy "daily_check_ins_update_own_while_waiting"
+  on public.daily_check_ins
+  for update
+  to authenticated
+  using (
+    user_id = (select auth.uid())
+    and couple_id = public.current_couple_id()
+    and not (select public.partner_has_check_in(couple_id, check_in_date))
+  )
+  with check (
+    user_id = (select auth.uid())
+    and couple_id = public.current_couple_id()
+    and not (select public.partner_has_check_in(couple_id, check_in_date))
+  );
+
+notify pgrst, 'reload schema';
+
+-- 20260826200000_daily_actions_shared.sql
+-- One small shared action per couple per day. Not a thread: propose, accept or
+-- skip, then complete. Private device notes never live here.
+
+create table public.daily_actions (
+  id uuid primary key default gen_random_uuid(),
+  couple_id uuid not null references public.couples (id) on delete cascade,
+  check_in_date date not null,
+  proposed_by uuid not null references public.profiles (id) on delete cascade,
+  kind text not null,
+  text text not null,
+  status text not null default 'proposed',
+  responded_by uuid references public.profiles (id) on delete set null,
+  proposed_at timestamptz not null default now(),
+  responded_at timestamptz,
+  completed_at timestamptz,
+  constraint daily_actions_kind_check
+    check (kind in ('appreciate', 'support', 'plan')),
+  constraint daily_actions_status_check
+    check (status in ('proposed', 'accepted', 'completed', 'skipped')),
+  constraint daily_actions_text_length
+    check (char_length(trim(text)) between 1 and 280),
+  constraint daily_actions_couple_date_unique unique (couple_id, check_in_date)
+);
+
+create index daily_actions_couple_status_idx
+  on public.daily_actions (couple_id, status, check_in_date desc);
+
+alter table public.daily_actions replica identity full;
+
+create or replace function private.enforce_daily_action_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  profile_couple uuid;
+begin
+  if auth.uid() is null or new.proposed_by is distinct from auth.uid() then
+    raise exception 'Can only offer your own small action';
+  end if;
+
+  select couple_id into profile_couple
+  from public.profiles
+  where id = auth.uid();
+
+  if profile_couple is null then
+    raise exception 'You must be paired to offer a small action';
+  end if;
+
+  new.couple_id := profile_couple;
+  new.status := 'proposed';
+  new.responded_by := null;
+  new.responded_at := null;
+  new.completed_at := null;
+  new.proposed_at := coalesce(new.proposed_at, now());
+  new.text := trim(new.text);
+  return new;
+end;
+$$;
+
+drop trigger if exists daily_actions_enforce_insert on public.daily_actions;
+create trigger daily_actions_enforce_insert
+  before insert on public.daily_actions
+  for each row
+  execute function private.enforce_daily_action_insert();
+
+create or replace function private.enforce_daily_action_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if new.id is distinct from old.id
+     or new.couple_id is distinct from old.couple_id
+     or new.check_in_date is distinct from old.check_in_date
+     or new.proposed_by is distinct from old.proposed_by
+     or new.proposed_at is distinct from old.proposed_at then
+    raise exception 'Cannot reassign a small action';
+  end if;
+
+  if uid is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if old.status = 'proposed' and new.status = 'proposed' then
+    if uid is distinct from old.proposed_by then
+      raise exception 'Only the person who offered can edit it';
+    end if;
+    new.responded_by := null;
+    new.responded_at := null;
+    new.completed_at := null;
+    new.text := trim(new.text);
+    return new;
+  end if;
+
+  if old.status = 'proposed' and new.status in ('accepted', 'skipped') then
+    if uid is not distinct from old.proposed_by then
+      raise exception 'The other person responds to this action';
+    end if;
+    new.kind := old.kind;
+    new.text := old.text;
+    new.responded_by := uid;
+    new.responded_at := now();
+    new.completed_at := null;
+    return new;
+  end if;
+
+  if old.status = 'accepted' and new.status = 'completed' then
+    new.kind := old.kind;
+    new.text := old.text;
+    new.responded_by := old.responded_by;
+    new.responded_at := old.responded_at;
+    new.completed_at := now();
+    return new;
+  end if;
+
+  raise exception 'That small action cannot change that way';
+end;
+$$;
+
+drop trigger if exists daily_actions_enforce_update on public.daily_actions;
+create trigger daily_actions_enforce_update
+  before update on public.daily_actions
+  for each row
+  execute function private.enforce_daily_action_update();
+
+revoke all on table public.daily_actions from anon, authenticated;
+grant select, insert, update on table public.daily_actions to authenticated;
+
+alter table public.daily_actions enable row level security;
+
+create policy "daily_actions_select_couple"
+  on public.daily_actions
+  for select
+  to authenticated
+  using (couple_id = public.current_couple_id());
+
+create policy "daily_actions_insert_own"
+  on public.daily_actions
+  for insert
+  to authenticated
+  with check (
+    proposed_by = (select auth.uid())
+    and couple_id = public.current_couple_id()
+    and status = 'proposed'
+  );
+
+create policy "daily_actions_update_couple"
+  on public.daily_actions
+  for update
+  to authenticated
+  using (couple_id = public.current_couple_id())
+  with check (
+    couple_id = public.current_couple_id()
+    and (
+      (
+        status = 'proposed'
+        and proposed_by = (select auth.uid())
+      )
+      or (
+        status in ('accepted', 'skipped')
+        and responded_by = (select auth.uid())
+        and proposed_by is distinct from (select auth.uid())
+      )
+      or status = 'completed'
+    )
+  );
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'daily_actions'
+  ) then
+    execute 'alter publication supabase_realtime add table public.daily_actions';
+  end if;
+end $$;
+
+create or replace function private.emit_partner_signal()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  event text;
+  summary text;
+  actor uuid;
+  cid uuid;
+begin
+  if TG_TABLE_NAME = 'daily_check_ins' then
+    event := 'partner_checked_in';
+    summary := 'checked in';
+    actor := new.user_id;
+    cid := new.couple_id;
+  elsif TG_TABLE_NAME = 'habit_completions' then
+    event := 'partner_logged_achievement';
+    summary := 'logged ' || initcap(new.habit_id);
+    actor := new.user_id;
+    cid := new.couple_id;
+  elsif TG_TABLE_NAME = 'couple_goals' then
+    actor := new.created_by;
+    cid := new.couple_id;
+    if TG_OP = 'UPDATE' and new.status = 'completed' and old.status is distinct from 'completed' then
+      event := 'partner_completed_goal';
+      summary := 'completed a goal';
+    elsif TG_OP = 'INSERT' then
+      event := 'partner_set_goal';
+      summary := 'set a goal';
+    else
+      return new;
+    end if;
+  elsif TG_TABLE_NAME = 'weekly_reviews' then
+    event := 'partner_weekly_review';
+    summary := 'finished a weekly review';
+    actor := new.user_id;
+    cid := new.couple_id;
+  elsif TG_TABLE_NAME = 'daily_actions' then
+    cid := new.couple_id;
+    if TG_OP = 'INSERT' then
+      event := 'daily_action_proposed';
+      summary := 'offered a small action';
+      actor := new.proposed_by;
+    elsif TG_OP = 'UPDATE' and new.status is distinct from old.status then
+      if new.status = 'accepted' then
+        event := 'daily_action_accepted';
+        summary := 'accepted a small action';
+        actor := new.responded_by;
+      elsif new.status = 'skipped' then
+        event := 'daily_action_skipped';
+        summary := 'passed on a small action';
+        actor := new.responded_by;
+      elsif new.status = 'completed' then
+        event := 'daily_action_completed';
+        summary := 'completed a small action';
+        actor := coalesce(auth.uid(), new.proposed_by);
+      else
+        return new;
+      end if;
+    else
+      return new;
+    end if;
+  elsif TG_TABLE_NAME = 'profiles' then
+    if new.couple_id is null then
+      return new;
+    end if;
+    event := 'partner_joined';
+    summary := 'joined your Bond';
+    actor := new.id;
+    cid := new.couple_id;
+  else
+    return new;
+  end if;
+
+  begin
+    insert into public.partner_signals (couple_id, actor_id, event_type, summary)
+    values (cid, actor, event, summary);
+  exception
+    when undefined_table then null;
+  end;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists partner_signal_daily_actions_ins on public.daily_actions;
+create trigger partner_signal_daily_actions_ins
+  after insert on public.daily_actions
+  for each row
+  execute function private.emit_partner_signal();
+
+drop trigger if exists partner_signal_daily_actions_upd on public.daily_actions;
+create trigger partner_signal_daily_actions_upd
+  after update of status on public.daily_actions
+  for each row
+  execute function private.emit_partner_signal();
+
+create or replace function public.leave_couple()
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  cid uuid;
+  remaining int;
+  couple_deleted boolean := false;
+begin
+  if uid is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select couple_id into cid
+  from public.profiles
+  where id = uid;
+
+  if cid is null then
+    return json_build_object('ok', true, 'left', false, 'couple_deleted', false);
+  end if;
+
+  delete from public.daily_check_ins where user_id = uid;
+  delete from public.weekly_reviews where user_id = uid;
+
+  begin
+    delete from public.weekly_ai_summaries where couple_id = cid;
+  exception
+    when undefined_table then null;
+  end;
+  begin
+    delete from public.partner_signals where couple_id = cid;
+  exception
+    when undefined_table then null;
+  end;
+  begin
+    delete from public.habit_completions where user_id = uid;
+  exception
+    when undefined_table then null;
+  end;
+  begin
+    delete from public.couple_goal_reviews where user_id = uid;
+  exception
+    when undefined_table then null;
+  end;
+  begin
+    delete from public.bid_logs where user_id = uid;
+  exception
+    when undefined_table then null;
+  end;
+  begin
+    delete from public.appreciations
+      where from_user_id = uid or to_user_id = uid;
+  exception
+    when undefined_table then null;
+  end;
+  begin
+    delete from public.daily_actions where proposed_by = uid;
+  exception
+    when undefined_table then null;
+  end;
+
+  update public.profiles
+    set couple_id = null
+    where id = uid;
+
+  begin
+    update public.profiles
+      set expo_push_token = null
+      where id = uid;
+  exception
+    when undefined_column then null;
+  end;
+
+  select count(*)::int into remaining
+  from public.profiles
+  where couple_id = cid;
+
+  if remaining = 0 then
+    delete from public.couples where id = cid;
+    couple_deleted := true;
+  else
+    update public.couples
+      set invite_code = private.generate_invite_code(),
+          paired_at = null
+      where id = cid;
+  end if;
+
+  return json_build_object(
+    'ok', true,
+    'left', true,
+    'couple_deleted', couple_deleted
+  );
+end;
+$$;
+
+alter function public.leave_couple() owner to postgres;
+
+notify pgrst, 'reload schema';
+
+
+-- 20260826210000_couple_goals_agreement.sql
+-- Shared goals require the other person's agreement.
+-- proposed → active → completed, plus declined and archived.
+-- Completing takes two confirmations; we record who asked and who confirmed.
+
+alter table public.couple_goals
+  add column if not exists accepted_by uuid references public.profiles (id) on delete set null,
+  add column if not exists accepted_at timestamptz,
+  add column if not exists declined_by uuid references public.profiles (id) on delete set null,
+  add column if not exists declined_at timestamptz,
+  add column if not exists completion_requested_by uuid references public.profiles (id) on delete set null,
+  add column if not exists completion_requested_at timestamptz,
+  add column if not exists completed_by uuid references public.profiles (id) on delete set null,
+  add column if not exists archived_by uuid references public.profiles (id) on delete set null,
+  add column if not exists archived_at timestamptz;
+
+alter table public.couple_goals
+  drop constraint if exists couple_goals_status_check;
+
+alter table public.couple_goals
+  add constraint couple_goals_status_check
+  check (status in ('proposed', 'active', 'completed', 'declined', 'archived'));
+
+alter table public.couple_goals
+  drop constraint if exists couple_goals_completed_at_check;
+
+alter table public.couple_goals
+  add constraint couple_goals_completed_at_check
+  check (
+    (
+      status = 'completed'
+      and completed_at is not null
+      and completed_by is not null
+    )
+    or (
+      status in ('proposed', 'active', 'declined')
+      and completed_at is null
+    )
+    or status = 'archived'
+  );
+
+alter table public.couple_goals
+  alter column status set default 'proposed';
+
+-- Goals created before agreement stay active so in-flight work is not rewound.
+update public.couple_goals
+set
+  accepted_by = coalesce(accepted_by, created_by),
+  accepted_at = coalesce(accepted_at, created_at)
+where status = 'active';
+
+update public.couple_goals
+set completed_by = coalesce(completed_by, created_by)
+where status = 'completed';
+
+create or replace function private.enforce_couple_goal_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  profile_couple uuid;
+begin
+  if auth.uid() is null or new.created_by is distinct from auth.uid() then
+    raise exception 'Can only offer your own goal';
+  end if;
+
+  select couple_id into profile_couple
+  from public.profiles
+  where id = auth.uid();
+
+  if profile_couple is null then
+    raise exception 'You must be paired to offer a goal';
+  end if;
+
+  new.couple_id := profile_couple;
+  new.status := 'proposed';
+  new.accepted_by := null;
+  new.accepted_at := null;
+  new.declined_by := null;
+  new.declined_at := null;
+  new.completion_requested_by := null;
+  new.completion_requested_at := null;
+  new.completed_by := null;
+  new.completed_at := null;
+  new.archived_by := null;
+  new.archived_at := null;
+  return new;
+end;
+$$;
+
+drop trigger if exists couple_goals_enforce_insert on public.couple_goals;
+create trigger couple_goals_enforce_insert
+  before insert on public.couple_goals
+  for each row
+  execute function private.enforce_couple_goal_insert();
+
+create or replace function private.enforce_couple_goal_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if new.id is distinct from old.id
+     or new.couple_id is distinct from old.couple_id
+     or new.created_by is distinct from old.created_by
+     or new.created_at is distinct from old.created_at then
+    raise exception 'Cannot reassign a goal';
+  end if;
+
+  if uid is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if old.status = 'proposed' and new.status = 'proposed' then
+    if uid is distinct from old.created_by then
+      raise exception 'Only the person who offered can edit it';
+    end if;
+    new.accepted_by := null;
+    new.accepted_at := null;
+    new.declined_by := null;
+    new.declined_at := null;
+    new.completion_requested_by := null;
+    new.completion_requested_at := null;
+    new.completed_by := null;
+    new.completed_at := null;
+    new.archived_by := null;
+    new.archived_at := null;
+    return new;
+  end if;
+
+  if old.status = 'proposed' and new.status = 'active' then
+    if uid is not distinct from old.created_by then
+      raise exception 'The other person agrees to this goal';
+    end if;
+    new.outcome := old.outcome;
+    new.success_criteria := old.success_criteria;
+    new.realistic_plan := old.realistic_plan;
+    new.why := old.why;
+    new.deadline := old.deadline;
+    new.accepted_by := uid;
+    new.accepted_at := now();
+    new.declined_by := null;
+    new.declined_at := null;
+    new.completion_requested_by := null;
+    new.completion_requested_at := null;
+    new.completed_by := null;
+    new.completed_at := null;
+    new.archived_by := null;
+    new.archived_at := null;
+    return new;
+  end if;
+
+  if old.status = 'proposed' and new.status = 'declined' then
+    if uid is not distinct from old.created_by then
+      raise exception 'The other person responds to this goal';
+    end if;
+    new.outcome := old.outcome;
+    new.success_criteria := old.success_criteria;
+    new.realistic_plan := old.realistic_plan;
+    new.why := old.why;
+    new.deadline := old.deadline;
+    new.declined_by := uid;
+    new.declined_at := now();
+    new.accepted_by := null;
+    new.accepted_at := null;
+    new.completed_by := null;
+    new.completed_at := null;
+    return new;
+  end if;
+
+  if old.status = 'proposed' and new.status = 'archived' then
+    if uid is distinct from old.created_by then
+      raise exception 'Only the person who offered can withdraw it';
+    end if;
+    new.archived_by := uid;
+    new.archived_at := now();
+    return new;
+  end if;
+
+  if old.status = 'active' and new.status = 'active' then
+    if old.completion_requested_by is null and new.completion_requested_by = uid then
+      new.completion_requested_at := now();
+      new.outcome := old.outcome;
+      new.success_criteria := old.success_criteria;
+      new.realistic_plan := old.realistic_plan;
+      new.why := old.why;
+      new.deadline := old.deadline;
+      new.accepted_by := old.accepted_by;
+      new.accepted_at := old.accepted_at;
+      new.completed_by := null;
+      new.completed_at := null;
+      return new;
+    end if;
+    raise exception 'An agreed goal cannot be rewritten';
+  end if;
+
+  if old.status = 'active' and new.status = 'completed' then
+    new.outcome := old.outcome;
+    new.success_criteria := old.success_criteria;
+    new.realistic_plan := old.realistic_plan;
+    new.why := old.why;
+    new.deadline := old.deadline;
+    new.accepted_by := old.accepted_by;
+    new.accepted_at := old.accepted_at;
+    if old.completion_requested_by is null then
+      new.status := 'active';
+      new.completion_requested_by := uid;
+      new.completion_requested_at := now();
+      new.completed_by := null;
+      new.completed_at := null;
+      return new;
+    end if;
+    if old.completion_requested_by = uid then
+      raise exception 'Waiting for the other person to confirm';
+    end if;
+    new.completion_requested_by := old.completion_requested_by;
+    new.completion_requested_at := old.completion_requested_at;
+    new.completed_by := uid;
+    new.completed_at := now();
+    return new;
+  end if;
+
+  if old.status in ('active', 'declined', 'completed') and new.status = 'archived' then
+    new.outcome := old.outcome;
+    new.success_criteria := old.success_criteria;
+    new.realistic_plan := old.realistic_plan;
+    new.why := old.why;
+    new.deadline := old.deadline;
+    new.accepted_by := old.accepted_by;
+    new.accepted_at := old.accepted_at;
+    new.declined_by := old.declined_by;
+    new.declined_at := old.declined_at;
+    new.completion_requested_by := old.completion_requested_by;
+    new.completion_requested_at := old.completion_requested_at;
+    new.completed_by := old.completed_by;
+    new.completed_at := old.completed_at;
+    new.archived_by := uid;
+    new.archived_at := now();
+    return new;
+  end if;
+
+  raise exception 'That goal cannot change that way';
+end;
+$$;
+
+drop trigger if exists couple_goals_enforce_update on public.couple_goals;
+create trigger couple_goals_enforce_update
+  before update on public.couple_goals
+  for each row
+  execute function private.enforce_couple_goal_update();
+
+revoke all on table public.couple_goals from anon, authenticated;
+grant select, insert, update on table public.couple_goals to authenticated;
+
+drop policy if exists "couple_goals_insert_couple" on public.couple_goals;
+create policy "couple_goals_insert_couple"
+  on public.couple_goals
+  for insert
+  to authenticated
+  with check (
+    couple_id = public.current_couple_id()
+    and created_by = (select auth.uid())
+    and status = 'proposed'
+  );
+
+drop policy if exists "couple_goals_update_couple" on public.couple_goals;
+create policy "couple_goals_update_couple"
+  on public.couple_goals
+  for update
+  to authenticated
+  using (couple_id = public.current_couple_id())
+  with check (
+    couple_id = public.current_couple_id()
+    and (
+      (
+        status = 'proposed'
+        and created_by = (select auth.uid())
+      )
+      or (
+        status = 'active'
+        and (
+          accepted_by = (select auth.uid())
+          or completion_requested_by = (select auth.uid())
+        )
+      )
+      or (
+        status = 'declined'
+        and declined_by = (select auth.uid())
+      )
+      or (
+        status = 'completed'
+        and completed_by = (select auth.uid())
+      )
+      or (
+        status = 'archived'
+        and archived_by = (select auth.uid())
+      )
+    )
+  );
+
+create or replace function private.emit_partner_signal()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  event text;
+  summary text;
+  actor uuid;
+  cid uuid;
+begin
+  if TG_TABLE_NAME = 'daily_check_ins' then
+    event := 'partner_checked_in';
+    summary := 'checked in';
+    actor := new.user_id;
+    cid := new.couple_id;
+  elsif TG_TABLE_NAME = 'habit_completions' then
+    event := 'partner_logged_achievement';
+    summary := 'logged ' || initcap(new.habit_id);
+    actor := new.user_id;
+    cid := new.couple_id;
+  elsif TG_TABLE_NAME = 'couple_goals' then
+    cid := new.couple_id;
+    if TG_OP = 'INSERT' then
+      event := 'partner_set_goal';
+      summary := 'proposed a goal';
+      actor := new.created_by;
+    elsif TG_OP = 'UPDATE' and new.status is distinct from old.status then
+      if new.status = 'active' then
+        event := 'partner_accepted_goal';
+        summary := 'accepted a goal';
+        actor := new.accepted_by;
+      elsif new.status = 'declined' then
+        event := 'partner_declined_goal';
+        summary := 'passed on a goal';
+        actor := new.declined_by;
+      elsif new.status = 'completed' then
+        event := 'partner_completed_goal';
+        summary := 'confirmed a goal complete';
+        actor := new.completed_by;
+      elsif new.status = 'archived' then
+        event := 'partner_archived_goal';
+        summary := 'archived a goal';
+        actor := new.archived_by;
+      else
+        return new;
+      end if;
+    elsif TG_OP = 'UPDATE'
+      and new.completion_requested_by is distinct from old.completion_requested_by then
+      event := 'partner_goal_complete_requested';
+      summary := 'marked a goal done, waiting';
+      actor := new.completion_requested_by;
+    else
+      return new;
+    end if;
+  elsif TG_TABLE_NAME = 'weekly_reviews' then
+    event := 'partner_weekly_review';
+    summary := 'finished a weekly review';
+    actor := new.user_id;
+    cid := new.couple_id;
+  elsif TG_TABLE_NAME = 'daily_actions' then
+    cid := new.couple_id;
+    if TG_OP = 'INSERT' then
+      event := 'daily_action_proposed';
+      summary := 'offered a small action';
+      actor := new.proposed_by;
+    elsif TG_OP = 'UPDATE' and new.status is distinct from old.status then
+      if new.status = 'accepted' then
+        event := 'daily_action_accepted';
+        summary := 'accepted a small action';
+        actor := new.responded_by;
+      elsif new.status = 'skipped' then
+        event := 'daily_action_skipped';
+        summary := 'passed on a small action';
+        actor := new.responded_by;
+      elsif new.status = 'completed' then
+        event := 'daily_action_completed';
+        summary := 'completed a small action';
+        actor := coalesce(auth.uid(), new.proposed_by);
+      else
+        return new;
+      end if;
+    else
+      return new;
+    end if;
+  elsif TG_TABLE_NAME = 'profiles' then
+    if new.couple_id is null then
+      return new;
+    end if;
+    event := 'partner_joined';
+    summary := 'joined your Bond';
+    actor := new.id;
+    cid := new.couple_id;
+  else
+    return new;
+  end if;
+
+  begin
+    insert into public.partner_signals (couple_id, actor_id, event_type, summary)
+    values (cid, actor, event, summary);
+  exception
+    when undefined_table then null;
+  end;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists partner_signal_goals_upd on public.couple_goals;
+create trigger partner_signal_goals_upd
+  after update on public.couple_goals
+  for each row
+  execute function private.emit_partner_signal();
+
+alter table public.couple_goals replica identity full;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'couple_goals'
+  ) then
+    execute 'alter publication supabase_realtime add table public.couple_goals';
+  end if;
+exception
+  when undefined_object then null;
+end $$;
+
+-- Last week's review stays a look back. Answers cannot be rewritten.
+-- AI suggestion hide/edit is personal, not couple-wide.
+
+create or replace function private.enforce_weekly_review_immutable()
+returns trigger
+language plpgsql
+as $$
+begin
+  raise exception 'Weekly review answers cannot be changed';
+end;
+$$;
+
+drop trigger if exists weekly_reviews_immutable on public.weekly_reviews;
+create trigger weekly_reviews_immutable
+  before update on public.weekly_reviews
+  for each row
+  execute function private.enforce_weekly_review_immutable();
+
+revoke update, delete on table public.weekly_reviews from anon, authenticated;
+grant select, insert on table public.weekly_reviews to authenticated;
+
+create table if not exists public.weekly_ai_summary_prefs (
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  couple_id uuid not null references public.couples (id) on delete cascade,
+  week_start date not null,
+  hidden boolean not null default false,
+  edited_summary text,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, week_start)
+);
+
+create index if not exists weekly_ai_summary_prefs_couple_week_idx
+  on public.weekly_ai_summary_prefs (couple_id, week_start desc);
+
+alter table public.weekly_ai_summary_prefs replica identity full;
+
+revoke all on table public.weekly_ai_summary_prefs from anon, authenticated;
+grant select, insert, update on table public.weekly_ai_summary_prefs to authenticated;
+
+alter table public.weekly_ai_summary_prefs enable row level security;
+
+drop policy if exists "weekly_ai_summary_prefs_select_own" on public.weekly_ai_summary_prefs;
+create policy "weekly_ai_summary_prefs_select_own"
+  on public.weekly_ai_summary_prefs
+  for select
+  to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists "weekly_ai_summary_prefs_insert_own" on public.weekly_ai_summary_prefs;
+create policy "weekly_ai_summary_prefs_insert_own"
+  on public.weekly_ai_summary_prefs
+  for insert
+  to authenticated
+  with check (
+    user_id = (select auth.uid())
+    and couple_id = public.current_couple_id()
+  );
+
+drop policy if exists "weekly_ai_summary_prefs_update_own" on public.weekly_ai_summary_prefs;
+create policy "weekly_ai_summary_prefs_update_own"
+  on public.weekly_ai_summary_prefs
+  for update
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (
+    user_id = (select auth.uid())
+    and couple_id = public.current_couple_id()
+  );
+
+insert into public.weekly_ai_summary_prefs (
+  user_id, couple_id, week_start, hidden
+)
+select dismissed_by, couple_id, week_start, true
+from public.weekly_ai_summaries
+where dismissed_by is not null
+on conflict (user_id, week_start) do nothing;
+
+create or replace function public.leave_couple()
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  cid uuid;
+  remaining int;
+  couple_deleted boolean := false;
+begin
+  if uid is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select couple_id into cid
+  from public.profiles
+  where id = uid;
+
+  if cid is null then
+    return json_build_object('ok', true, 'left', false, 'couple_deleted', false);
+  end if;
+
+  delete from public.daily_check_ins where user_id = uid;
+  delete from public.weekly_reviews where user_id = uid;
+
+  begin
+    delete from public.weekly_ai_summary_prefs where user_id = uid;
+  exception
+    when undefined_table then null;
+  end;
+  begin
+    delete from public.weekly_ai_summaries where couple_id = cid;
+  exception
+    when undefined_table then null;
+  end;
+  begin
+    delete from public.partner_signals where couple_id = cid;
+  exception
+    when undefined_table then null;
+  end;
+  begin
+    delete from public.habit_completions where user_id = uid;
+  exception
+    when undefined_table then null;
+  end;
+  begin
+    delete from public.couple_goal_reviews where user_id = uid;
+  exception
+    when undefined_table then null;
+  end;
+  begin
+    delete from public.bid_logs where user_id = uid;
+  exception
+    when undefined_table then null;
+  end;
+  begin
+    delete from public.appreciations
+      where from_user_id = uid or to_user_id = uid;
+  exception
+    when undefined_table then null;
+  end;
+  begin
+    delete from public.daily_actions where proposed_by = uid;
+  exception
+    when undefined_table then null;
+  end;
+
+  update public.profiles
+    set couple_id = null
+    where id = uid;
+
+  begin
+    update public.profiles
+      set expo_push_token = null
+      where id = uid;
+  exception
+    when undefined_column then null;
+  end;
+
+  select count(*)::int into remaining
+  from public.profiles
+  where couple_id = cid;
+
+  if remaining = 0 then
+    delete from public.couples where id = cid;
+    couple_deleted := true;
+  else
+    update public.couples
+      set invite_code = private.generate_invite_code(),
+          paired_at = null
+      where id = cid;
+  end if;
+
+  return json_build_object(
+    'ok', true,
+    'left', true,
+    'couple_deleted', couple_deleted
+  );
+end;
+$$;
+
+alter function public.leave_couple() owner to postgres;
+
+create or replace function public.peek_invite(invite text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  normalized text;
+  target_id uuid;
+  member_count int;
+begin
+  normalized := upper(trim(invite));
+  if normalized !~ '^[A-Z0-9]{6}$' then
+    return 'invalid';
+  end if;
+
+  select id into target_id
+  from public.couples
+  where invite_code = normalized;
+
+  if target_id is null then
+    return 'expired';
+  end if;
+
+  select count(*)::int into member_count
+  from public.profiles
+  where couple_id = target_id;
+
+  if member_count >= 2 then
+    return 'full';
+  end if;
+
+  return 'open';
+end;
+$$;
+
+revoke all on function public.peek_invite(text) from public;
+grant execute on function public.peek_invite(text) to anon, authenticated;
+
+create or replace function public.join_couple(invite text)
+returns public.couples
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  existing_couple_id uuid;
+  target public.couples;
+  member_count int;
+  normalized text;
+begin
+  if uid is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  normalized := upper(trim(invite));
+
+  if normalized !~ '^[A-Z0-9]{6}$' then
+    raise exception 'Invalid invite code';
+  end if;
+
+  select couple_id into existing_couple_id
+  from public.profiles
+  where id = uid;
+
+  if existing_couple_id is not null then
+    raise exception 'Already paired';
+  end if;
+
+  select * into target
+  from public.couples
+  where invite_code = normalized;
+
+  if target.id is null then
+    raise exception 'Invite expired';
+  end if;
+
+  if target.created_by = uid then
+    raise exception 'Cannot join your own invite';
+  end if;
+
+  select count(*)::int into member_count
+  from public.profiles
+  where couple_id = target.id;
+
+  if member_count >= 2 then
+    raise exception 'Couple is full';
+  end if;
+
+  update public.profiles
+  set couple_id = target.id
+  where id = uid;
+
+  update public.couples
+  set paired_at = coalesce(paired_at, now())
+  where id = target.id;
+
+  select * into target from public.couples where id = target.id;
+  return target;
+end;
+$$;
+
+revoke all on function public.join_couple(text) from public;
+grant execute on function public.join_couple(text) to authenticated;
+
 notify pgrst, 'reload schema';

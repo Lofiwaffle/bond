@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native'
@@ -13,46 +12,46 @@ import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
-  ActionPreview,
   CompactScorePicker,
   ExpectationRow,
   PromiseVisual,
   RevealPreview,
   SAMPLE_PROMPT,
-  UnderstandingPreview,
 } from '../components/OnboardingRitual'
 import { PrimaryButton, TextLink } from '../components/ui'
 import { markOnboardingSeen } from '../lib/onboarding'
-import { colors, phoneMaxWidth, radii, type } from '../lib/theme'
+import { DEVICE_ONLY_THOUGHTS } from '../lib/privacy'
+import { colors, radii, type } from '../lib/theme'
 
-const SLIDE_IDS = [
-  'promise',
-  'reflect',
-  'reveal',
-  'understand',
-  'act',
-] as const
+const SLIDE_IDS = ['promise', 'reveal', 'invite'] as const
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets()
-  const { width: windowWidth } = useWindowDimensions()
-  const width = Math.min(windowWidth, phoneMaxWidth)
   const [index, setIndex] = useState(0)
   const [score, setScore] = useState<number | null>(null)
   const [revealed, setRevealed] = useState(false)
+  const [slideSize, setSlideSize] = useState({ width: 0, height: 0 })
   const scrollRef = useRef<ScrollView>(null)
+  const innerRefs = useRef<Array<ScrollView | null>>([])
+  const widthRef = useRef(0)
+  const pageWidth = slideSize.width
+  const slideHeight = slideSize.height
   const isLast = index === SLIDE_IDS.length - 1
   const yours = score ?? 4
+  const current = SLIDE_IDS[index]
 
   const goToIndex = (next: number) => {
     const clamped = Math.max(0, Math.min(SLIDE_IDS.length - 1, next))
-    scrollRef.current?.scrollTo({ x: clamped * width, animated: true })
+    innerRefs.current[clamped]?.scrollTo({ y: 0, animated: false })
+    scrollRef.current?.scrollTo({ x: clamped * pageWidth, animated: true })
     setIndex(clamped)
   }
 
   const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const next = Math.round(e.nativeEvent.contentOffset.x / Math.max(width, 1))
-    setIndex(next)
+    const next = Math.round(
+      e.nativeEvent.contentOffset.x / Math.max(pageWidth, 1),
+    )
+    setIndex(Math.max(0, Math.min(SLIDE_IDS.length - 1, next)))
   }
 
   const finish = async (destination: '/(auth)/signup' | '/(auth)/login') => {
@@ -60,18 +59,12 @@ export default function OnboardingScreen() {
     router.replace(destination)
   }
 
-  const current = SLIDE_IDS[index]
   const nextHint =
-    current === 'reflect' && score == null
-      ? 'Continue'
-      : current === 'reveal' && !revealed
-        ? 'See the reveal'
-        : current === 'understand'
-          ? 'Take a step'
-          : 'Next'
+    current === 'reveal' && !revealed ? 'See the reveal' : 'Next'
 
   return (
     <View
+      testID="onboarding-screen"
       style={[
         styles.screen,
         {
@@ -96,106 +89,141 @@ export default function OnboardingScreen() {
         )}
       </View>
 
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        nestedScrollEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={onMomentumScrollEnd}
+      <View
         style={styles.carousel}
+        onLayout={(event) => {
+          const nextWidth = Math.round(event.nativeEvent.layout.width)
+          const nextHeight = Math.round(event.nativeEvent.layout.height)
+          if (nextWidth <= 0 || nextHeight <= 0) return
+          const widthChanged = nextWidth !== widthRef.current
+          if (
+            nextWidth !== slideSize.width ||
+            nextHeight !== slideSize.height
+          ) {
+            setSlideSize({ width: nextWidth, height: nextHeight })
+          }
+          if (widthChanged) {
+            widthRef.current = nextWidth
+            scrollRef.current?.scrollTo({
+              x: index * nextWidth,
+              animated: false,
+            })
+          }
+        }}
       >
-        <Slide width={width} kicker="Bond" title="Before distance builds">
-          <PromiseVisual />
-          <Text style={styles.promise}>
-            A two-minute daily ritual that helps couples understand each other
-            before distance builds.
-          </Text>
-        </Slide>
+        {pageWidth > 0 && slideHeight > 0 ? (
+          <ScrollView
+            ref={scrollRef}
+            horizontal
+            pagingEnabled
+            nestedScrollEnabled
+            directionalLockEnabled
+            decelerationRate="fast"
+            snapToInterval={pageWidth}
+            snapToAlignment="start"
+            disableIntervalMomentum
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={onMomentumScrollEnd}
+            style={{ height: slideHeight }}
+            contentContainerStyle={{ height: slideHeight }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Slide
+              width={pageWidth}
+              height={slideHeight}
+              scrollRef={(node) => {
+                innerRefs.current[0] = node
+              }}
+              testID="onboarding-slide-promise"
+              kicker="Bond"
+              title="Before distance builds"
+            >
+              <PromiseVisual />
+              <Text style={styles.promise}>
+                A two-minute daily ritual that helps couples understand each
+                other before distance builds.
+              </Text>
+            </Slide>
 
-        <Slide
-          width={width}
-          kicker="1 · Reflect privately"
-          title="You go first. They cannot see it yet."
-        >
-          <Text style={styles.prompt}>{SAMPLE_PROMPT}</Text>
-          <CompactScorePicker value={score} onChange={setScore} />
-          <Text style={styles.body}>
-            Honest, not performed. Your check-in stays yours until they answer
-            too.
-          </Text>
-        </Slide>
+            <Slide
+              width={pageWidth}
+              height={slideHeight}
+              scrollRef={(node) => {
+                innerRefs.current[1] = node
+              }}
+              testID="onboarding-slide-reveal"
+              kicker="The ritual"
+              title="Check in privately. Reveal when you both show up."
+            >
+              <Text style={styles.prompt}>{SAMPLE_PROMPT}</Text>
+              <CompactScorePicker value={score} onChange={setScore} />
+              <RevealPreview
+                yours={yours}
+                revealed={revealed}
+                stacked={pageWidth < 400}
+                onReveal={() => setRevealed(true)}
+              />
+              <Text style={styles.body}>
+                {!revealed
+                  ? 'Your answer stays yours until they check in too. Tap the sealed side to see the same day through both eyes.'
+                  : yours >= 4
+                    ? 'You felt close. They felt far. Naming the gap is enough — talking it through together is optional, and only if it feels safe.'
+                    : yours <= 2
+                      ? 'You named a hard day. You do not have to discuss it together. A conversation is optional, and only if it feels safe.'
+                      : 'Same day, two different temperatures. Understanding can stay in the app. Talking together is optional, and only if it feels safe.'}
+              </Text>
+            </Slide>
 
-        <Slide
-          width={width}
-          kicker="2 · Reveal when both respond"
-          title="Nothing opens until you both show up."
-        >
-          <RevealPreview
-            yours={yours}
-            revealed={revealed}
-            onReveal={() => setRevealed(true)}
-          />
-          <Text style={styles.body}>
-            {revealed
-              ? 'Same day, side by side. Until they check in, their side stays sealed.'
-              : 'Your answer is already saved. Tap the sealed side to see what happens when they respond.'}
-          </Text>
-        </Slide>
+            <Slide
+              width={pageWidth}
+              height={slideHeight}
+              scrollRef={(node) => {
+                innerRefs.current[2] = node
+              }}
+              testID="onboarding-slide-invite"
+              kicker="Create, then invite"
+              title="Start a Bond, then invite one person."
+            >
+              <ExpectationRow
+                icon="clock"
+                title="Two minutes a day"
+                body="That is the whole habit. Miss a day, come back tomorrow."
+              />
+              <ExpectationRow
+                icon="eye-off"
+                title="Private until you both check in"
+                body="Only the two of you. No one else sees this."
+              />
+              <ExpectationRow
+                icon="smartphone"
+                title="Device-only thoughts"
+                body={DEVICE_ONLY_THOUGHTS}
+              />
+              <ExpectationRow
+                icon="bell"
+                title="Reminders are optional"
+                body="Off by default. You can choose one daily reminder, or none. There is no rush."
+              />
+              <Text style={styles.body}>
+                Next, invite the one person this ritual is for. Bond is not
+                therapy or emergency support.
+              </Text>
+            </Slide>
+          </ScrollView>
+        ) : null}
+      </View>
 
-        <Slide
-          width={width}
-          kicker="3 · Understand each other"
-          title="See the same day through both eyes."
-        >
-          <UnderstandingPreview yours={yours} />
-          <Text style={styles.body}>
-            {yours >= 4
-              ? 'You felt close. They felt far. Naming the gap is enough — talking it through together is optional, and only if it feels safe.'
-              : yours <= 2
-                ? 'You named a hard day. You do not have to discuss it together. A conversation is optional, and only if it feels safe.'
-                : 'Same day, two different temperatures. Understanding can stay in the app. Talking together is optional, and only if it feels safe.'}
-          </Text>
-        </Slide>
-
-        <Slide
-          width={width}
-          kicker="4 · One small action"
-          title="Then one small next step."
-        >
-          <ActionPreview />
-          <ExpectationRow
-            icon="clock"
-            title="Two minutes a day"
-            body="That is the whole habit. Miss a day, come back tomorrow."
-          />
-          <ExpectationRow
-            icon="eye-off"
-            title="Private until you both check in"
-            body="Only the two of you. No one else sees this."
-          />
-          <ExpectationRow
-            icon="bell"
-            title="Reminders are optional"
-            body="An 8pm nudge if you want it. You can leave notifications off."
-          />
-          <Text style={styles.body}>
-            Next, invite the one person this ritual is for. Bond is not therapy
-            or emergency support.
-          </Text>
-        </Slide>
-      </ScrollView>
-
-      <View style={styles.dots}>
+      <View testID="onboarding-dots" style={styles.dots}>
         {SLIDE_IDS.map((id, i) => (
           <View
             key={id}
+            testID={`onboarding-dot-${id}`}
             style={[styles.dot, i === index && styles.dotActive]}
           />
         ))}
       </View>
 
-      <View style={styles.footer}>
+      <View testID="onboarding-footer" style={styles.footer}>
         {isLast ? (
           <>
             <PrimaryButton
@@ -226,6 +254,7 @@ export default function OnboardingScreen() {
               <View style={styles.navButton} />
             )}
             <Pressable
+              testID="onboarding-next"
               accessibilityRole="button"
               accessibilityLabel={nextHint}
               onPress={() => {
@@ -248,25 +277,40 @@ export default function OnboardingScreen() {
 
 function Slide({
   width,
+  height,
   kicker,
   title,
   children,
+  testID,
+  scrollRef,
 }: {
   width: number
+  height: number
   kicker: string
   title: string
   children: ReactNode
+  testID: string
+  scrollRef: (node: ScrollView | null) => void
 }) {
   return (
-    <ScrollView
-      style={{ width }}
-      contentContainerStyle={styles.slide}
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={styles.kicker}>{kicker}</Text>
-      <Text style={styles.title}>{title}</Text>
-      {children}
-    </ScrollView>
+    <View testID={testID} style={{ width, height }}>
+      <ScrollView
+        ref={scrollRef}
+        style={{ height }}
+        contentContainerStyle={styles.slide}
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator
+      >
+        <Text accessibilityRole="header" style={styles.kicker}>
+          {kicker}
+        </Text>
+        <Text accessibilityRole="header" style={styles.title}>
+          {title}
+        </Text>
+        {children}
+      </ScrollView>
+    </View>
   )
 }
 
@@ -292,13 +336,13 @@ const styles = StyleSheet.create({
   },
   carousel: {
     flex: 1,
+    minHeight: 0,
   },
   slide: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 16,
+    paddingBottom: 24,
     gap: 14,
-    flexGrow: 1,
   },
   kicker: {
     ...type.label,

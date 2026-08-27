@@ -65,8 +65,12 @@ export function CompactScorePicker({
         })}
       </View>
       <View style={styles.scaleCaptions}>
-        <Text style={styles.caption}>{SCORE_LABELS[1]}</Text>
-        <Text style={styles.caption}>{SCORE_LABELS[5]}</Text>
+        <Text style={[styles.caption, styles.captionStart]} numberOfLines={1}>
+          {SCORE_LABELS[1]}
+        </Text>
+        <Text style={[styles.caption, styles.captionEnd]} numberOfLines={1}>
+          {SCORE_LABELS[5]}
+        </Text>
       </View>
       <Text style={styles.hint}>
         {value == null
@@ -87,13 +91,18 @@ export function RevealPreview({
   yours,
   revealed,
   onReveal,
+  stacked = false,
 }: {
   yours: number
   revealed: boolean
   onReveal: () => void
+  stacked?: boolean
 }) {
   return (
-    <View style={styles.revealRow}>
+    <View
+      testID="onboarding-reveal"
+      style={[styles.revealRow, stacked && styles.revealStack]}
+    >
       <EntryPreview
         name="You"
         score={yours}
@@ -107,6 +116,7 @@ export function RevealPreview({
         />
       ) : (
         <Pressable
+          testID="onboarding-sealed"
           accessibilityRole="button"
           accessibilityLabel="Show when they respond"
           onPress={onReveal}
@@ -122,19 +132,6 @@ export function RevealPreview({
           </Text>
         </Pressable>
       )}
-    </View>
-  )
-}
-
-export function UnderstandingPreview({ yours }: { yours: number }) {
-  return (
-    <View style={styles.revealRow}>
-      <EntryPreview name="You" score={yours} note={SAMPLE_YOURS} />
-      <EntryPreview
-        name={SAMPLE_PARTNER}
-        score={SAMPLE_PARTNER_SCORE}
-        note={SAMPLE_THEIRS}
-      />
     </View>
   )
 }
@@ -157,7 +154,7 @@ export function ExpectationRow({
   title,
   body,
 }: {
-  icon: Extract<IconName, 'clock' | 'eye-off' | 'bell' | 'users'>
+  icon: Extract<IconName, 'clock' | 'eye-off' | 'bell' | 'users' | 'smartphone'>
   title: string
   body: string
 }) {
@@ -241,11 +238,19 @@ const styles = StyleSheet.create({
   scaleCaptions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 8,
     marginTop: 6,
   },
   caption: {
     ...type.label,
     marginBottom: 0,
+    flexShrink: 1,
+  },
+  captionStart: {
+    textAlign: 'left',
+  },
+  captionEnd: {
+    textAlign: 'right',
   },
   hint: {
     ...type.label,
@@ -269,7 +274,11 @@ const styles = StyleSheet.create({
   },
   revealRow: {
     flexDirection: 'row',
+    alignItems: 'stretch',
     gap: 10,
+  },
+  revealStack: {
+    flexDirection: 'column',
   },
   entry: {
     flex: 1,

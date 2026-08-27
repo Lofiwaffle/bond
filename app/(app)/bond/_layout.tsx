@@ -8,6 +8,7 @@ export default function BondLayout() {
       <Stack.Screen name="goals" />
       <Stack.Screen name="streaks" />
       <Stack.Screen name="reviews" />
+      <Stack.Screen name="prompts" />
     </Stack>
   )
 }

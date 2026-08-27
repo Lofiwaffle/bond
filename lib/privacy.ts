@@ -1,4 +1,4 @@
-export const PRIVACY_UPDATED = '26 August 2026'
+export const PRIVACY_UPDATED = '27 August 2026'
 
 export const NOT_THERAPY =
   'Bond is a daily check-in habit for two people. It is not therapy, counseling, medical care, or emergency support. If you are in danger, contact local emergency services.'
@@ -63,7 +63,11 @@ export const STORED_ON_SERVER = [
   'Your hide or edit choice for a weekly suggestion. Your partner cannot see that preference.',
   'A push token if you turn on “Our reveal is ready.”',
   'Notification preferences: whether reminders are on, the time, timezone, and quiet hours.',
+  'On the free plan, a device advertising ID for ads (Google AdMob). Bond Plus and the trial remove ads.',
 ]
+
+export const ADS_DISCLOSURE =
+  'On the free plan, Bond shows an ad when you open the app the first time that day, and ads in History. Ads are served by Google AdMob and may use a device advertising ID. Bond Plus and the trial remove ads. We do not use your check-in answers to target ads.'
 
 export const DEVICE_ONLY_THOUGHTS =
   'Private thoughts stay on this device and are never uploaded. They are lost if you clear Bond’s app storage, uninstall, or switch phones.'
@@ -71,11 +75,11 @@ export const DEVICE_ONLY_THOUGHTS =
 export const NOT_STORED = [
   'Private thoughts typed during check-in (this device only; lost if app storage is cleared).',
   'Weekly review drafts (this device only; lost if app storage is cleared).',
-  'Precise location, contacts, photos, microphone, or advertising IDs.',
+  'Precise location, contacts, photos, or microphone.',
 ]
 
 export const UNPAIR_SEMANTICS =
-  'Leaving a Bond removes your words from it: your check-ins, weekly answers, achievement logs, small actions you offered, anything you wrote on a shared goal, and your hide or edit choices for weekly suggestions. Your partner keeps their own entries. Shared weekly suggestions are removed because they quote both of you. Shared goals stay with the remaining partner. Your account stays, so you can start a new Bond later. The old invite code stops working.'
+  'Leaving a Bond removes your words from it: your check-ins, weekly answers, achievement logs, small actions you offered, anything you wrote on a shared goal, and your hide or edit choices for weekly suggestions. Your partner keeps their own entries. Shared weekly suggestions are removed because they quote both of you. Shared goals stay with the remaining partner. If you paid for Bond Plus, the receipt stays with you and Plus pauses for this Bond; you can restore it onto a new Bond you join. If your partner paid, you keep every answer already opened and you do not keep Plus. Your account stays, so you can start a new Bond later. The old invite code stops working.'
 
 export const DELETE_SEMANTICS =
   'Deleting your account first leaves any Bond you are in (same rules as above), then permanently removes your profile and sign-in. If you are the last remaining member, the couple record and leftover shared data are deleted too. This cannot be undone. You can also email a deletion request using the address on the Bond store listing.'

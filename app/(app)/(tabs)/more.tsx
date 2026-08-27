@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import {
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -23,7 +24,9 @@ import {
   TextLink,
 } from '../../../components/ui'
 import { useTodayCheckIn } from '../../../hooks/useCheckIn'
+import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useAuth } from '../../../lib/auth'
+import { SUPPORT_URL } from '../../../lib/appUrls'
 import { buildExportBundle, shareExportBundle } from '../../../lib/exportData'
 import { DELETE_SEMANTICS, UNPAIR_SEMANTICS } from '../../../lib/privacy'
 import { focusInput } from '../../../lib/formFocus'
@@ -57,6 +60,7 @@ export default function UsScreen() {
     deleteAccount,
     leaveCouple,
   } = useAuth()
+  const plus = useBondPlus()
   const { isLoading: historyLoading, error: historyError, refresh: refreshHistory } =
     useTodayCheckIn()
   const [editingName, setEditingName] = useState(false)
@@ -251,6 +255,19 @@ export default function UsScreen() {
           <Text style={styles.label}>Notifications</Text>
           <NotificationSettings />
 
+          <Text style={[styles.label, styles.accountLabel]}>Bond Plus</Text>
+          <Text style={styles.sectionHint}>
+            {plus.active
+              ? plus.status === 'trialing'
+                ? 'Trial is on for both of you.'
+                : 'Bond Plus is on for both of you.'
+              : 'Deeper growth after three opened days. You never pay to see an answer already shared.'}
+          </Text>
+          <TextLink
+            label={plus.active ? 'Manage Bond Plus' : 'See Bond Plus'}
+            onPress={() => router.push('/(app)/plus' as Href)}
+          />
+
           <Text style={[styles.label, styles.accountLabel]}>Privacy & safety</Text>
           <Text style={styles.sectionHint}>
             Bond is not therapy or emergency support. Who can see each entry is
@@ -263,6 +280,10 @@ export default function UsScreen() {
           <TextLink
             label="Help & safety"
             onPress={() => router.push('/help' as Href)}
+          />
+          <TextLink
+            label="Report a problem"
+            onPress={() => void Linking.openURL(SUPPORT_URL)}
           />
           <TextLink
             label={exporting ? 'Preparing download...' : 'Download my data'}

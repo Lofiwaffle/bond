@@ -13,6 +13,7 @@ import {
   STORED_ON_SERVER,
   UNPAIR_SEMANTICS,
   VISIBILITY_ROWS,
+  ADS_DISCLOSURE,
 } from '../lib/privacy'
 import { colors, hairlineWidth, type } from '../lib/theme'
 
@@ -102,12 +103,18 @@ export default function PrivacyScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.heading}>Ads</Text>
+          <Text style={styles.body}>{ADS_DISCLOSURE}</Text>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.heading}>How we use data</Text>
           <Text style={styles.body}>
             We use this data to run the app: sign you in, pair you, and show
-            shared entries after both of you check in. We do not sell personal
-            data. We do not use your relationship content for ads. Hosting and
-            authentication providers see data only to operate Bond.
+            shared entries after both of you check in, and (on the free plan)
+            show ads. We do not sell personal data. We do not use your
+            relationship content to target ads. Hosting, authentication, and
+            AdMob see data only to operate Bond.
           </Text>
         </View>
 

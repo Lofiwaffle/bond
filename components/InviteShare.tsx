@@ -11,6 +11,7 @@ import {
   inviteHttpsUrl,
   shareInvite,
 } from '../lib/invite'
+import { supabase } from '../lib/supabase'
 import { colors, type } from '../lib/theme'
 
 export function InviteShare({
@@ -38,6 +39,7 @@ export function InviteShare({
       return
     }
     if (result.copied) onCopied?.('Invite copied')
+    void supabase.rpc('track_plus_funnel', { ev: 'invite_sent', meta: {} })
   }
 
   return (

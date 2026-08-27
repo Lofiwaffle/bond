@@ -1,15 +1,20 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { BondSectionHeader } from '../../../components/BondSectionHeader'
+import { plusGate } from '../../../components/PlusPreview'
 import { LoadingScreen, Screen } from '../../../components/ui'
 import { useMilestones } from '../../../hooks/useMilestones'
+import { useBondPlus } from '../../../hooks/useBondPlus'
 import { formatDisplayDate } from '../../../lib/dates'
 import { colors, hairlineWidth, type } from '../../../lib/theme'
 
 export default function BondMilestonesScreen() {
   const { milestones, earnedCount, isLoading } = useMilestones()
+  const plus = useBondPlus()
 
   if (isLoading) return <LoadingScreen />
+  const plusLock = plusGate('milestones', plus)
+  if (plusLock) return plusLock
 
   return (
     <Screen style={styles.screen}>

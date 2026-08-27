@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons'
 import { Redirect, Tabs, router } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
+import { DailyOpenAd } from '../../../components/DailyOpenAd'
 import { LoadingScreen } from '../../../components/ui'
 import { useTodayCheckIn } from '../../../hooks/useCheckIn'
 import { useAuth } from '../../../lib/auth'
@@ -59,64 +60,67 @@ export default function TabsLayout() {
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.tabBarIconMuted,
-        tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: styles.tabLabel,
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Today',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="sun" size={size} color={color} />
-          ),
+    <>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: colors.accent,
+          tabBarInactiveTintColor: colors.tabBarIconMuted,
+          tabBarStyle: styles.tabBar,
+          tabBarLabelStyle: styles.tabLabel,
         }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: 'History',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="clock" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="check-in-tab"
-        options={{
-          title: 'Check-in',
-          tabBarLabel: () => null,
-          tabBarButton: () => (
-            <View style={styles.fabSlot}>
-              <CheckInFab />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="stats"
-        options={{
-          title: 'Growth',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="trending-up" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="more"
-        options={{
-          title: 'Us',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="users" size={size} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Today',
+            tabBarIcon: ({ color, size }) => (
+              <Feather name="sun" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="history"
+          options={{
+            title: 'History',
+            tabBarIcon: ({ color, size }) => (
+              <Feather name="clock" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="check-in-tab"
+          options={{
+            title: 'Check-in',
+            tabBarLabel: () => null,
+            tabBarButton: () => (
+              <View style={styles.fabSlot}>
+                <CheckInFab />
+              </View>
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="stats"
+          options={{
+            title: 'Growth',
+            tabBarIcon: ({ color, size }) => (
+              <Feather name="trending-up" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="more"
+          options={{
+            title: 'Us',
+            tabBarIcon: ({ color, size }) => (
+              <Feather name="users" size={size} color={color} />
+            ),
+          }}
+        />
+      </Tabs>
+      <DailyOpenAd />
+    </>
   )
 }
 

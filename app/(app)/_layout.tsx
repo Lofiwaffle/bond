@@ -4,6 +4,7 @@ import { LoadingScreen } from '../../components/ui'
 import { CheckInProvider } from '../../hooks/useCheckIn'
 import { DailyActionProvider } from '../../hooks/useDailyAction'
 import { HabitBadgesProvider } from '../../hooks/useHabitBadges'
+import { BondPlusProvider } from '../../hooks/useBondPlus'
 import { PartnerActivitySync } from '../../hooks/usePartnerActivity'
 import { useAuth } from '../../lib/auth'
 
@@ -18,7 +19,8 @@ export default function AppLayout() {
     <CheckInProvider>
       <DailyActionProvider>
         <HabitBadgesProvider>
-          <PartnerActivitySync>
+          <BondPlusProvider>
+            <PartnerActivitySync>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="bond" />
@@ -39,8 +41,16 @@ export default function AppLayout() {
               <Stack.Screen name="day/[date]" />
               <Stack.Screen name="pair" />
               <Stack.Screen name="setup" />
+              <Stack.Screen
+                name="plus"
+                options={{
+                  presentation: 'modal',
+                  animation: 'slide_from_bottom',
+                }}
+              />
             </Stack>
-          </PartnerActivitySync>
+            </PartnerActivitySync>
+          </BondPlusProvider>
         </HabitBadgesProvider>
       </DailyActionProvider>
     </CheckInProvider>

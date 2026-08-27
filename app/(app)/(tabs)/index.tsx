@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router, useFocusEffect } from 'expo-router'
 
 import { NextStepCard } from '../../../components/NextStepCard'
+import { PlusOfferCard } from '../../../components/PlusOfferCard'
 import { RevealMoment, SharedActionCard, WaitingMoment } from '../../../components/CheckInMoment'
 import { LoadingScreen, Screen, StatusPanel, TextLink } from '../../../components/ui'
-import { useTodayCheckIn, useCheckInGrowth } from '../../../hooks/useCheckIn'
+import { useTodayCheckIn, useCheckInGrowth, useCheckInIndex } from '../../../hooks/useCheckIn'
+import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useDailyAction } from '../../../hooks/useDailyAction'
 import { useNotificationPreferences } from '../../../hooks/useNotificationPreferences'
 import { useAuth } from '../../../lib/auth'
@@ -13,6 +15,8 @@ import { hasSentNudge, markNudgeSent } from '../../../lib/checkInDraft'
 import { promptForDate } from '../../../lib/dailyPrompts'
 import { formatDisplayDate, localDateString } from '../../../lib/dates'
 import { useQueuedCheckIn } from '../../../lib/checkInOutbox'
+import { firstInsight } from '../../../lib/firstInsight'
+import { observationDaysFromIndex } from '../../../lib/growthObservations'
 import { todayPhase } from '../../../lib/nextStep'
 import { welcomeBackCopy } from '../../../lib/rhythm'
 import { useToast } from '../../../lib/toast'
@@ -32,6 +36,8 @@ export default function TodayScreen() {
     sendNudge,
   } = useTodayCheckIn()
   const { myCheckIns, lastDate } = useCheckInGrowth()
+  const { days: indexDays } = useCheckInIndex()
+  const plus = useBondPlus()
   const { accepted } = useDailyAction()
   const { remindInOneHour } = useNotificationPreferences()
   const { showToast } = useToast()
@@ -82,6 +88,10 @@ export default function TodayScreen() {
         welcomeBack: gapDays >= 2,
       })
     : null
+  const insight = useMemo(
+    () => firstInsight(observationDaysFromIndex(indexDays)),
+    [indexDays],
+  )
 
   const onNudge = async () => {
     if (!user?.id || nudged || nudging) return
@@ -194,6 +204,13 @@ export default function TodayScreen() {
             mine={mine}
             partner={partnerCheckIn}
             partnerName={partnerName}
+          />
+        ) : null}
+
+        {plus.offerEligible && insight ? (
+          <PlusOfferCard
+            insight={insight}
+            onNotNow={() => void plus.snoozeOffer()}
           />
         ) : null}
       </ScrollView>

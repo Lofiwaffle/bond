@@ -10,16 +10,15 @@ import {
 import { router, useFocusEffect } from 'expo-router'
 
 import { BondSectionHeader } from '../../../components/BondSectionHeader'
+import { plusGate } from '../../../components/PlusPreview'
 import {
   LoadingScreen,
   Screen,
   StatusPanel,
   TextLink,
 } from '../../../components/ui'
-import {
-  useWeeklyReview,
-  useWeeklyReviewHistory,
-} from '../../../hooks/useWeeklyReview'
+import { useWeeklyReview, useWeeklyReviewHistory } from '../../../hooks/useWeeklyReview'
+import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useAuth } from '../../../lib/auth'
 import { formatDisplayDate } from '../../../lib/dates'
 import { Icon } from '../../../lib/icons'
@@ -30,6 +29,7 @@ export default function BondReviewsScreen() {
   const { partner, isLoading: authLoading } = useAuth()
   const { weeks, isLoading, error, refresh } = useWeeklyReviewHistory()
   const { unlocked, needsReview } = useWeeklyReview()
+  const plus = useBondPlus()
   const [openWeek, setOpenWeek] = useState<string | null>(null)
 
   useFocusEffect(
@@ -39,6 +39,8 @@ export default function BondReviewsScreen() {
   )
 
   if (authLoading || isLoading) return <LoadingScreen />
+  const plusLock = plusGate('weekly_review', plus)
+  if (plusLock) return plusLock
 
   const partnerName = partner?.display_name ?? 'your partner'
   const completed = weeks.filter((week) => week.completed)

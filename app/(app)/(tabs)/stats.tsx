@@ -1,15 +1,17 @@
 import { useMemo } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { Redirect, router } from 'expo-router'
+import { Redirect, router, type Href } from 'expo-router'
 
 import { GrowthObservations } from '../../../components/GrowthObservations'
 import { NextStepCard } from '../../../components/NextStepCard'
 import { LoadingScreen, Screen } from '../../../components/ui'
 import { useCheckInGrowth, useCheckInIndex } from '../../../hooks/useCheckIn'
+import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useCoupleGoal } from '../../../hooks/useCoupleGoal'
 import { useWeeklyReview } from '../../../hooks/useWeeklyReview'
 import { useAuth } from '../../../lib/auth'
 import { localDateString } from '../../../lib/dates'
+import { firstInsight } from '../../../lib/firstInsight'
 import {
   buildGrowthObservations,
   observationDaysFromIndex,
@@ -28,15 +30,14 @@ export default function GrowthScreen() {
   const { myCheckIns, revealedDays, isLoading: checkInLoading } =
     useCheckInGrowth()
   const { days, isLoading: indexLoading } = useCheckInIndex()
+  const plus = useBondPlus()
   const { needsReview, unlocked: weeklyUnlocked } = useWeeklyReview()
+  const observationDays = useMemo(() => observationDaysFromIndex(days), [days])
   const observations = useMemo(
-    () =>
-      buildGrowthObservations(
-        observationDaysFromIndex(days),
-        localDateString(),
-      ),
-    [days],
+    () => buildGrowthObservations(observationDays, localDateString()),
+    [observationDays],
   )
+  const insight = useMemo(() => firstInsight(observationDays), [observationDays])
 
   const unlocks = useMemo(
     () =>
@@ -60,7 +61,7 @@ export default function GrowthScreen() {
     (item) => item.id !== next?.id,
   )
 
-  if (isLoading || goalsLoading || checkInLoading || indexLoading) {
+  if (isLoading || goalsLoading || checkInLoading || indexLoading || plus.isLoading) {
     return <LoadingScreen />
   }
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
@@ -77,7 +78,7 @@ export default function GrowthScreen() {
           title={next.title}
           body={next.body}
           actionLabel={`Open ${next.title.toLowerCase()}`}
-          onAction={() => router.push(next.href)}
+          onAction={() => router.push(next.href as Href)}
         />
       ) : (
         <NextStepCard
@@ -93,7 +94,18 @@ export default function GrowthScreen() {
         />
       )}
 
-      <GrowthObservations observations={observations} />
+      {plus.active ? (
+        <GrowthObservations observations={observations} />
+      ) : insight ? (
+        <GrowthObservations
+          observations={[{ id: 'similar', body: insight.body }]}
+        />
+      ) : (
+        <GrowthObservations
+          observations={[]}
+          lockedHint="After three days you both open, a first look appears here. Longer trends are Bond Plus."
+        />
+      )}
 
       {items.length > 0 ? (
         <View style={styles.list}>
@@ -102,10 +114,10 @@ export default function GrowthScreen() {
               key={item.id}
               accessibilityRole="button"
               accessibilityLabel={`${item.title}. ${item.body}`}
-              onPress={() => router.push(item.href)}
+              onPress={() => router.push(item.href as Href)}
               style={(state) => [
                 styles.row,
-                index === items.length - 1 && styles.rowLast,
+                index === items.length - 1 && !plus.active && styles.rowLast,
                 state.pressed && styles.rowPressed,
                 Boolean((state as { focused?: boolean }).focused) &&
                   styles.rowFocus,
@@ -118,6 +130,29 @@ export default function GrowthScreen() {
               <Icon name="chevron-right" size={16} color={colors.muted} />
             </Pressable>
           ))}
+          {plus.active ? null : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Bond Plus. Deeper growth for the two of you."
+              onPress={() => router.push('/(app)/plus' as Href)}
+              style={(state) => [
+                styles.row,
+                styles.rowLast,
+                state.pressed && styles.rowPressed,
+                Boolean((state as { focused?: boolean }).focused) &&
+                  styles.rowFocus,
+              ]}
+            >
+              <View style={styles.copy}>
+                <Text style={styles.rowTitle}>Bond Plus</Text>
+                <Text style={styles.rowBody}>
+                  History, State of Us, and trends — without paying to see an
+                  answer already shared.
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={16} color={colors.muted} />
+            </Pressable>
+          )}
         </View>
       ) : null}
       </ScrollView>

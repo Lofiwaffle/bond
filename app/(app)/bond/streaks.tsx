@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { BondSectionHeader } from '../../../components/BondSectionHeader'
+import { plusGate } from '../../../components/PlusPreview'
 import { GrowthObservations } from '../../../components/GrowthObservations'
 import {
   LoadingScreen,
@@ -9,6 +10,7 @@ import {
   StatusPanel,
 } from '../../../components/ui'
 import { useCheckInIndex } from '../../../hooks/useCheckIn'
+import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useAuth } from '../../../lib/auth'
 import { localDateString } from '../../../lib/dates'
 import {
@@ -21,6 +23,7 @@ import { SCORE_LABELS, colors, hairlineWidth, radii, scoreColors, type } from '.
 
 export default function BondRhythmScreen() {
   const { isLoading: authLoading } = useAuth()
+  const plus = useBondPlus()
   const { days, isLoading, error, refresh } = useCheckInIndex()
   const now = useMemo(() => new Date(), [])
   const year = now.getFullYear()
@@ -49,6 +52,8 @@ export default function BondRhythmScreen() {
   }, [days, year])
 
   if (authLoading || isLoading) return <LoadingScreen />
+  const plusLock = plusGate('trends', plus)
+  if (plusLock) return plusLock
 
   const welcome = welcomeBackCopy(stats.rhythm)
 

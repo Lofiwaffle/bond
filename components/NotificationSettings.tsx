@@ -2,6 +2,8 @@ import { StyleSheet, Text, View } from 'react-native'
 
 import { ErrorText, TextLink } from './ui'
 import { useNotificationPreferences } from '../hooks/useNotificationPreferences'
+import { useBondPlus } from '../hooks/useBondPlus'
+import { router, type Href } from 'expo-router'
 import {
   formatClockLabel,
   formatHourLabel,
@@ -12,6 +14,7 @@ import { colors, type } from '../lib/theme'
 
 export function NotificationSettings() {
   const { prefs, busy, error, expoGoNote, patch } = useNotificationPreferences()
+  const plus = useBondPlus()
 
   return (
     <View>
@@ -126,6 +129,12 @@ export function NotificationSettings() {
         />
       </View>
       <Text style={styles.meta}>Timezone: {prefs.timezone}</Text>
+      {plus.active ? null : (
+        <TextLink
+          label="Personalized reminder times are Bond Plus"
+          onPress={() => router.push('/(app)/plus' as Href)}
+        />
+      )}
       {error ? <ErrorText message={error} /> : null}
     </View>
   )

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router } from 'expo-router'
+import { plusGate } from '../../components/PlusPreview'
+import { useBondPlus } from '../../hooks/useBondPlus'
 
 import {
   ErrorText,
@@ -50,6 +52,7 @@ function mergeDraft(
 
 export default function WeeklyReviewScreen() {
   const { user, partner, profile, isLoading: authLoading } = useAuth()
+  const plus = useBondPlus()
   const {
     unlocked,
     needsReview,
@@ -142,6 +145,9 @@ export default function WeeklyReviewScreen() {
       </Screen>
     )
   }
+
+  const plusLock = plusGate('weekly_review', plus)
+  if (plusLock) return plusLock
 
   const onChangeAnswer = (index: number, text: string) => {
     setAnswers((prev) => {

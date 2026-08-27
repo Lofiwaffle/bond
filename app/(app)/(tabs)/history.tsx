@@ -9,7 +9,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native'
-import { Redirect, router, useFocusEffect } from 'expo-router'
+import { Redirect, router, useFocusEffect, type Href } from 'expo-router'
 import Svg, { Circle } from 'react-native-svg'
 
 import {
@@ -20,15 +20,21 @@ import {
   StatusPanel,
   TextLink,
 } from '../../../components/ui'
+import { FeedAd } from '../../../components/FeedAd'
 import {
+  useCheckInRange,
   useMonthCheckIns,
   type HistoryDay,
 } from '../../../hooks/useCheckIn'
+import { useBondPlus } from '../../../hooks/useBondPlus'
 import { ACTIVITIES } from '../../../lib/activities'
 import { useAuth } from '../../../lib/auth'
+import { FREE_HISTORY_DAYS, PLUS_TRUST_LINE } from '../../../lib/bondPlus'
+import { shouldInsertFeedAd, shouldShowAds } from '../../../lib/ads'
 import {
   SCORE_LABELS,
   addMonths,
+  addDays,
   dateKey,
   formatDisplayDate,
   formatMonthTitle,
@@ -87,6 +93,7 @@ function dayMatches(
 
 export default function HistoryScreen() {
   const { profile, partner, couple, isLoading: authLoading } = useAuth()
+  const plus = useBondPlus()
   const today = localDateString()
   const now = monthFromDate(today)
   const saved = readHistoryView()
@@ -96,10 +103,16 @@ export default function HistoryScreen() {
   const [activityFilter, setActivityFilter] = useState<string | null>(
     saved.activity,
   )
-  const { days, byDate, isLoading, error, refresh } = useMonthCheckIns(
-    year,
-    month,
+  const monthQuery = useMonthCheckIns(year, month)
+  const recentQuery = useCheckInRange(
+    addDays(today, -(FREE_HISTORY_DAYS - 1)),
+    today,
   )
+  const archive = plus.active
+  const { days, isLoading, error, refresh } = archive ? monthQuery : recentQuery
+  const byDate = archive
+    ? monthQuery.byDate
+    : Object.fromEntries(recentQuery.days.map((day) => [day.date, day]))
   const scrollRef = useRef<ScrollView>(null)
   const pendingScroll = useRef(saved.scrollY)
   const ignoreScroll = useRef(false)
@@ -152,7 +165,7 @@ export default function HistoryScreen() {
     [activityFilter, days, scoreFilter],
   )
 
-  if (authLoading || (isLoading && days.length === 0 && !error)) {
+  if (authLoading || plus.isLoading || (isLoading && days.length === 0 && !error)) {
     return <LoadingScreen />
   }
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
@@ -189,6 +202,8 @@ export default function HistoryScreen() {
           <RefreshControl refreshing={false} onRefresh={() => void refresh()} />
         }
       >
+        {archive ? (
+          <>
         <View style={styles.monthNav}>
           <Pressable
             accessibilityRole="button"
@@ -328,23 +343,38 @@ export default function HistoryScreen() {
         <Text style={styles.legend}>
           Filled days are yours. A ring means the day is open for both of you.
         </Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.monthTitle}>Last seven days</Text>
+            <Text style={styles.legend}>{PLUS_TRUST_LINE}</Text>
+            <TextLink
+              label="Complete history with Bond Plus"
+              onPress={() => router.push('/(app)/plus' as Href)}
+            />
+          </>
+        )}
 
         {error ? (
           <StatusPanel
-            message="Couldn't load this month."
+            message={
+              archive ? "Couldn't load this month." : "Couldn't load recent days."
+            }
             onRetry={() => void refresh()}
           />
         ) : null}
 
         {!error && feed.length === 0 ? (
           <EmptyState
-            title={filtersOn ? 'Nothing matches' : 'No days this month'}
+            title={filtersOn ? 'Nothing matches' : archive ? 'No days this month' : 'No days this week'}
             body={
               filtersOn
                 ? 'Try another connection label or activity, or clear the filters.'
-                : viewingToday
-                  ? 'Today holds the check-in. Past months stay on the arrows.'
-                  : 'Nothing was saved in this month.'
+                : archive
+                  ? viewingToday
+                    ? 'Today holds the check-in. Past months stay on the arrows.'
+                    : 'Nothing was saved in this month.'
+                  : 'Check-ins from the last seven days show up here. Older opened days stay readable if you open them.'
             }
             actionLabel={
               filtersOn
@@ -369,16 +399,22 @@ export default function HistoryScreen() {
           />
         ) : null}
 
-        {feed.map((day) => (
-          <DayGroup
-            key={day.date}
-            day={day}
-            today={today}
-            myName={myName}
-            partnerName={partner ? partnerName : null}
-            myInitial={initialOf(myName)}
-            partnerInitial={initialOf(partnerName)}
-          />
+        {feed.map((day, index) => (
+          <View key={day.date}>
+            {plus.isLoading || !shouldShowAds(plus.active)
+              ? null
+              : shouldInsertFeedAd(index)
+                ? <FeedAd />
+                : null}
+            <DayGroup
+              day={day}
+              today={today}
+              myName={myName}
+              partnerName={partner ? partnerName : null}
+              myInitial={initialOf(myName)}
+              partnerInitial={initialOf(partnerName)}
+            />
+          </View>
         ))}
       </ScrollView>
     </Screen>

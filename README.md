@@ -14,7 +14,9 @@ That installs Bond as a standalone app from this repo’s GitHub Pages build. It
 
 If sign-up fails because tables are missing, run `supabase/bootstrap.sql` in the [SQL editor](https://supabase.com/dashboard/project/melmzlgzfcysbnvtuksv/sql/new). Under Authentication → URL configuration add `https://lofiwaffle.github.io/bond/**` and `bond://**` (needed for confirmation and password reset). Then refresh the app.
 
-Privacy policy (Play Store URL): [https://lofiwaffle.github.io/bond/privacy-policy.html](https://lofiwaffle.github.io/bond/privacy-policy.html)
+Privacy policy: [https://lofiwaffle.github.io/bond/privacy-policy.html](https://lofiwaffle.github.io/bond/privacy-policy.html)
+
+Support: [https://lofiwaffle.github.io/bond/support.html](https://lofiwaffle.github.io/bond/support.html)
 
 ## Run locally
 
@@ -31,4 +33,10 @@ Then press `a` for Android, `i` for iOS, or `w` for web. Expo Go can load the de
 
 ## Android Play Store
 
-Production Android builds use EAS (`npm run build:android`). See [docs/play-store.md](docs/play-store.md).
+First release is a free AAB to internal testing, then closed testing. Personal Play accounts need 12 testers opted in for 14 days before production. See [docs/play-store.md](docs/play-store.md).
+
+## Apple App Store
+
+Production iOS builds use EAS (`npm run build:ios`). See [docs/app-store.md](docs/app-store.md).
+
+Bond Plus (optional couple subscription) is documented in [docs/bond-plus.md](docs/bond-plus.md).

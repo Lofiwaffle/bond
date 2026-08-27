@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { BondSectionHeader } from '../../../components/BondSectionHeader'
+import { plusGate } from '../../../components/PlusPreview'
 import {
   ErrorText,
   Field,
@@ -13,6 +14,7 @@ import {
   TextLink,
 } from '../../../components/ui'
 import { useCoupleGoal } from '../../../hooks/useCoupleGoal'
+import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useAuth } from '../../../lib/auth'
 import { formatDisplayDate, localDateString } from '../../../lib/dates'
 import {
@@ -96,6 +98,7 @@ function listMeta(
 
 export default function BondGoalsScreen() {
   const { user, partner, isLoading: authLoading } = useAuth()
+  const plus = useBondPlus()
   const {
     proposedByMe,
     proposedByPartner,
@@ -152,6 +155,8 @@ export default function BondGoalsScreen() {
   }, [])
 
   if (authLoading || isLoading) return <LoadingScreen />
+  const plusLock = plusGate('goals', plus)
+  if (plusLock) return plusLock
 
   const updateDraft = (key: keyof SmartGoalDraft, value: string) => {
     setDraft((prev) => ({ ...prev, [key]: value }))

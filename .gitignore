@@ -36,6 +36,7 @@ yarn-error.*
 
 # generated screenshots
 artifacts/
+store/screenshots/*.png
 
 # typescript
 *.tsbuildinfo

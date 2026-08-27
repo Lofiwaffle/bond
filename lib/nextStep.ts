@@ -42,7 +42,7 @@ export function growthUnlocks({
 }
 
 export type GrowthDestination = {
-  id: 'weekly' | 'patterns' | 'goals' | 'achievements'
+  id: 'weekly' | 'patterns' | 'goals' | 'achievements' | 'prompts'
   title: string
   body: string
   href:
@@ -51,6 +51,7 @@ export type GrowthDestination = {
     | '/(app)/bond/goals'
     | '/(app)/bond/achievements'
     | '/(app)/bond/reviews'
+    | '/(app)/bond/prompts'
 }
 
 function rhythmBody(revealedDays: number): string {
@@ -152,6 +153,14 @@ export function unlockedGrowthItems(
       title: 'Weekly review',
       body: 'A look back together',
       href: '/(app)/bond/reviews',
+    })
+  }
+  if (unlocks.patterns) {
+    items.push({
+      id: 'prompts',
+      title: 'Private prompts',
+      body: 'Questions only the two of you see',
+      href: '/(app)/bond/prompts',
     })
   }
   return items

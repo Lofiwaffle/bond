@@ -186,6 +186,32 @@ export type DailyAction = {
   completed_at: string | null
 }
 
+export type CouplePromptItem = {
+  id: string
+  couple_id: string
+  created_by: string
+  prompt_text: string
+  created_at: string
+}
+
+export type CoupleEntitlement = {
+  couple_id: string
+  entitlement: 'bond_plus'
+  status: 'none' | 'trialing' | 'active' | 'grace' | 'expired' | 'paused'
+  plan: 'trial' | 'monthly' | 'annual' | 'founding_annual' | null
+  purchaser_id: string | null
+  store: string | null
+  store_product_id: string | null
+  trial_started_at: string | null
+  trial_ends_at: string | null
+  current_period_ends_at: string | null
+  grace_period_ends_at: string | null
+  offer_shown_at: string | null
+  offer_snoozed_until: string | null
+  created_at: string
+  updated_at: string
+}
+
 // Supabase row types
 export type Database = {
   public: {
@@ -516,6 +542,35 @@ export type Database = {
         }
         Relationships: []
       }
+      couple_entitlements: {
+        Row: CoupleEntitlement
+        Insert: {
+          couple_id: string
+          entitlement?: 'bond_plus'
+          status?: CoupleEntitlement['status']
+          plan?: CoupleEntitlement['plan']
+        }
+        Update: {
+          status?: CoupleEntitlement['status']
+          plan?: CoupleEntitlement['plan']
+          offer_snoozed_until?: string | null
+        }
+        Relationships: []
+      }
+      couple_prompt_items: {
+        Row: CouplePromptItem
+        Insert: {
+          id?: string
+          couple_id: string
+          created_by: string
+          prompt_text: string
+          created_at?: string
+        }
+        Update: {
+          prompt_text?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -582,6 +637,30 @@ export type Database = {
       list_repair_cards: {
         Args: Record<PropertyKey, never>
         Returns: RepairCard[]
+      }
+      plus_status: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      start_plus_trial: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      restore_plus: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      snooze_plus_offer: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      mark_plus_preview_viewed: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      track_plus_funnel: {
+        Args: { ev: string; meta?: Json }
+        Returns: Json
       }
     }
     Enums: Record<string, never>

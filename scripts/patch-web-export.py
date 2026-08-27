@@ -37,6 +37,11 @@ def main() -> None:
     index.write_text(html)
     (dist / '404.html').write_text(html)
     (dist / '.nojekyll').write_text('')
+    # Store listing URLs must be real HTML, not the SPA 404 fallback.
+    for name in ('privacy-policy.html', 'support.html'):
+        src = Path('public') / name
+        if src.exists():
+            (dist / name).write_text(src.read_text())
 
 
 if __name__ == '__main__':

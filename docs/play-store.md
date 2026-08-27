@@ -1,112 +1,151 @@
-# Publish Bond to Google Play
+# First Play Store release
 
-Expo SDK 57 already targets Android API 36, which Google Play requires for new apps as of 31 August 2026.
+Bond ships as a **free** Android app. Paid Bond Plus is not sold in this build (`PLUS_PAID_CHECKOUT_READY` is false) so Google Play Billing policy is not triggered.
 
-## 1. Hosted backend
+Target API 36 is already set. Google requires that for new apps as of 31 August 2026.
 
-Local `127.0.0.1:54321` will not work for store users. Create a hosted Supabase project, run the migrations in `supabase/migrations/`, and set EAS secrets (never commit them):
+Do not run `eas build` until `eas login` and `eas init` have written a real `extra.eas.projectId`. Do not invent that id.
+
+## 0. Accounts
+
+1. Google Play developer account ($25 one-time).
+2. Expo account; `npm install -g eas-cli && eas login && eas init`.
+3. Hosted Supabase (not localhost). Apply migrations including Bond Plus if you want the free trial. Set EAS secrets:
 
 ```sh
 eas secret:create --name EXPO_PUBLIC_SUPABASE_URL --value https://YOUR-PROJECT.supabase.co
 eas secret:create --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value YOUR_ANON_OR_PUBLISHABLE_KEY
 ```
 
-Confirm `APP_ENV=production` on the production EAS profile (already in `eas.json`). A release build throws if the URL is localhost.
+`APP_ENV=production` is already on the production profile. Release builds refuse localhost.
 
-## 2. Unique package name
+Optional, for partner “reveal is ready” remote alerts: Firebase Cloud Messaging + `google-services.json` (gitignored). Local daily reminders work without it. After `eas init`, push tokens also need `extra.eas.projectId`.
 
-`android.package` is `com.bond.app`. Google Play package names are permanent. If that id is taken, change it in `app.json` **before** the first upload.
+## 1. Package name
 
-## 3. Expo / EAS
+`com.bond.app` in `app.json`. Permanent. Change it before the first upload if it is taken.
 
-```sh
-npm install -g eas-cli
-eas login
-eas init          # writes extra.eas.projectId into app.json
-eas build:configure
-```
-
-Create an upload keystore with EAS (do not generate a local debug keystore for production):
+## 2. Credentials and AAB
 
 ```sh
-eas credentials --platform android
+eas credentials --platform android   # production profile; let EAS make the upload keystore
+npm run build:android               # AAB, not APK
 ```
 
-Choose the **production** profile and let EAS generate and store the Play upload keystore.
+Preview APK for a device: `eas build --platform android --profile preview`.
 
-## 4. Build an AAB (required; APK is not accepted for new apps)
+## 3. Play Console app
+
+Create the app: name **Bond**, default language English (US), type **App**, **Free**, declarations.
+
+First AAB goes to **internal testing** as a **draft** and is **not** sent for review (`eas.json`). Then:
 
 ```sh
-eas build --platform android --profile production
+eas credentials --platform android  # upload Play Developer API service-account JSON
+npm run submit:android
 ```
 
-Preview APK for device testing:
+Or upload the AAB in Play Console → Testing → Internal testing.
 
-```sh
-eas build --platform android --profile preview
-```
+## 4. Closed testing before production
 
-## 5. Play Console (one-time)
+Personal developer accounts created after 13 November 2023 cannot publish to production until a **closed test** has **at least 12 testers opted in continuously for 14 days**. Internal testers do not count.
 
-1. Pay for a [Play developer account](https://play.google.com/apps/publish/signup/).
-2. Create the app: name **Bond**, default language, app type **App**, free/paid, declarations.
-3. Complete **Store listing**:
-   - Short description (80 chars) and full description: copy from below
-   - App icon: `assets/icon.png` (512×512 minimum; 1024 is used)
-   - Feature graphic: `store/feature-graphic.png` (1024×500)
-   - Phone screenshots: at least 2, up to 8 (1080×1920 recommended). Capture Entries, Check-in, Bond, Us from a device or emulator
-   - Privacy policy URL: https://lofiwaffle.github.io/bond/privacy-policy.html
-4. **App content**:
-   - Privacy policy URL (same)
-   - Ads: No
-   - Target audience: 18+
-   - News / COVID / Data safety as applicable
-   - **Data safety**: collect email + user-generated content; encrypted in transit; account deletion available; not sold
-   - **Account deletion**: in-app path is Us → Delete account. Play also needs a public deletion URL — use the hosted privacy page (it documents the same path and an email request).
-5. **Content rating** questionnaire (social / lifestyle; no violence).
-6. Create a Google Cloud **service account** with Play Android Developer permission and upload the JSON via `eas credentials` (needed for `eas submit`).
-7. First AAB must be uploaded (EAS submit or Play Console). First submit uses the **internal testing** track as a draft (`eas.json`).
+1. Create a closed testing release from the same AAB (or a later production-profile AAB).
+2. Add 15–20 emails so drop-outs do not restart the clock.
+3. Testers must open the opt-in link and install.
+4. Keep them opted in for 14 consecutive days, then apply for production access from the Play Console dashboard.
 
-## 6. Submit
+Organization Play accounts are outside that stated rule; still use closed testing.
 
-```sh
-eas submit --platform android --profile production
-```
+## 5. Store listing (paste from below)
 
-Then in Play Console: finish the listing, promote the internal release when ready, and send for review.
+Assets:
 
-## Store copy
+| Item | File | Size |
+| --- | --- | --- |
+| High-res icon | `store/play-icon-512.png` or `assets/icon.png` | 512×512 or 1024×1024, no alpha |
+| Feature graphic | `store/feature-graphic.png` | 1024×500 |
+| Phone screenshots | `npm run test:store-screens` → `store/screenshots/play-phone-*.png` | 1080×1920, at least 2 |
 
-**Short description**
+Phone-only UI; 7" / 10" tablet screenshots are not required.
 
-Daily check-ins, shared goals, and weekly reviews for the two of you.
+Privacy: https://lofiwaffle.github.io/bond/privacy-policy.html
 
-**Full description**
+Support / deletion / reports: https://lofiwaffle.github.io/bond/support.html
 
-Bond is a private space for couples to check in every day.
+Confirm those two URLs are **static HTML** after GitHub Pages deploys, not the JavaScript app.
 
-• Save how connected you felt, answer a shared prompt, and tag what shaped the day  
-• Your partner’s entry stays hidden until they check in too  
-• Keep SMART goals, achievements, streaks, and weekly review summaries together  
+Category: Lifestyle. Tags: relationship, couples (optional).
 
-Bond is for two people who already know each other. There is no public feed and no ads.
+### Short description (80)
 
-## Data safety (Play form)
+A two-minute daily ritual for two people, before distance builds.
 
-| Data type | Collected | Shared with partner | Purpose |
+### Full description
+
+Bond is a private space for two people to check in every day.
+
+• Save how connected you felt. Your partner cannot see that day until they check in too
+• Optional shared words and one small next step stay between you
+• After enough opened days, Growth can notice patterns in the labels you both saved — not a verdict
+
+Bond is for two people who already know each other. There is no public feed. The free plan shows ads; Bond Plus removes them. It is not therapy or emergency support. For adults 18+.
+
+You can export your data or delete your account in Us. Help and a report path are on the support page.
+
+## 6. App content questionnaires
+
+**Privacy policy:** same URL as above.
+
+**Ads:** Yes. Free accounts see an ad on first open of the day and ads in History. Bond Plus and the trial remove ads.
+
+**Target audience:** 18+. Not designed for children. News app: No. COVID: No.
+
+**Government / political:** No.
+
+**Health:** Not a health or medical app. Daily check-in labels are not a diagnosis.
+
+**Financial features:** No.
+
+**Photos and videos:** We do not access photos, video, or files. Those Android permissions are blocked.
+
+**Advertising ID:** Yes, for ads on the free plan (Google AdMob). Not used for Bond Plus or the trial. Check-in content is not used to target ads.
+
+**Data safety** (encrypted in transit; users can delete; not sold; ads on the free plan only):
+
+| Data | Collected | Shared | Purpose |
 | --- | --- | --- | --- |
-| Email | Yes | No | Account |
-| Name | Yes (display name) | Yes, after pairing | App functionality |
-| User-generated content | Yes (check-ins, goals, reviews) | Yes, per in-app rules | App functionality |
+| Email | Yes | Auth/database provider | Account |
+| Name (display name) | Yes | Partner, after pairing | App functionality |
+| User-generated content | Yes (check-ins, goals, reviews) | Partner, per in-app rules | App functionality |
+| Device ID | Yes, Expo push token if they turn on partner reveal alerts; advertising ID for free-plan ads | Push provider; Google AdMob | App functionality; advertising |
 | Photos / location / contacts | No | — | — |
 
-Encryption in transit: yes. Optional deletion: yes.
+Crash logs stay on device. We do not run analytics.
+
+**Account deletion:** Us → Delete account. Public URL: the support page.
+
+**User-generated content:** Private between two paired adults. No public feed. Users can leave the Bond, delete the account, or report a problem from Us / the support page.
+
+**Content rating (IARC):** Lifestyle / social. No violence, sexual content, drugs, or simulated gambling. Users interact only with one invited partner.
+
+## 7. Review notes (closed test / production)
+
+Bond is a private daily check-in for two people who already know each other. There is no public feed. The free plan shows ads; Bond Plus removes them. Demo: create two accounts, pair with the invite code, check in on the same calendar day to see reveal. Account deletion is Us → Delete account. Notifications are optional.
+
+## 8. After closed testing
+
+Apply for production access, then promote a release to Production when Google enables it. Turn on Play App Signing if the Console asks (EAS upload key is the correct upload key).
+
+Bond Plus paid plans stay off until Play subscriptions and `PLUS_PAID_CHECKOUT_READY` are set. Do not add prices to the listing until then.
 
 ## What this repo cannot do for you
 
-- Expo login and Play Console signup
-- A public privacy-policy URL
-- Hosted production database
-- Phone screenshots from a running device
-- Paying the Play registration fee
-- The first review by Google
+- Expo login, Play signup, and the $25 fee
+- `eas init` project id
+- A unique package name if `com.bond.app` is taken
+- 12 closed testers and 14 days of opt-in
+- Firebase `google-services.json`
+- GitHub Pages deploy of privacy/support HTML
+- Google’s review

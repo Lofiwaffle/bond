@@ -10,7 +10,7 @@ Bond (“we”) provides a paired daily check-in space for two partners.
 
 ## Data we collect
 
-- Account: email, password (stored by our auth provider, not in plain text), display name
+- Account: email, optional password (stored by our auth provider, not in plain text), display name. If you continue with Google, Google shares your email and name so we can create the account.
 - Couple pairing: invite codes, invite links, and the link between two accounts
 - Check-ins: connection scores, shared words, activity tags, timestamps. You can correct yours until your partner submits that day.
 - Shared content you choose to save: one small action, goals (after agreement), weekly review answers, optional weekly suggestions, and achievements

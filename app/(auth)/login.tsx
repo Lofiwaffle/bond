@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, type TextInput } from 'react-native'
 import { Link, Redirect, useLocalSearchParams, type Href } from 'expo-router'
 
 import { AuthFooter } from '../../components/AuthFooter'
+import { GoogleSignInButton } from '../../components/GoogleSignInButton'
 import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen, StatusPanel } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { CONFIRM_EMAIL_MESSAGE, RESEND_COOLDOWN_MS } from '../../lib/authRedirect'
@@ -17,6 +18,7 @@ export default function LoginScreen() {
     profile,
     isLoading,
     signIn,
+    signInWithGoogle,
     sessionError,
     retrySession,
     passwordRecovery,
@@ -92,6 +94,16 @@ export default function LoginScreen() {
     }
   }
 
+  const onGoogle = async () => {
+    if (submitting) return
+    setError(null)
+    setNeedsConfirmation(false)
+    setSubmitting(true)
+    const result = await signInWithGoogle()
+    setSubmitting(false)
+    if (result.error) setError(result.error)
+  }
+
   const onResend = async () => {
     if (submitting || remaining > 0) return
     setError(null)
@@ -122,6 +134,12 @@ export default function LoginScreen() {
             onRetry={() => void retrySession()}
           />
         ) : null}
+
+        <GoogleSignInButton
+          onPress={() => void onGoogle()}
+          loading={submitting}
+        />
+        <Text style={styles.or}>or</Text>
 
         <Label>Email</Label>
         <Field
@@ -197,6 +215,11 @@ const styles = StyleSheet.create({
     ...type.body,
     color: colors.muted,
     marginBottom: 22,
+  },
+  or: {
+    ...type.label,
+    textAlign: 'center',
+    marginBottom: 8,
   },
   link: {
     marginTop: 20,

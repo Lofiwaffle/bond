@@ -12,7 +12,9 @@ Private daily check-ins for two people. Live web app (installable on your phone)
 
 That installs Bond as a standalone app from this repo’s GitHub Pages build. It uses the hosted Supabase project `melmzlgzfcysbnvtuksv`.
 
-If sign-up fails because tables are missing, run `supabase/bootstrap.sql` in the [SQL editor](https://supabase.com/dashboard/project/melmzlgzfcysbnvtuksv/sql/new). Under Authentication → URL configuration add `https://lofiwaffle.github.io/bond/**` and `bond://**` (needed for confirmation and password reset). Then refresh the app.
+If sign-up fails because tables are missing, run `supabase/bootstrap.sql` in the [SQL editor](https://supabase.com/dashboard/project/melmzlgzfcysbnvtuksv/sql/new). Under Authentication → URL configuration add `https://lofiwaffle.github.io/bond/**` and `bond://**` (needed for confirmation, Google sign-in, and password reset). Then refresh the app.
+
+**Google sign-in:** In Google Cloud, create an OAuth **web** client. Authorized redirect URI: `https://melmzlgzfcysbnvtuksv.supabase.co/auth/v1/callback`. In Supabase → Authentication → Providers → Google, paste that client ID and secret and enable the provider. Do not invent client IDs in the app.
 
 Privacy policy: [https://lofiwaffle.github.io/bond/privacy-policy.html](https://lofiwaffle.github.io/bond/privacy-policy.html)
 

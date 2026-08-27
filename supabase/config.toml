@@ -168,6 +168,8 @@ additional_redirect_urls = [
   "https://lofiwaffle.github.io/bond",
   "https://lofiwaffle.github.io/bond/",
   "https://lofiwaffle.github.io/bond/update-password",
+  "exp://127.0.0.1:8081",
+  "exp://localhost:8081",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600

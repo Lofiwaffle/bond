@@ -100,7 +100,9 @@ The build lands in TestFlight after processing. In App Store Connect: attach the
 
 Create two production accounts, pair them, and paste both emails and passwords into Review Information. Reviewers cannot finish the ritual with a single login.
 
-Review notes to paste: Bond is a private ritual for two people who already know each other. There is no public feed. Demo: sign in with the two review accounts below (already paired). Check in on the same calendar day on both devices to see reveal. Bond Plus is optional and is not required to see a partner’s already-opened day.
+Review notes to paste: Bond is a private ritual for two people who already know each other. There is no public feed. Demo: sign in with the two review accounts below (already paired), or Continue with Google if that is enabled on the review project. Check in on the same calendar day on both devices to see reveal. Bond Plus is optional and is not required to see a partner’s already-opened day.
+
+**Guideline 4.8:** Google sign-in is offered on login and signup. Before the first iOS submission with that button live, add Sign in with Apple as an equivalent option (email/password alone is not enough once a third-party social login is present).
 
 ## Subscriptions (Bond Plus)
 

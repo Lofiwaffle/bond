@@ -66,6 +66,7 @@ function makeClient(url: string, key: string, persist: boolean): SupabaseClient<
       autoRefreshToken: persist,
       persistSession: persist,
       detectSessionInUrl: false,
+      flowType: 'pkce',
     },
     global: {
       fetch: async (input, init) => {

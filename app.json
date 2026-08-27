@@ -185,7 +185,8 @@
         "iosAppId": "ca-app-pub-3940256099942544~1458002511",
         "delayAppMeasurementInit": true
       }
-    ]
+    ],
+    "expo-web-browser"
   ],
   "experiments": {
     "typedRoutes": true,

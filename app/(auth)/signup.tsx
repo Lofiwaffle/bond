@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, type TextInput } from 'react-native'
 import { Link, Redirect, useLocalSearchParams, type Href } from 'expo-router'
 
 import { AuthFooter } from '../../components/AuthFooter'
+import { GoogleSignInButton } from '../../components/GoogleSignInButton'
 import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import {
@@ -23,6 +24,7 @@ export default function SignUpScreen() {
     passwordRecovery,
     authLinkExpired,
     signUp,
+    signInWithGoogle,
     resendConfirmation,
     clearAuthLinkExpired,
   } = useAuth()
@@ -100,6 +102,15 @@ export default function SignUpScreen() {
     }
   }
 
+  const onGoogle = async () => {
+    if (submitting) return
+    setError(null)
+    setSubmitting(true)
+    const result = await signInWithGoogle()
+    setSubmitting(false)
+    if (result.error) setError(result.error)
+  }
+
   const onResend = async () => {
     if (submitting || remaining > 0) return
     setError(null)
@@ -174,6 +185,12 @@ export default function SignUpScreen() {
             : "Two minutes a day, just the two of you. You'll invite them after this."}
         </Text>
 
+        <GoogleSignInButton
+          onPress={() => void onGoogle()}
+          loading={submitting}
+        />
+        <Text style={styles.or}>or</Text>
+
         <Label>Display name</Label>
         <Field
           ref={displayNameRef}
@@ -243,6 +260,11 @@ const styles = StyleSheet.create({
     ...type.body,
     color: colors.muted,
     marginBottom: 22,
+  },
+  or: {
+    ...type.label,
+    textAlign: 'center',
+    marginBottom: 8,
   },
   link: {
     marginTop: 20,

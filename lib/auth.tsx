@@ -12,6 +12,7 @@ import * as Linking from 'expo-linking'
 import type { Session, User } from '@supabase/supabase-js'
 
 import { consumeAuthUrl } from './authCallback'
+import { signInWithGoogle as startGoogleSignIn } from './googleAuth'
 import {
   RESET_REQUESTED_MESSAGE,
   authRedirectUrl,
@@ -44,6 +45,7 @@ type AuthContextValue = {
     email: string,
     password: string,
   ) => Promise<{ error: string | null; emailNotConfirmed: boolean }>
+  signInWithGoogle: () => Promise<{ error: string | null }>
   requestPasswordReset: (
     email: string,
   ) => Promise<{ error: string | null; message: string }>
@@ -318,6 +320,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null, emailNotConfirmed: false }
   }, [])
 
+  const signInWithGoogle = useCallback(async () => {
+    if (!supabaseConfigured) {
+      return { error: supabaseConfigError }
+    }
+    return startGoogleSignIn()
+  }, [])
+
   const requestPasswordReset = useCallback(async (email: string) => {
     if (!supabaseConfigured) {
       return { error: supabaseConfigError, message: '' }
@@ -485,6 +494,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       retrySession: restoreSession,
       signUp,
       signIn,
+      signInWithGoogle,
       requestPasswordReset,
       updatePassword,
       resendConfirmation,
@@ -510,6 +520,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       restoreSession,
       signUp,
       signIn,
+      signInWithGoogle,
       requestPasswordReset,
       updatePassword,
       resendConfirmation,

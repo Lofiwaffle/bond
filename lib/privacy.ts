@@ -57,7 +57,7 @@ export const VISIBILITY_ROWS: VisibilityRow[] = [
 ]
 
 export const STORED_ON_SERVER = [
-  'Account: email, hashed password (held by the auth provider), display name.',
+  'Account: email, optional password (held by our auth provider, not in plain text), display name. If you continue with Google, Google shares your email and name so we can create the account.',
   'Pairing: invite code, invite link, and the link between two accounts.',
   'Shared ritual: check-in scores, shared words, activity tags, one small action, weekly answers, goals, achievements, and optional weekly suggestions.',
   'Your hide or edit choice for a weekly suggestion. Your partner cannot see that preference.',

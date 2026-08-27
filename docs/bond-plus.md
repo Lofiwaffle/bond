@@ -32,6 +32,10 @@ If the purchaser leaves, Plus pauses on that Bond. Their receipt can be restored
 
 If the non-purchaser leaves, Plus stays with the purchaser’s Bond.
 
+## Promo code
+
+Us → Purchases accepts a promo code. `43v3r` grants **lifetime** Bond Plus for that Bond (no expiry, ads off). The person who applies it is the purchaser. Unpair and restore follow the same receipt rules as a paid plan.
+
 ## Store checkout
 
 Paid checkout needs App Store / Play products plus a service-role webhook that calls `apply_plus_purchase`. Until those exist, the paywall still starts the 14-day trial.

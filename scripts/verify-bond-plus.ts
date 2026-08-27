@@ -5,9 +5,11 @@
 import {
   FOUNDING_COUPLE_CAP,
   FREE_HISTORY_DAYS,
+  LIFETIME_PROMO_CODE,
   OFFER_AFTER_REVEALS,
   PLUS_PRODUCTS,
   TRIAL_DAYS,
+  normalizePromoCode,
 } from '../lib/bondPlus'
 import { firstInsight } from '../lib/firstInsight'
 import {
@@ -34,6 +36,10 @@ assert(
 assert('monthly price', PLUS_PRODUCTS[0].priceLabel === '$4.99')
 assert('annual price', PLUS_PRODUCTS[1].priceLabel === '$48')
 assert('founding then 48', PLUS_PRODUCTS[2].periodLabel.includes('$48'))
+assert(
+  'promo code',
+  normalizePromoCode(' 43V3R ') === LIFETIME_PROMO_CODE,
+)
 
 assert(
   'free window includes today',
@@ -88,6 +94,17 @@ assert(
     plan: 'annual',
     trialEndsAt: null,
     periodEndsAt: '2026-12-01T00:00:00.000Z',
+    graceEndsAt: null,
+  }),
+)
+
+assert(
+  'lifetime with no end is active',
+  isPlusActive({
+    status: 'active',
+    plan: 'lifetime',
+    trialEndsAt: null,
+    periodEndsAt: null,
     graceEndsAt: null,
   }),
 )

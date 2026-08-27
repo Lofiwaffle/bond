@@ -198,7 +198,7 @@ export type CoupleEntitlement = {
   couple_id: string
   entitlement: 'bond_plus'
   status: 'none' | 'trialing' | 'active' | 'grace' | 'expired' | 'paused'
-  plan: 'trial' | 'monthly' | 'annual' | 'founding_annual' | null
+  plan: 'trial' | 'monthly' | 'annual' | 'founding_annual' | 'lifetime' | null
   purchaser_id: string | null
   store: string | null
   store_product_id: string | null
@@ -660,6 +660,10 @@ export type Database = {
       }
       track_plus_funnel: {
         Args: { ev: string; meta?: Json }
+        Returns: Json
+      }
+      redeem_plus_promo: {
+        Args: { code: string }
         Returns: Json
       }
     }

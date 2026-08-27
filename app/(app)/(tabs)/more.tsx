@@ -29,6 +29,7 @@ import { useAuth } from '../../../lib/auth'
 import { SUPPORT_URL } from '../../../lib/appUrls'
 import { buildExportBundle, shareExportBundle } from '../../../lib/exportData'
 import { DELETE_SEMANTICS, UNPAIR_SEMANTICS } from '../../../lib/privacy'
+import { PLUS_LIFETIME_COPY, PLUS_PROMO_HINT } from '../../../lib/bondPlus'
 import { focusInput } from '../../../lib/formFocus'
 import { useToast } from '../../../lib/toast'
 import { colors, hairlineWidth, hit, type } from '../../../lib/theme'
@@ -76,6 +77,9 @@ export default function UsScreen() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [leaveError, setLeaveError] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [promoDraft, setPromoDraft] = useState('')
+  const [applyingPromo, setApplyingPromo] = useState(false)
+  const [promoError, setPromoError] = useState<string | null>(null)
   const { showToast } = useToast()
 
   if (isLoading || historyLoading) return <LoadingScreen />
@@ -123,6 +127,25 @@ export default function UsScreen() {
       return
     }
     showToast('Data export ready')
+  }
+
+  const onApplyPromo = async () => {
+    if (applyingPromo) return
+    const code = promoDraft.trim()
+    if (!code) {
+      setPromoError('Enter a promo code')
+      return
+    }
+    setPromoError(null)
+    setApplyingPromo(true)
+    const result = await plus.redeemPromo(code)
+    setApplyingPromo(false)
+    if (result.error) {
+      setPromoError(result.error)
+      return
+    }
+    setPromoDraft('')
+    showToast('Lifetime Bond Plus is on')
   }
 
   const onLeaveCouple = async () => {
@@ -255,14 +278,36 @@ export default function UsScreen() {
           <Text style={styles.label}>Notifications</Text>
           <NotificationSettings />
 
-          <Text style={[styles.label, styles.accountLabel]}>Bond Plus</Text>
+          <Text style={[styles.label, styles.accountLabel]}>Purchases</Text>
           <Text style={styles.sectionHint}>
-            {plus.active
-              ? plus.status === 'trialing'
-                ? 'Trial is on for both of you.'
-                : 'Bond Plus is on for both of you.'
-              : 'Deeper growth after three opened days. You never pay to see an answer already shared.'}
+            {plus.plan === 'lifetime'
+              ? PLUS_LIFETIME_COPY
+              : plus.active
+                ? plus.status === 'trialing'
+                  ? 'Trial is on for both of you.'
+                  : 'Bond Plus is on for both of you.'
+                : `Deeper growth after three opened days. ${PLUS_PROMO_HINT} You never pay to see an answer already shared.`}
           </Text>
+          {plus.plan === 'lifetime' ? null : (
+            <>
+              <Field
+                value={promoDraft}
+                onChangeText={setPromoDraft}
+                placeholder="Promo code"
+                accessibilityLabel="Promo code"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!applyingPromo}
+              />
+              {promoError ? <ErrorText message={promoError} /> : null}
+              <PrimaryButton
+                label={applyingPromo ? 'Applying…' : 'Apply code'}
+                onPress={() => void onApplyPromo()}
+                loading={applyingPromo}
+                disabled={applyingPromo}
+              />
+            </>
+          )}
           <TextLink
             label={plus.active ? 'Manage Bond Plus' : 'See Bond Plus'}
             onPress={() => router.push('/(app)/plus' as Href)}

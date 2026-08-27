@@ -66,6 +66,7 @@ type PlusContextValue = PlusStatus & {
   markPreviewViewed: () => Promise<void>
   trackFunnel: (event: Extract<PlusFunnelEvent, 'invite_sent'>) => Promise<void>
   purchase: (productId: PlusProductId) => Promise<{ error: string | null }>
+  redeemPromo: (code: string) => Promise<{ error: string | null }>
 }
 
 const PlusContext = createContext<PlusContextValue | undefined>(undefined)
@@ -88,7 +89,8 @@ function asPlan(value: unknown): PlusPlan | null {
     value === 'trial' ||
     value === 'monthly' ||
     value === 'annual' ||
-    value === 'founding_annual'
+    value === 'founding_annual' ||
+    value === 'lifetime'
   ) {
     return value
   }
@@ -233,6 +235,18 @@ export function BondPlusProvider({ children }: { children: ReactNode }) {
     [refresh],
   )
 
+  const redeemPromo = useCallback(
+    async (code: string) => {
+      const { error: redeemError } = await supabase.rpc('redeem_plus_promo', {
+        code,
+      })
+      const message = await rpcError('plus-promo', redeemError)
+      if (!message) await refresh()
+      return { error: message }
+    },
+    [refresh],
+  )
+
   const value = useMemo<PlusContextValue>(
     () => ({
       ...status,
@@ -245,12 +259,14 @@ export function BondPlusProvider({ children }: { children: ReactNode }) {
       markPreviewViewed,
       trackFunnel,
       purchase,
+      redeemPromo,
     }),
     [
       error,
       isLoading,
       markPreviewViewed,
       purchase,
+      redeemPromo,
       refresh,
       restore,
       snoozeOffer,

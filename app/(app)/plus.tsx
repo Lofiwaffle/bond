@@ -17,6 +17,7 @@ import {
   PLUS_FEATURES,
   PLUS_FREE_LINES,
   PLUS_LEGAL,
+  PLUS_LIFETIME_COPY,
   PLUS_NAME,
   PLUS_PAID_CHECKOUT_READY,
   PLUS_PRODUCTS,
@@ -87,19 +88,23 @@ export default function BondPlusScreen() {
         <Text style={styles.subtitle}>{PLUS_SUBTITLE}</Text>
         <Text style={styles.trust}>{PLUS_TRUST_LINE}</Text>
         <Text style={styles.body}>{PLUS_COUPLE_BILLING}</Text>
-        <Text style={styles.body}>{PLUS_TRIAL_COPY}</Text>
+        {plus.plan === 'lifetime' ? null : (
+          <Text style={styles.body}>{PLUS_TRIAL_COPY}</Text>
+        )}
 
         {plus.active ? (
           <Text style={styles.status}>
-            {plus.status === 'trialing'
-              ? 'Trial is on for this Bond.'
-              : plus.status === 'grace'
-                ? 'Billing is in a grace period. Plus stays on.'
-                : 'Bond Plus is on for this Bond.'}
+            {plus.plan === 'lifetime'
+              ? PLUS_LIFETIME_COPY
+              : plus.status === 'trialing'
+                ? 'Trial is on for this Bond.'
+                : plus.status === 'grace'
+                  ? 'Billing is in a grace period. Plus stays on.'
+                  : 'Bond Plus is on for this Bond.'}
           </Text>
         ) : null}
 
-        {plus.trialEligible ? (
+        {plus.plan === 'lifetime' ? null : plus.trialEligible ? (
           <PrimaryButton
             label={busy === 'trial' ? 'Starting…' : 'Start 14-day trial'}
             onPress={() => void onTrial()}
@@ -168,7 +173,7 @@ export default function BondPlusScreen() {
               disabled={Boolean(busy)}
             />
           </>
-        ) : (
+        ) : plus.plan === 'lifetime' ? null : (
           <Text style={styles.hint}>{PLUS_CHECKOUT_PENDING}</Text>
         )}
         <ErrorText message={error ?? plus.error} />

@@ -9,7 +9,7 @@ export const FREE_HISTORY_DAYS = 7
 export const OFFER_AFTER_REVEALS = 3
 export const OFFER_SNOOZE_DAYS = 14
 
-export type PlusPlan = 'trial' | 'monthly' | 'annual' | 'founding_annual'
+export type PlusPlan = 'trial' | 'monthly' | 'annual' | 'founding_annual' | 'lifetime'
 
 export type PlusProductId =
   | 'bond_plus_monthly'
@@ -148,6 +148,18 @@ export const PLUS_COUPLE_BILLING =
 
 export const PLUS_TRUST_LINE =
   'You will never pay to see an answer your partner already shared with you.'
+
+export const LIFETIME_PROMO_CODE = '43v3r'
+
+export const PLUS_LIFETIME_COPY =
+  'Lifetime Bond Plus is on for both of you. Ads stay off.'
+
+export const PLUS_PROMO_HINT =
+  'A promo code unlocks lifetime Bond Plus for this Bond.'
+
+export function normalizePromoCode(value: string): string {
+  return value.trim().toLowerCase()
+}
 
 export const PLUS_FREE_LINES = [
   'Pairing and invitations',

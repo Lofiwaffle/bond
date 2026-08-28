@@ -13,6 +13,32 @@ export function friendlyGoogleAuthError(message: string): string {
   return text
 }
 
+/**
+ * Probe the OAuth start URL before navigating. GoTrue returns JSON when
+ * Google is disabled; a browser redirect would replace the login screen
+ * with that payload.
+ */
+export async function googleAuthorizeStartError(
+  url: string,
+  fetcher: typeof fetch = fetch,
+): Promise<string | null> {
+  try {
+    const response = await fetcher(url, {
+      method: 'GET',
+      redirect: 'manual',
+      headers: { Accept: 'application/json' },
+    })
+    if (response.type === 'opaqueredirect') return null
+    if (response.status >= 300 && response.status < 400) return null
+    if (response.ok) return null
+    const body = await response.text()
+    if (!body.trim()) return 'Could not start Google sign-in'
+    return friendlyGoogleAuthError(body)
+  } catch {
+    return null
+  }
+}
+
 function unwrapAuthMessage(message: string): string {
   const trimmed = message.trim()
   if (!trimmed.startsWith('{')) return message

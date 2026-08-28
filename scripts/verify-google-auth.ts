@@ -4,6 +4,7 @@
 import {
   friendlyGoogleAuthError,
   googleAuthCancelled,
+  googleAuthorizeStartError,
 } from '../lib/googleAuthErrors'
 
 function assert(label: string, condition: boolean) {
@@ -31,4 +32,32 @@ assert(
 )
 assert('passthrough', friendlyGoogleAuthError('Network request failed') === 'Network request failed')
 
-console.log('verify-google-auth: ok')
+const providerOffJson =
+  '{"code":400,"error_code":"validation_failed","msg":"Unsupported provider: provider is not enabled"}'
+
+void (async () => {
+  const blocked = await googleAuthorizeStartError(
+    'https://example.supabase.co/auth/v1/authorize?provider=google',
+    async () =>
+      new Response(providerOffJson, {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+  )
+  assert('probe provider off', Boolean(blocked && blocked.includes('Providers')))
+
+  const okRedirect = await googleAuthorizeStartError(
+    'https://example.supabase.co/auth/v1/authorize?provider=google',
+    async () =>
+      new Response(null, {
+        status: 302,
+        headers: { Location: 'https://accounts.google.com/' },
+      }),
+  )
+  assert('probe redirect is ok', okRedirect === null)
+
+  console.log('verify-google-auth: ok')
+})().catch((error) => {
+  console.error(error)
+  process.exit(1)
+})

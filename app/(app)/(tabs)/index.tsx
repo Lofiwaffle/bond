@@ -7,13 +7,19 @@ import { PlusOfferCard } from '../../../components/PlusOfferCard'
 import { CheckInDayFeed } from '../../../components/CheckInDayFeed'
 import { SharedActionCard } from '../../../components/CheckInMoment'
 import { LoadingScreen, Screen, StatusPanel, TextLink } from '../../../components/ui'
-import { useTodayCheckIn, useCheckInGrowth, useCheckInIndex, useCheckInRange } from '../../../hooks/useCheckIn'
+import {
+  useTodayCheckIn,
+  useCheckInGrowth,
+  useCheckInIndex,
+  useCheckInRange,
+  type HistoryDay,
+} from '../../../hooks/useCheckIn'
 import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useDailyAction } from '../../../hooks/useDailyAction'
 import { useNotificationPreferences } from '../../../hooks/useNotificationPreferences'
 import { useAuth } from '../../../lib/auth'
 import { promptForDate } from '../../../lib/dailyPrompts'
-import { formatDisplayDate, localDateString } from '../../../lib/dates'
+import { addDays, formatDisplayDate, localDateString } from '../../../lib/dates'
 import { useQueuedCheckIn } from '../../../lib/checkInOutbox'
 import { firstInsight } from '../../../lib/firstInsight'
 import { observationDaysFromIndex } from '../../../lib/growthObservations'
@@ -27,6 +33,7 @@ export default function TodayScreen() {
   const { user, profile, partner, isLoading: authLoading } = useAuth()
   const {
     mine,
+    partnerCheckIn,
     bothSubmitted,
     waitingForPartner,
     isLoading,
@@ -42,19 +49,29 @@ export default function TodayScreen() {
   const [snoozing, setSnoozing] = useState(false)
   const today = localDateString()
   const queued = useQueuedCheckIn(user?.id, today)
-  const feedQuery = useCheckInRange('2020-01-01', today)
+  const feedQuery = useCheckInRange(addDays(today, -180), today)
 
   const insight = useMemo(
     () => firstInsight(observationDaysFromIndex(indexDays)),
     [indexDays],
   )
-  const feed = useMemo(
-    () =>
-      feedQuery.days.filter(
-        (day) => day.mine || (day.revealed && day.partner),
-      ),
-    [feedQuery.days],
-  )
+  const feed = useMemo(() => {
+    const byDate = new Map<string, HistoryDay>()
+    for (const day of feedQuery.days) {
+      if (day.mine || (day.revealed && day.partner)) {
+        byDate.set(day.date, day)
+      }
+    }
+    if (mine) {
+      byDate.set(today, {
+        date: today,
+        mine,
+        partner: partnerCheckIn,
+        revealed: bothSubmitted,
+      })
+    }
+    return [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date))
+  }, [bothSubmitted, feedQuery.days, mine, partnerCheckIn, today])
 
   useFocusEffect(
     useCallback(() => {
@@ -193,14 +210,15 @@ export default function TodayScreen() {
         </View>
 
         <View style={styles.feed}>
-          <Text style={styles.feedTitle}>Feed</Text>
           {feedQuery.error ? (
             <View style={styles.padded}>
               <StatusPanel
-                message="Couldn't load the feed."
+                message="Couldn't load the thread."
                 onRetry={() => void feedQuery.refresh()}
               />
             </View>
+          ) : feedQuery.isLoading && feed.length === 0 ? (
+            <Text style={styles.feedEmpty}>Loading the thread…</Text>
           ) : feed.length === 0 ? (
             <Text style={styles.feedEmpty}>
               Check-ins show up here in a thread, newest first.
@@ -244,11 +262,6 @@ const styles = StyleSheet.create({
   },
   feed: {
     marginTop: 8,
-  },
-  feedTitle: {
-    ...type.label,
-    marginBottom: 4,
-    paddingHorizontal: 20,
   },
   feedEmpty: {
     ...type.body,

@@ -6,12 +6,19 @@ import { authRedirectUrl } from './authRedirect'
 import {
   friendlyGoogleAuthError,
   googleAuthCancelled,
+  googleAuthorizeStartError,
 } from './googleAuthErrors'
 import { supabase, supabaseConfigured, supabaseConfigError } from './supabase'
 
 export { friendlyGoogleAuthError, googleAuthCancelled }
 
 WebBrowser.maybeCompleteAuthSession()
+
+function openWebOAuth(url: string) {
+  if (typeof window !== 'undefined') {
+    window.location.assign(url)
+  }
+}
 
 /**
  * Sign in or create an account with Google via Supabase OAuth.
@@ -29,7 +36,7 @@ export async function signInWithGoogle(): Promise<{ error: string | null }> {
       provider: 'google',
       options: {
         redirectTo,
-        skipBrowserRedirect: Platform.OS !== 'web',
+        skipBrowserRedirect: true,
         queryParams: { prompt: 'select_account' },
       },
     })
@@ -43,12 +50,16 @@ export async function signInWithGoogle(): Promise<{ error: string | null }> {
     return { error: friendlyGoogleAuthError(message) }
   }
 
-  if (Platform.OS === 'web') {
-    return { error: null }
+  if (!data?.url) {
+    return { error: 'Could not start Google sign-in' }
   }
 
-  if (!data.url) {
-    return { error: 'Could not start Google sign-in' }
+  const blocked = await googleAuthorizeStartError(data.url)
+  if (blocked) return { error: blocked }
+
+  if (Platform.OS === 'web') {
+    openWebOAuth(data.url)
+    return { error: null }
   }
 
   try {

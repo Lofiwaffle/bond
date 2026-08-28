@@ -633,7 +633,7 @@ insert into public.repair_cards (title, prompt, category) values
   ('Humor', 'Can we do the "ridiculous accent" thing to lighten the mood?', 'humor'),
   ('Apology', 'I snapped. I am sorry for raising my voice.', 'apology'),
   ('Validation', 'You are right that I did not listen. Tell me more.', 'validation'),
-  ('De-escalation', "I'm flooding. Can we take a 20-min break?", 'deescalation'),
+  ('De-escalation', 'I''m flooding. Can we take a 20-min break?', 'deescalation'),
   ('Affection', '*reaches for hand*', 'affection');
 
 -- 20260819120000_checkin_activities.sql

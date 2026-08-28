@@ -10,25 +10,26 @@ import {
 import { router, useFocusEffect } from 'expo-router'
 
 import { BondSectionHeader } from '../../../components/BondSectionHeader'
+import { plusGate } from '../../../components/PlusPreview'
 import {
-  ErrorText,
   LoadingScreen,
   Screen,
+  StatusPanel,
   TextLink,
 } from '../../../components/ui'
-import {
-  useWeeklyReview,
-  useWeeklyReviewHistory,
-} from '../../../hooks/useWeeklyReview'
+import { useWeeklyReview, useWeeklyReviewHistory } from '../../../hooks/useWeeklyReview'
+import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useAuth } from '../../../lib/auth'
 import { formatDisplayDate } from '../../../lib/dates'
 import { Icon } from '../../../lib/icons'
 import { colors, hairlineWidth, type } from '../../../lib/theme'
+import { displayWeeklyAnswer } from '../../../lib/weeklyPrompts'
 
 export default function BondReviewsScreen() {
   const { partner, isLoading: authLoading } = useAuth()
   const { weeks, isLoading, error, refresh } = useWeeklyReviewHistory()
   const { unlocked, needsReview } = useWeeklyReview()
+  const plus = useBondPlus()
   const [openWeek, setOpenWeek] = useState<string | null>(null)
 
   useFocusEffect(
@@ -38,6 +39,8 @@ export default function BondReviewsScreen() {
   )
 
   if (authLoading || isLoading) return <LoadingScreen />
+  const plusLock = plusGate('weekly_review', plus)
+  if (plusLock) return plusLock
 
   const partnerName = partner?.display_name ?? 'your partner'
   const completed = weeks.filter((week) => week.completed)
@@ -58,27 +61,32 @@ export default function BondReviewsScreen() {
           }.`}
         />
 
-        <ErrorText message={error} />
+        {error ? (
+          <StatusPanel
+            message="Couldn't load weekly reviews."
+            onRetry={() => void refresh()}
+          />
+        ) : null}
 
         {unlocked ? (
           <View style={styles.cta}>
             <Text style={styles.ctaTitle}>
-              {needsReview ? "This week's review is ready" : 'This week'}
+              {needsReview ? "Last week's review is ready" : 'Last week'}
             </Text>
             <Text style={styles.ctaBody}>
               {needsReview
-                ? 'Write this week’s reflection. The summary shows up here after you both finish.'
-                : 'Open the current weekly review, or look back on weeks you’ve already completed.'}
+                ? 'Look back at the Sunday–Saturday that already ended. The summary shows up here after you both finish.'
+                : 'Open last week’s review, or look back on weeks you’ve already completed.'}
             </Text>
             <TextLink
-              label={needsReview ? 'Start this week’s review' : 'Open weekly review'}
+              label={needsReview ? "Start last week’s review" : 'Open weekly review'}
               onPress={() => router.push('/(app)/weekly-review')}
             />
           </View>
         ) : (
           <Text style={styles.emptyBody}>
-            Keep a 7-day check-in streak to unlock weekly reviews. Finished
-            weeks will collect here.
+            Weekly review opens after seven days of honest reflection, even if
+            they were not in a row. Finished weeks live here.
           </Text>
         )}
 
@@ -125,7 +133,9 @@ export default function BondReviewsScreen() {
                     {formatDisplayDate(week.weekEnd)}
                   </Text>
                   <Text style={styles.weekHint} numberOfLines={expanded ? 0 : 2}>
-                    {week.summary}
+                    {displayWeeklyAnswer(
+                      week.mine?.answers.find((a) => a.prompt_id === 'intention'),
+                    ) || week.summary}
                   </Text>
                 </View>
                 <Icon
@@ -136,8 +146,30 @@ export default function BondReviewsScreen() {
               </Pressable>
               {expanded ? (
                 <View style={styles.detail}>
-                  <Text style={styles.detailKicker}>Week summary</Text>
-                  <Text style={styles.detailBody}>{week.summary}</Text>
+                  {week.mine?.answers.map((answer, index) => (
+                    <View key={answer.prompt_id} style={styles.prompt}>
+                      <Text style={styles.detailKicker}>{answer.prompt_text}</Text>
+                      <Text style={styles.detailBody}>
+                        You: {displayWeeklyAnswer(answer)}
+                      </Text>
+                      {week.partnerReview?.answers[index] ? (
+                        <Text style={styles.detailBody}>
+                          {partnerName}:{' '}
+                          {displayWeeklyAnswer(week.partnerReview.answers[index])}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ))}
+                  {week.summary ? (
+                    <>
+                      <Text style={styles.detailKicker}>
+                        {week.source === 'review'
+                          ? 'Your words'
+                          : 'Suggested reading'}
+                      </Text>
+                      <Text style={styles.detailBody}>{week.summary}</Text>
+                    </>
+                  ) : null}
                 </View>
               ) : null}
             </View>
@@ -211,5 +243,8 @@ const styles = StyleSheet.create({
   },
   detailBody: {
     ...type.body,
+  },
+  prompt: {
+    marginBottom: 12,
   },
 })

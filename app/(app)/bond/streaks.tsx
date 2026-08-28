@@ -1,201 +1,116 @@
 import { useMemo } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { router } from 'expo-router'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { BondSectionHeader } from '../../../components/BondSectionHeader'
+import { plusGate } from '../../../components/PlusPreview'
+import { GrowthObservations } from '../../../components/GrowthObservations'
 import {
   LoadingScreen,
-  PrimaryButton,
   Screen,
+  StatusPanel,
 } from '../../../components/ui'
-import {
-  computeStreak,
-  useCheckInHistory,
-  useMonthCheckIns,
-  useTodayCheckIn,
-} from '../../../hooks/useCheckIn'
+import { useCheckInIndex } from '../../../hooks/useCheckIn'
+import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useAuth } from '../../../lib/auth'
+import { localDateString } from '../../../lib/dates'
 import {
-  formatMonthTitle,
-  getMonthGrid,
-  dateKey,
-  localDateString,
-} from '../../../lib/dates'
-import { Icon } from '../../../lib/icons'
+  OBSERVATION_MIN_REVEALED,
+  buildGrowthObservations,
+  observationDaysFromIndex,
+} from '../../../lib/growthObservations'
+import { describeRhythm, welcomeBackCopy } from '../../../lib/rhythm'
 import { SCORE_LABELS, colors, hairlineWidth, radii, scoreColors, type } from '../../../lib/theme'
 
-export default function BondStreaksScreen() {
-  const { profile, partner, isLoading: authLoading } = useAuth()
-  const { days, isLoading } = useCheckInHistory()
-  const { mine: todayMine } = useTodayCheckIn()
+export default function BondRhythmScreen() {
+  const { isLoading: authLoading } = useAuth()
+  const plus = useBondPlus()
+  const { days, isLoading, error, refresh } = useCheckInIndex()
   const now = useMemo(() => new Date(), [])
   const year = now.getFullYear()
-  const month = now.getMonth()
-  const { byDate, isLoading: monthLoading } = useMonthCheckIns(year, month)
 
   const stats = useMemo(() => {
     const today = localDateString()
-    const myDates = days.filter((d) => d.mine).map((d) => d.date)
-    const streak = computeStreak(myDates, today)
-    const togetherCount =
-      days.filter((d) => d.mine).length +
-      days.filter((d) => d.revealed && d.partner).length
-
+    const myDates = days.filter((d) => d.mineScore != null).map((d) => d.date)
+    const revealedDates = days.filter((d) => d.revealed).map((d) => d.date)
+    const rhythm = describeRhythm(myDates, revealedDates, today)
     const yearMine = [0, 0, 0, 0, 0]
-    const yearPartner = [0, 0, 0, 0, 0]
     for (const day of days) {
       if (!day.date.startsWith(String(year))) continue
-      if (day.mine?.score) yearMine[day.mine.score - 1] += 1
-      if (day.revealed && day.partner?.score) {
-        yearPartner[day.partner.score - 1] += 1
-      }
+      if (day.mineScore) yearMine[day.mineScore - 1] += 1
     }
-
+    const observations = buildGrowthObservations(
+      observationDaysFromIndex(days),
+      today,
+    )
     return {
-      streak,
-      togetherCount,
+      rhythm,
       yearMine,
-      yearPartner,
-      mineTotal: yearMine.reduce((a, b) => a + b, 0),
-      partnerTotal: yearPartner.reduce((a, b) => a + b, 0),
+      mineTotal: yearMine.reduce((a, n) => a + n, 0),
+      revealedCount: revealedDates.length,
+      observations,
     }
   }, [days, year])
 
-  if (authLoading || isLoading || monthLoading) return <LoadingScreen />
+  if (authLoading || isLoading) return <LoadingScreen />
+  const plusLock = plusGate('trends', plus)
+  if (plusLock) return plusLock
 
-  const grid = getMonthGrid(year, month)
-  const partnerName = partner?.display_name ?? 'your partner'
+  const welcome = welcomeBackCopy(stats.rhythm)
 
   return (
     <Screen style={styles.screen}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <BondSectionHeader
-          title="Streaks"
-          subtitle="Keep showing up. The streak is its own game."
+          title="Rhythm"
+          subtitle="Days you showed up. Missing one does not erase the rest."
         />
+        {error ? (
+          <StatusPanel
+            message="Couldn't load your rhythm."
+            onRetry={() => void refresh()}
+          />
+        ) : null}
 
         <View style={styles.section}>
-          <Text style={styles.heroEyebrow}>Together streak</Text>
-          <Text style={styles.heroStreak}>{stats.streak}</Text>
-          <Text style={styles.heroUnit}>days showing up</Text>
+          <Text style={styles.heroEyebrow}>Days connected</Text>
+          <Text style={styles.heroStreak}>{stats.rhythm.daysConnected}</Text>
+          <Text style={styles.heroUnit}>check-ins that still count</Text>
+          {welcome ? <Text style={styles.welcome}>{welcome}</Text> : null}
           <View style={styles.heroStats}>
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{stats.togetherCount}</Text>
-              <Text style={styles.heroStatLabel}>check-ins</Text>
+              <Text style={styles.heroStatValue}>{stats.rhythm.daysOpen}</Text>
+              <Text style={styles.heroStatLabel}>days opened together</Text>
             </View>
             <View style={styles.heroDivider} />
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{stats.mineTotal}</Text>
-              <Text style={styles.heroStatLabel}>{year} yours</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Today</Text>
-          <Text style={styles.sectionHint}>
-            Protect the streak that keeps you both showing up.
-          </Text>
-          {!todayMine ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push('/(app)/check-in')}
-              style={styles.questRow}
-            >
-              <Icon name="edit-3" size={18} color={colors.ink} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.questTitle}>Check in today</Text>
-                <Text style={styles.questBody}>
-                  Protect the streak and share how connected you feel.
-                </Text>
-              </View>
-              <Text style={styles.questCta}>Go</Text>
-            </Pressable>
-          ) : (
-            <View style={styles.questRow}>
-              <Icon name="check" size={18} color={colors.ink} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.questTitle}>Today's check-in saved</Text>
-                <Text style={styles.questBody}>
-                  {partner
-                    ? `Waiting on ${partnerName} to reveal today.`
-                    : 'Come back tomorrow to keep growing.'}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {!todayMine ? (
-            <PrimaryButton
-              label="Check in now"
-              onPress={() => router.push('/(app)/check-in')}
-            />
-          ) : null}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {formatMonthTitle(year, month)} rhythm
-          </Text>
-          <Text style={styles.sectionHint}>
-            Your connection this month. Fill more cells together.
-          </Text>
-          <View style={styles.matrix}>
-            {grid.map((day, index) => {
-              if (day == null) {
-                return <View key={`e-${index}`} style={styles.matrixSlot} />
-              }
-              const key = dateKey(year, month, day)
-              const score = byDate[key]?.mine?.score
-              const synced = byDate[key]?.revealed
-              return (
-                <View key={key} style={styles.matrixSlot}>
-                  <View
-                    style={[
-                      styles.matrixDot,
-                      {
-                        backgroundColor:
-                          score != null ? scoreColors[score] : colors.bgSoft,
-                        borderWidth: synced ? 1.5 : 0,
-                        borderColor: colors.accent,
-                      },
-                    ]}
-                  />
-                </View>
-              )
-            })}
-          </View>
-          <View style={styles.legendRow}>
-            {[1, 2, 3, 4, 5].map((score) => (
-              <View key={score} style={styles.legendItem}>
-                <View
-                  style={[
-                    styles.legendSwatch,
-                    { backgroundColor: scoreColors[score] },
-                  ]}
-                />
-                <Text style={styles.legendText}>{score}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.sectionLast}>
-          <Text style={styles.sectionTitle}>{year} connection mix</Text>
-          <Text style={styles.meta}>You · {stats.mineTotal} check-ins</Text>
-          <DistributionBars counts={stats.yearMine} total={stats.mineTotal} />
-          {partner ? (
-            <>
-              <Text style={[styles.meta, { marginTop: 16 }]}>
-                {partner.display_name} · {stats.partnerTotal} revealed
+              <Text style={styles.heroStatValue}>
+                {stats.rhythm.gapDays <= 1 ? stats.rhythm.stretch : '—'}
               </Text>
-              <DistributionBars
-                counts={stats.yearPartner}
-                total={stats.partnerTotal}
-              />
-            </>
-          ) : null}
+              <Text style={styles.heroStatLabel}>
+                {stats.rhythm.gapDays <= 1
+                  ? 'recent stretch, with room to miss a day'
+                  : 'stretch pauses; days stay'}
+              </Text>
+            </View>
+          </View>
         </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>How your days felt</Text>
+          <Text style={styles.meta}>
+            Your labels only. Not a ranking, and not a health score.
+          </Text>
+          <DistributionBars counts={stats.yearMine} total={stats.mineTotal} />
+        </View>
+
+        <GrowthObservations
+          observations={stats.observations}
+          lockedHint={
+            stats.revealedCount < OBSERVATION_MIN_REVEALED
+              ? 'Observations about opened days appear after 14 days you both completed.'
+              : undefined
+          }
+        />
       </ScrollView>
     </Screen>
   )
@@ -242,9 +157,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: hairlineWidth,
     borderBottomColor: colors.hairline,
   },
-  sectionLast: {
-    paddingVertical: 16,
-  },
   heroEyebrow: {
     ...type.label,
     marginBottom: 4,
@@ -252,74 +164,47 @@ const styles = StyleSheet.create({
   heroStreak: {
     ...type.heading,
     fontSize: 48,
-    lineHeight: 52,
-    fontWeight: '500',
+    lineHeight: 56,
   },
   heroUnit: {
     ...type.body,
     color: colors.muted,
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  welcome: {
+    ...type.body,
+    marginBottom: 12,
   },
   heroStats: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    paddingTop: 8,
   },
-  heroStat: { flex: 1, alignItems: 'center' },
-  heroStatValue: { ...type.heading },
+  heroStat: {
+    flex: 1,
+  },
+  heroStatValue: {
+    ...type.heading,
+  },
   heroStatLabel: {
     ...type.label,
-    marginTop: 2,
+    marginTop: 4,
     marginBottom: 0,
   },
-  heroDivider: { width: 0.5, height: 28, backgroundColor: colors.hairline },
+  heroDivider: {
+    width: hairlineWidth,
+    alignSelf: 'stretch',
+    backgroundColor: colors.hairline,
+    marginHorizontal: 12,
+  },
   sectionTitle: {
     ...type.heading,
     marginBottom: 4,
   },
-  sectionHint: {
+  meta: {
     ...type.body,
     color: colors.muted,
     marginBottom: 12,
-  },
-  questRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-  },
-  questTitle: { ...type.body, fontWeight: '500' },
-  questBody: {
-    ...type.label,
-    marginTop: 2,
-    marginBottom: 0,
-  },
-  questCta: { ...type.label, color: colors.accent, marginBottom: 0 },
-  matrix: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  matrixSlot: {
-    width: `${100 / 7}%`,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
-  },
-  matrixDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-  },
-  legendRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendSwatch: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { ...type.label, marginBottom: 0 },
-  meta: {
-    ...type.label,
-    marginBottom: 8,
   },
   distList: { gap: 8 },
   distRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

@@ -7,8 +7,19 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { AppState } from 'react-native'
+import * as Linking from 'expo-linking'
 import type { Session, User } from '@supabase/supabase-js'
 
+import { consumeAuthUrl } from './authCallback'
+import { signInWithGoogle as startGoogleSignIn } from './googleAuth'
+import {
+  RESET_REQUESTED_MESSAGE,
+  authRedirectUrl,
+} from './authRedirect'
+import { captureInviteFromUrl, clearPendingInvite } from './invite'
+import { reportError } from './monitor'
+import { cancelAllBondNotifications } from './notifications'
 import { clearOnboarding } from './onboarding'
 import { supabase, supabaseConfigured, supabaseConfigError } from './supabase'
 import type { Couple, Profile } from '../types/database'
@@ -20,15 +31,27 @@ type AuthContextValue = {
   couple: Couple | null
   partner: Profile | null
   isLoading: boolean
+  sessionError: string | null
+  passwordRecovery: boolean
+  authLinkExpired: boolean
+  authLinkExpiredKind: 'recovery' | 'signup' | null
+  retrySession: () => Promise<void>
   signUp: (
     email: string,
     password: string,
     displayName: string,
-  ) => Promise<{ error: string | null }>
+  ) => Promise<{ error: string | null; needsConfirmation: boolean }>
   signIn: (
     email: string,
     password: string,
-  ) => Promise<{ error: string | null }>
+  ) => Promise<{ error: string | null; emailNotConfirmed: boolean }>
+  signInWithGoogle: () => Promise<{ error: string | null }>
+  requestPasswordReset: (
+    email: string,
+  ) => Promise<{ error: string | null; message: string }>
+  updatePassword: (password: string) => Promise<{ error: string | null }>
+  resendConfirmation: (email: string) => Promise<{ error: string | null }>
+  clearAuthLinkExpired: () => void
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   createCouple: () => Promise<{ couple: Couple | null; error: string | null }>
@@ -36,6 +59,7 @@ type AuthContextValue = {
     inviteCode: string,
   ) => Promise<{ couple: Couple | null; error: string | null }>
   deleteAccount: () => Promise<{ error: string | null }>
+  leaveCouple: () => Promise<{ error: string | null }>
   updateDisplayName: (name: string) => Promise<{ error: string | null }>
 }
 
@@ -49,8 +73,8 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
     .maybeSingle()
 
   if (error) {
-    console.error('Failed to fetch profile', error.message)
-    return null
+    reportError('auth', error.message, { op: 'profile' })
+    throw new Error(error.message)
   }
 
   return data
@@ -64,8 +88,8 @@ async function fetchCouple(coupleId: string): Promise<Couple | null> {
     .maybeSingle()
 
   if (error) {
-    console.error('Failed to fetch couple', error.message)
-    return null
+    reportError('auth', error.message, { op: 'couple' })
+    throw new Error(error.message)
   }
 
   return data
@@ -83,8 +107,8 @@ async function fetchPartner(
     .maybeSingle()
 
   if (error) {
-    console.error('Failed to fetch partner', error.message)
-    return null
+    reportError('auth', error.message, { op: 'partner' })
+    throw new Error(error.message)
   }
 
   return data
@@ -96,23 +120,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [couple, setCouple] = useState<Couple | null>(null)
   const [partner, setPartner] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [sessionError, setSessionError] = useState<string | null>(null)
+  const [passwordRecovery, setPasswordRecovery] = useState(false)
+  const [authLinkExpired, setAuthLinkExpired] = useState(false)
+  const [authLinkExpiredKind, setAuthLinkExpiredKind] = useState<
+    'recovery' | 'signup' | null
+  >(null)
 
   const loadCoupleState = useCallback(async (userId: string) => {
-    const nextProfile = await fetchProfile(userId)
-    setProfile(nextProfile)
+    try {
+      const nextProfile = await fetchProfile(userId)
+      setProfile(nextProfile)
 
-    if (!nextProfile?.couple_id) {
-      setCouple(null)
-      setPartner(null)
-      return
+      if (!nextProfile?.couple_id) {
+        setCouple(null)
+        setPartner(null)
+        setSessionError(null)
+        return
+      }
+
+      const [nextCouple, nextPartner] = await Promise.all([
+        fetchCouple(nextProfile.couple_id),
+        fetchPartner(nextProfile.couple_id, userId),
+      ])
+      setCouple(nextCouple)
+      setPartner(nextPartner)
+      setSessionError(null)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not load your Bond'
+      reportError('auth', message, { op: 'couple-state' })
+      setSessionError(message)
     }
-
-    const [nextCouple, nextPartner] = await Promise.all([
-      fetchCouple(nextProfile.couple_id),
-      fetchPartner(nextProfile.couple_id, userId),
-    ])
-    setCouple(nextCouple)
-    setPartner(nextPartner)
   }, [])
 
   const refreshProfile = useCallback(async () => {
@@ -126,6 +165,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await loadCoupleState(userId)
   }, [loadCoupleState, session?.user?.id])
 
+  const restoreSession = useCallback(async () => {
+    if (!supabaseConfigured) {
+      setIsLoading(false)
+      return
+    }
+    setSessionError(null)
+    try {
+      const { data, error } = await supabase.auth.getSession()
+      if (error) throw error
+      setSession(data.session)
+      if (data.session?.user) {
+        await loadCoupleState(data.session.user.id)
+      } else {
+        setProfile(null)
+        setCouple(null)
+        setPartner(null)
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not restore your session'
+      reportError('auth', message, { op: 'session' })
+      setSessionError(message)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [loadCoupleState])
+
   useEffect(() => {
     let mounted = true
 
@@ -134,29 +200,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!mounted) return
-        setSession(data.session)
-        if (data.session?.user) {
-          loadCoupleState(data.session.user.id).finally(() => {
-            if (mounted) setIsLoading(false)
-          })
-        } else {
-          setIsLoading(false)
-        }
-      })
-      .catch(() => {
-        if (mounted) setIsLoading(false)
-      })
+    void restoreSession()
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!mounted) return
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
+      if (event === 'SIGNED_OUT') {
+        setPasswordRecovery(false)
+        setAuthLinkExpired(false)
+        setAuthLinkExpiredKind(null)
+      }
       setSession(nextSession)
       if (nextSession?.user) {
-        void loadCoupleState(nextSession.user.id)
+        void loadCoupleState(nextSession.user.id).catch((error) => {
+          const message =
+            error instanceof Error ? error.message : 'Could not load your Bond'
+          setSessionError(message)
+        })
       } else {
         setProfile(null)
         setCouple(null)
@@ -164,41 +226,162 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })
 
+    const applyIncomingUrl = (url: string | null) => {
+      void captureInviteFromUrl(url)
+      void consumeAuthUrl(url).then((result) => {
+        if (!mounted) return
+        if (result.recovery) setPasswordRecovery(true)
+        if (result.expired) {
+          setAuthLinkExpired(true)
+          setAuthLinkExpiredKind(result.expiredKind)
+        }
+      })
+    }
+    void Linking.getInitialURL().then(applyIncomingUrl)
+    const linking = Linking.addEventListener('url', (event) => {
+      applyIncomingUrl(event.url)
+    })
+
+    const app = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void supabase.auth.getSession().then(({ data, error }) => {
+          if (error) {
+            reportError('auth', error.message, { op: 'resume' })
+            return
+          }
+          if (data.session?.user) {
+            void loadCoupleState(data.session.user.id).catch((err) => {
+              reportError('auth', err, { op: 'resume-profile' })
+            })
+          }
+        })
+      }
+    })
+
     return () => {
       mounted = false
       subscription.unsubscribe()
+      linking.remove()
+      app.remove()
     }
-  }, [loadCoupleState])
+  }, [loadCoupleState, restoreSession])
 
   const signUp = useCallback(
     async (email: string, password: string, displayName: string) => {
       if (!supabaseConfigured) {
-        return { error: supabaseConfigError }
+        return { error: supabaseConfigError, needsConfirmation: false }
       }
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
           data: { display_name: displayName.trim() },
+          emailRedirectTo: authRedirectUrl('app'),
         },
       })
-      return { error: error?.message ?? null }
+      if (error) {
+        const already =
+          /already registered|already been registered|user already/i.test(
+            error.message,
+          )
+        if (already) {
+          return { error: null, needsConfirmation: true }
+        }
+        reportError('auth', error.message, { op: 'signup' })
+        return { error: error.message, needsConfirmation: false }
+      }
+      return { error: null, needsConfirmation: !data.session }
     },
     [],
   )
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!supabaseConfigured) {
-      return { error: supabaseConfigError }
+      return { error: supabaseConfigError, emailNotConfirmed: false }
     }
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     })
-    return { error: error?.message ?? null }
+    if (error) {
+      const emailNotConfirmed = /not confirmed|confirm your email/i.test(
+        error.message,
+      )
+      if (!emailNotConfirmed) {
+        reportError('auth', error.message, { op: 'signin' })
+      }
+      return {
+        error: emailNotConfirmed
+          ? 'Confirm this email first. We can send another link.'
+          : error.message,
+        emailNotConfirmed,
+      }
+    }
+    return { error: null, emailNotConfirmed: false }
+  }, [])
+
+  const signInWithGoogle = useCallback(async () => {
+    if (!supabaseConfigured) {
+      return { error: supabaseConfigError }
+    }
+    return startGoogleSignIn()
+  }, [])
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    if (!supabaseConfigured) {
+      return { error: supabaseConfigError, message: '' }
+    }
+    const trimmed = email.trim()
+    const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
+      redirectTo: authRedirectUrl('update-password'),
+    })
+    if (error) {
+      const rateLimited = /rate limit|too many/i.test(error.message)
+      if (rateLimited) {
+        return { error: error.message, message: '' }
+      }
+      reportError('auth', error.message, { op: 'reset' })
+    }
+    return { error: null, message: RESET_REQUESTED_MESSAGE }
+  }, [])
+
+  const updatePassword = useCallback(async (password: string) => {
+    if (!supabaseConfigured) {
+      return { error: supabaseConfigError }
+    }
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) {
+      reportError('auth', error.message, { op: 'update-password' })
+      return { error: error.message }
+    }
+    setPasswordRecovery(false)
+    return { error: null }
+  }, [])
+
+  const resendConfirmation = useCallback(async (email: string) => {
+    if (!supabaseConfigured) {
+      return { error: supabaseConfigError }
+    }
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: { emailRedirectTo: authRedirectUrl('app') },
+    })
+    if (error) {
+      const rateLimited = /rate limit|too many/i.test(error.message)
+      if (rateLimited) return { error: error.message }
+      reportError('auth', error.message, { op: 'resend' })
+    }
+    return { error: null }
+  }, [])
+
+  const clearAuthLinkExpired = useCallback(() => {
+    setAuthLinkExpired(false)
+    setAuthLinkExpiredKind(null)
   }, [])
 
   const signOut = useCallback(async () => {
+    await cancelAllBondNotifications()
     await supabase.auth.signOut()
     setProfile(null)
     setCouple(null)
@@ -211,6 +394,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { data, error } = await supabase.rpc('create_couple')
     if (error) {
+      reportError('auth', error.message, { op: 'create-couple' })
       return { couple: null, error: error.message }
     }
     await refreshProfile()
@@ -226,13 +410,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         invite: inviteCode.trim().toUpperCase(),
       })
       if (error) {
+        reportError('auth', error.message, { op: 'join-couple' })
         return { couple: null, error: error.message }
       }
+      await clearPendingInvite()
       await refreshProfile()
       return { couple: data, error: null }
     },
     [refreshProfile],
   )
+
+  const leaveCouple = useCallback(async () => {
+    if (!supabaseConfigured) {
+      return { error: supabaseConfigError }
+    }
+    const { error } = await supabase.rpc('leave_couple')
+    if (error) {
+      reportError('auth', error.message, { op: 'leave-couple' })
+      return { error: error.message }
+    }
+    await cancelAllBondNotifications()
+    await refreshProfile()
+    return { error: null }
+  }, [refreshProfile])
 
   const deleteAccount = useCallback(async () => {
     if (!supabaseConfigured) {
@@ -240,8 +440,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { error } = await supabase.rpc('delete_own_account')
     if (error) {
+      reportError('auth', error.message, { op: 'delete-account' })
       return { error: error.message }
     }
+    await cancelAllBondNotifications()
     try {
       await supabase.auth.signOut({ scope: 'local' })
     } catch {
@@ -265,7 +467,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from('profiles')
         .update({ display_name: trimmed })
         .eq('id', userId)
-      if (error) return { error: error.message }
+      if (error) {
+        reportError('auth', error.message, { op: 'display-name' })
+        return { error: error.message }
+      }
       setProfile((current) =>
         current ? { ...current, display_name: trimmed } : current,
       )
@@ -282,13 +487,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       couple,
       partner,
       isLoading,
+      sessionError,
+      passwordRecovery,
+      authLinkExpired,
+      authLinkExpiredKind,
+      retrySession: restoreSession,
       signUp,
       signIn,
+      signInWithGoogle,
+      requestPasswordReset,
+      updatePassword,
+      resendConfirmation,
+      clearAuthLinkExpired,
       signOut,
       refreshProfile,
       createCouple,
       joinCouple,
       deleteAccount,
+      leaveCouple,
       updateDisplayName,
     }),
     [
@@ -297,13 +513,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       couple,
       partner,
       isLoading,
+      sessionError,
+      passwordRecovery,
+      authLinkExpired,
+      authLinkExpiredKind,
+      restoreSession,
       signUp,
       signIn,
+      signInWithGoogle,
+      requestPasswordReset,
+      updatePassword,
+      resendConfirmation,
+      clearAuthLinkExpired,
       signOut,
       refreshProfile,
       createCouple,
       joinCouple,
       deleteAccount,
+      leaveCouple,
       updateDisplayName,
     ],
   )

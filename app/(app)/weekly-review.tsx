@@ -1,25 +1,58 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router } from 'expo-router'
+import { plusGate } from '../../components/PlusPreview'
+import { useBondPlus } from '../../hooks/useBondPlus'
 
 import {
   ErrorText,
   Field,
-  Label,
   LoadingScreen,
   PrimaryButton,
-  ScoreMark,
   Screen,
+  StatusPanel,
   TextLink,
 } from '../../components/ui'
 import { useWeeklyReview } from '../../hooks/useWeeklyReview'
 import { useAuth } from '../../lib/auth'
 import { formatDisplayDate } from '../../lib/dates'
+import { useToast } from '../../lib/toast'
 import { colors, hairlineWidth, type } from '../../lib/theme'
-import type { WeeklyAnswer } from '../../lib/weeklyPrompts'
+import {
+  displayWeeklyAnswer,
+  intentionAnswers,
+  NO_WORDS_THIS_WEEK,
+  weeklyAnswerIsComplete,
+  type WeeklyAnswer,
+} from '../../lib/weeklyPrompts'
+import {
+  loadWeeklyReviewDraft,
+  saveWeeklyReviewDraft,
+} from '../../lib/weeklyReviewDraft'
+
+function mergeDraft(
+  prompts: { id: string; text: string }[],
+  draft: { answers: WeeklyAnswer[]; step: number } | null,
+): { answers: WeeklyAnswer[]; step: number } {
+  const answers = prompts.map((prompt, index) => {
+    const fromDraft =
+      draft?.answers.find((item) => item.prompt_id === prompt.id) ??
+      draft?.answers[index]
+    return {
+      prompt_id: prompt.id,
+      prompt_text: prompt.text,
+      answer: fromDraft?.answer ?? '',
+      skipped: Boolean(fromDraft?.skipped),
+    }
+  })
+  const maxStep = Math.max(0, prompts.length - 1)
+  const step = Math.min(Math.max(draft?.step ?? 0, 0), maxStep)
+  return { answers, step }
+}
 
 export default function WeeklyReviewScreen() {
-  const { partner, isLoading: authLoading } = useAuth()
+  const { user, partner, profile, isLoading: authLoading } = useAuth()
+  const plus = useBondPlus()
   const {
     unlocked,
     needsReview,
@@ -30,18 +63,21 @@ export default function WeeklyReviewScreen() {
     partnerReview,
     bothSubmitted,
     waitingForPartner,
-    mySummary,
-    partnerSummary,
     weekCheckIns,
+    daysConnected,
     aiSummary,
     aiLoading,
     aiError,
     generateAiSummary,
-    streak,
+    saveEditedSummary,
+    dismissSummary,
+    restoreSummary,
     isLoading,
     error,
+    refresh,
     submit,
   } = useWeeklyReview()
+  const { showToast } = useToast()
 
   const initialAnswers = useMemo(
     () =>
@@ -53,51 +89,95 @@ export default function WeeklyReviewScreen() {
     [prompts],
   )
   const [answers, setAnswers] = useState<WeeklyAnswer[]>([])
+  const [step, setStep] = useState(0)
+  const [draftReady, setDraftReady] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [editingSummary, setEditingSummary] = useState(false)
+  const [summaryDraft, setSummaryDraft] = useState('')
+  const [summaryBusy, setSummaryBusy] = useState(false)
 
   useEffect(() => {
-    setAnswers(initialAnswers)
-  }, [initialAnswers])
+    if (!user?.id || !weekStart) {
+      setAnswers(initialAnswers)
+      setStep(0)
+      setDraftReady(true)
+      return
+    }
+    if (mine) {
+      setAnswers(initialAnswers)
+      setStep(0)
+      setDraftReady(true)
+      return
+    }
+    let cancelled = false
+    setDraftReady(false)
+    void loadWeeklyReviewDraft(user.id, weekStart).then((draft) => {
+      if (cancelled) return
+      const next = mergeDraft(prompts, draft)
+      setAnswers(next.answers.length ? next.answers : initialAnswers)
+      setStep(next.step)
+      setDraftReady(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id, weekStart, initialAnswers, mine, prompts])
 
   useEffect(() => {
-    if (!unlocked || aiSummary || aiLoading) return
-    if (weekCheckIns.every((d) => !d.mine && !d.partner)) return
-    void generateAiSummary(false)
-  }, [aiLoading, aiSummary, generateAiSummary, unlocked, weekCheckIns])
+    if (!draftReady || !user?.id || mine || !weekStart || !answers.length) return
+    void saveWeeklyReviewDraft(user.id, { weekStart, step, answers })
+  }, [answers, step, draftReady, user?.id, weekStart, mine])
 
-  const refreshedAfterBoth = useRef(false)
-  useEffect(() => {
-    if (!bothSubmitted || refreshedAfterBoth.current) return
-    refreshedAfterBoth.current = true
-    void generateAiSummary(true)
-  }, [bothSubmitted, generateAiSummary])
-
-  if (authLoading || isLoading) return <LoadingScreen />
+  if (authLoading || isLoading || !draftReady) return <LoadingScreen />
   if (!partner) return <Redirect href="/(app)/setup" />
   if (!unlocked) {
+    const remaining = Math.max(0, 7 - daysConnected)
     return (
       <Screen>
         <Text style={styles.title}>Weekly review</Text>
         <Text style={styles.subtitle}>
-          Keep a 7-day check-in streak to unlock your weekly reflection (
-          {streak}/7).
+          This opens after seven days of honest reflection, even if they were
+          not in a row. {remaining} more check-in{remaining === 1 ? '' : 's'} on
+          Today.
         </Text>
         <TextLink label="Back" onPress={() => router.back()} />
       </Screen>
     )
   }
 
+  const plusLock = plusGate('weekly_review', plus)
+  if (plusLock) return plusLock
+
   const onChangeAnswer = (index: number, text: string) => {
     setAnswers((prev) => {
       const next = [...prev]
       const base = next[index] ?? initialAnswers[index]
-      next[index] = { ...base, answer: text }
+      next[index] = {
+        ...base,
+        answer: text,
+        skipped: false,
+      }
       return next
     })
   }
 
+  const onSkip = (index: number) => {
+    setAnswers((prev) => {
+      const next = [...prev]
+      const base = next[index] ?? initialAnswers[index]
+      next[index] = {
+        ...base,
+        answer: '',
+        skipped: true,
+      }
+      return next
+    })
+    if (index < prompts.length - 1) setStep((n) => n + 1)
+  }
+
   const onSubmit = async () => {
+    if (submitting) return
     const payload =
       answers.length === prompts.length
         ? answers
@@ -105,144 +185,267 @@ export default function WeeklyReviewScreen() {
             prompt_id: p.id,
             prompt_text: p.text,
             answer: answers[i]?.answer ?? '',
+            skipped: Boolean(answers[i]?.skipped),
           }))
     setSubmitting(true)
     setSubmitError(null)
     const result = await submit(payload)
     setSubmitting(false)
     if (result.error) setSubmitError(result.error)
+    else showToast('Saved. Private until they finish too.')
+  }
+
+  const myDays = weekCheckIns.filter((d) => d.mine).length
+  const openDays = weekCheckIns.filter((d) => d.revealed).length
+  const myName = profile?.display_name?.trim() || 'You'
+  const current = prompts[step]
+  const myIntention = mine ? intentionAnswers(mine.answers) : ''
+  const theirIntention = partnerReview
+    ? intentionAnswers(partnerReview.answers)
+    : ''
+  const canAdvance = weeklyAnswerIsComplete(answers[step])
+
+  const onGenerate = async () => {
+    setSummaryBusy(true)
+    await generateAiSummary(true)
+    setSummaryBusy(false)
+    setEditingSummary(false)
+  }
+
+  const onSaveEdit = async () => {
+    setSummaryBusy(true)
+    const result = await saveEditedSummary(summaryDraft)
+    setSummaryBusy(false)
+    if (result.error) {
+      showToast("Couldn't save that edit.")
+      return
+    }
+    setEditingSummary(false)
+    showToast('Saved for you. The original stays for both of you.')
+  }
+
+  const onDismiss = async () => {
+    setSummaryBusy(true)
+    const result = await dismissSummary()
+    setSummaryBusy(false)
+    if (result.error) showToast("Couldn't hide that summary.")
+    else showToast('Hidden for you. Your partner can still see it.')
   }
 
   return (
-    <Screen style={styles.screen}>
+    <Screen style={styles.screen} keyboard>
       <Text style={styles.title}>Weekly review</Text>
       <Text style={styles.subtitle}>
-        {formatDisplayDate(weekStart)} – {formatDisplayDate(weekEnd)} · streak{' '}
-        {streak}
+        Last week · {formatDisplayDate(weekStart)} – {formatDisplayDate(weekEnd)}
       </Text>
 
-      <ErrorText message={error} />
+      {error ? (
+        <StatusPanel
+          message="Couldn't load last week's review."
+          onRetry={() => void refresh()}
+        />
+      ) : null}
 
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your week at a glance</Text>
-          <Text style={styles.summaryLine}>
-            Avg connection:{' '}
-            {mySummary.avg != null
-              ? `${mySummary.avg.toFixed(1)} · ${mySummary.label}`
-              : 'None'}
-          </Text>
-          <View style={styles.faces}>
-            {weekCheckIns.map((day) =>
-              day.mine ? (
-                <ScoreMark key={day.date} score={day.mine.score} size={24} />
-              ) : (
-                <View key={day.date} style={styles.missing} />
-              ),
-            )}
-          </View>
-          {bothSubmitted || waitingForPartner ? (
-            <Text style={styles.summaryLine}>
-              {partner.display_name}:{' '}
-              {partnerSummary.avg != null
-                ? `${partnerSummary.avg.toFixed(1)} · ${partnerSummary.label}`
-                : waitingForPartner
-                  ? 'Waiting for their review'
-                  : 'Hidden until you both finish'}
-            </Text>
-          ) : null}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Week summary</Text>
+          <Text style={styles.sectionTitle}>Last week</Text>
           <Text style={styles.hint}>
-            A Bond summary of every daily check-in this week
-            {aiSummary?.source === 'ai' ? ' (AI)' : aiSummary ? ' (local)' : ''}.
+            Sunday through Saturday that already ended. Participation, not a
+            score. You checked in {myDays} day{myDays === 1 ? '' : 's'}.{' '}
+            {openDays} day{openDays === 1 ? '' : 's'} opened for both of you.
           </Text>
-          {aiLoading && !aiSummary ? (
-            <Text style={styles.hint}>Generating summary…</Text>
-          ) : null}
-          {aiSummary ? (
-            <Text style={styles.aiSummary}>{aiSummary.summary}</Text>
-          ) : (
-            <Text style={styles.hint}>
-              Check in during the week to unlock a narrative of your days
-              together.
-            </Text>
-          )}
-          <ErrorText message={aiError} />
-          <TextLink
-            label={aiSummary ? 'Regenerate summary' : 'Generate summary'}
-            onPress={() => void generateAiSummary(true)}
-            disabled={aiLoading}
-          />
         </View>
 
-        {needsReview ? (
+        {needsReview && current ? (
           <View style={styles.sectionLast}>
-            <Text style={styles.sectionTitle}>Check in with each other</Text>
-            <Text style={styles.hint}>
-              Answer privately. You'll see {partner.display_name}'s answers
-              after they submit too.
+            <Text style={styles.kicker}>
+              {step + 1} of {prompts.length}
             </Text>
-            {prompts.map((prompt, index) => (
-              <View key={prompt.id} style={styles.promptBlock}>
-                <Label>{`Prompt ${index + 1}`}</Label>
-                <Text style={styles.promptText}>{prompt.text}</Text>
-                <Field
-                  value={answers[index]?.answer ?? ''}
-                  onChangeText={(text) => onChangeAnswer(index, text)}
-                  placeholder="Your answer"
-                  autoCapitalize="sentences"
-                  multiline
-                  style={styles.answer}
-                />
-              </View>
-            ))}
-            <ErrorText message={submitError} />
-            <PrimaryButton
-              label="Save weekly review"
-              onPress={onSubmit}
-              loading={submitting}
+            <Text style={styles.sectionTitle}>{current.text}</Text>
+            <Text style={styles.hint}>
+              Answer on your own. {partner.display_name} will not see this until
+              you both finish. Closing this keeps your draft on this device; it
+              is lost if you clear Bond’s storage. You can finish until next
+              Sunday.
+            </Text>
+            <Field
+              value={answers[step]?.skipped ? '' : answers[step]?.answer ?? ''}
+              onChangeText={(text) => onChangeAnswer(step, text)}
+              placeholder={
+                answers[step]?.skipped ? NO_WORDS_THIS_WEEK : 'A few sentences'
+              }
+              accessibilityLabel={current.text}
+              autoCapitalize="sentences"
+              multiline
+              style={styles.answer}
             />
-            <TextLink label="Done" onPress={() => router.back()} />
+            <ErrorText message={submitError} />
+            <TextLink
+              label={NO_WORDS_THIS_WEEK}
+              onPress={() => onSkip(step)}
+            />
+            {step < prompts.length - 1 ? (
+              <PrimaryButton
+                label="Continue"
+                onPress={() => setStep((n) => n + 1)}
+                disabled={!canAdvance}
+              />
+            ) : (
+              <PrimaryButton
+                label="Save weekly review"
+                onPress={() => void onSubmit()}
+                loading={submitting}
+                disabled={!canAdvance}
+              />
+            )}
+            {step > 0 ? (
+              <TextLink label="Back" onPress={() => setStep((n) => n - 1)} />
+            ) : (
+              <TextLink label="Not this week" onPress={() => router.back()} />
+            )}
           </View>
         ) : null}
 
         {mine && waitingForPartner ? (
           <View style={styles.sectionLast}>
-            <Text style={styles.sectionTitle}>Saved. Waiting on partner</Text>
+            <Text style={styles.sectionTitle}>
+              Saved. Waiting on {partner.display_name}.
+            </Text>
+            <Text style={styles.hint}>
+              They cannot see your answers yet. There is no rush. These answers
+              cannot be changed.
+            </Text>
             {mine.answers.map((a) => (
               <View key={a.prompt_id} style={styles.promptBlock}>
                 <Text style={styles.promptText}>{a.prompt_text}</Text>
-                <Text style={styles.answerText}>{a.answer}</Text>
+                <Text style={styles.answerText}>{displayWeeklyAnswer(a)}</Text>
               </View>
             ))}
-            <Text style={styles.hint}>
-              {partner.display_name}'s answers unlock when they finish this
-              week's review.
-            </Text>
             <TextLink label="Done" onPress={() => router.back()} />
           </View>
         ) : null}
 
         {bothSubmitted && mine && partnerReview ? (
-          <View style={styles.sectionLast}>
-            <Text style={styles.sectionTitle}>Revealed together</Text>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Your words, side by side</Text>
             {mine.answers.map((a, index) => {
               const theirs = partnerReview.answers[index]
               return (
                 <View key={a.prompt_id} style={styles.promptBlock}>
                   <Text style={styles.promptText}>{a.prompt_text}</Text>
-                  <Text style={styles.metaLabel}>You</Text>
-                  <Text style={styles.answerText}>{a.answer}</Text>
+                  <Text style={styles.metaLabel}>{myName}</Text>
+                  <Text style={styles.answerText}>{displayWeeklyAnswer(a)}</Text>
                   <Text style={styles.metaLabel}>{partner.display_name}</Text>
                   <Text style={styles.answerText}>
-                    {theirs?.answer ?? 'None'}
+                    {displayWeeklyAnswer(theirs)}
                   </Text>
                 </View>
               )
             })}
+
+            <View style={styles.intention}>
+              <Text style={styles.metaLabel}>Last week's intention</Text>
+              {myIntention ? (
+                <Text style={styles.answerText}>{myName}: {myIntention}</Text>
+              ) : null}
+              {theirIntention ? (
+                <Text style={styles.answerText}>
+                  {partner.display_name}: {theirIntention}
+                </Text>
+              ) : null}
+              <Text style={styles.hint}>
+                Keep one small thing you can actually do. Talking together is
+                optional, and only if it feels safe.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {bothSubmitted ? (
+          <View style={styles.sectionLast}>
+            <Text style={styles.sectionTitle}>Suggested reading</Text>
+            <Text style={styles.hint}>
+              Optional. Clearly not a diagnosis. Your answers above are the
+              record and cannot be rewritten. Hide or edit applies only to you.
+            </Text>
+            {aiSummary && !aiSummary.dismissed ? (
+              <>
+                <Text style={styles.metaLabel}>
+                  {aiSummary.source === 'ai'
+                    ? 'Generated suggestion'
+                    : 'Local suggestion'}
+                  {aiSummary.personallyEdited ? ' · edited for you' : ''}
+                </Text>
+                {editingSummary ? (
+                  <Field
+                    value={summaryDraft}
+                    onChangeText={setSummaryDraft}
+                    accessibilityLabel="Edit summary"
+                    autoCapitalize="sentences"
+                    multiline
+                    style={styles.answer}
+                  />
+                ) : (
+                  <Text style={styles.aiSummary}>{aiSummary.summary}</Text>
+                )}
+                <ErrorText message={aiError} />
+                {editingSummary ? (
+                  <PrimaryButton
+                    label="Save this reading for you"
+                    onPress={() => void onSaveEdit()}
+                    loading={summaryBusy}
+                  />
+                ) : (
+                  <TextLink
+                    label="Edit this reading for you"
+                    onPress={() => {
+                      setSummaryDraft(aiSummary.summary)
+                      setEditingSummary(true)
+                    }}
+                  />
+                )}
+                <TextLink
+                  label="This doesn't sound like us"
+                  onPress={() => void onDismiss()}
+                  disabled={summaryBusy}
+                />
+                <TextLink
+                  label="Generate again"
+                  onPress={() => void onGenerate()}
+                  disabled={aiLoading || summaryBusy}
+                />
+              </>
+            ) : (
+              <>
+                {aiSummary?.dismissed ? (
+                  <Text style={styles.hint}>
+                    Hidden for you. Your original words stay, and your partner
+                    can still see the suggestion.
+                  </Text>
+                ) : null}
+                <PrimaryButton
+                  label={
+                    aiLoading || summaryBusy
+                      ? 'Working…'
+                      : aiSummary?.dismissed
+                        ? 'Show a suggestion again'
+                        : 'Generate a suggestion'
+                  }
+                  onPress={() => {
+                    if (aiSummary?.dismissed) {
+                      void restoreSummary()
+                      return
+                    }
+                    void onGenerate()
+                  }}
+                  loading={aiLoading || summaryBusy}
+                />
+              </>
+            )}
             <TextLink label="Done" onPress={() => router.back()} />
           </View>
         ) : null}
@@ -282,21 +485,9 @@ const styles = StyleSheet.create({
     ...type.heading,
     marginBottom: 8,
   },
-  summaryLine: {
-    ...type.body,
+  kicker: {
+    ...type.label,
     marginBottom: 8,
-  },
-  faces: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 8,
-  },
-  missing: {
-    width: 18,
-    height: 18,
-    borderRadius: 6,
-    borderWidth: 0.5,
-    borderColor: colors.border,
   },
   hint: {
     ...type.body,
@@ -308,10 +499,11 @@ const styles = StyleSheet.create({
   },
   promptText: {
     ...type.body,
+    fontWeight: '500',
     marginBottom: 8,
   },
   answer: {
-    minHeight: 72,
+    minHeight: 88,
     textAlignVertical: 'top',
   },
   answerText: {
@@ -325,5 +517,11 @@ const styles = StyleSheet.create({
   metaLabel: {
     ...type.label,
     marginTop: 4,
+  },
+  intention: {
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: hairlineWidth,
+    borderTopColor: colors.hairline,
   },
 })

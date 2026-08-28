@@ -9,5 +9,5 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
   ],
-  "exclude": ["wip", "supabase/functions", "node_modules"]
+  "exclude": ["wip", "supabase/functions", "node_modules", "scripts"]
 }

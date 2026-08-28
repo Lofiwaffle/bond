@@ -19,8 +19,8 @@ export function Icon({
 }
 
 const FACE_IMAGES = {
-  1: require('../assets/connection/1.png'),
-  2: require('../assets/connection/2.png'),
+  1: require('../assets/connection/distant-purple.png'),
+  2: require('../assets/connection/disconnected-blue.png'),
   3: require('../assets/connection/3.png'),
   4: require('../assets/connection/4.png'),
   5: require('../assets/connection/5.png'),

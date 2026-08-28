@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { BondSectionHeader } from '../../../components/BondSectionHeader'
+import { plusGate } from '../../../components/PlusPreview'
 import {
   ErrorText,
   Field,
@@ -9,16 +10,19 @@ import {
   LoadingScreen,
   PrimaryButton,
   Screen,
+  StatusPanel,
   TextLink,
 } from '../../../components/ui'
 import { useCoupleGoal } from '../../../hooks/useCoupleGoal'
+import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useAuth } from '../../../lib/auth'
 import { formatDisplayDate, localDateString } from '../../../lib/dates'
 import {
   loadCalendarMarks,
   openGoogleCalendarDeadline,
 } from '../../../lib/googleCalendar'
-import { Icon } from '../../../lib/icons'
+import { Icon, type IconName } from '../../../lib/icons'
+import { useToast } from '../../../lib/toast'
 import {
   DEADLINE_PRESETS,
   deadlineFromPreset,
@@ -58,16 +62,58 @@ function deadlineLabel(goal: CoupleGoal): string {
   return `${isOverdue(goal.deadline, goal.status) ? 'Past due · ' : 'Due '}${shortDate(goal.deadline)}`
 }
 
+function goalIcon(goal: CoupleGoal): IconName {
+  if (goal.status === 'completed') return 'check'
+  if (goal.status === 'proposed') return 'clock'
+  if (goal.status === 'declined') return 'x'
+  if (goal.status === 'archived') return 'archive'
+  return 'target'
+}
+
+function listMeta(
+  goal: CoupleGoal,
+  me: string | undefined,
+  partnerName: string,
+): string {
+  if (goal.status === 'proposed') {
+    return goal.created_by === me
+      ? `Waiting for ${partnerName} to agree`
+      : `${partnerName} offered this`
+  }
+  if (goal.status === 'declined') {
+    return `Passed on · ${goal.declined_at ? shortDate(goal.declined_at) : deadlineLabel(goal)}`
+  }
+  if (goal.status === 'archived') {
+    return goal.archived_at
+      ? `Archived ${shortDate(goal.archived_at)}`
+      : 'Archived'
+  }
+  if (goal.status === 'active' && goal.completion_requested_by) {
+    return goal.completion_requested_by === me
+      ? `Waiting for ${partnerName} to confirm it's done`
+      : `${partnerName} thinks this is done`
+  }
+  return deadlineLabel(goal)
+}
+
 export default function BondGoalsScreen() {
   const { user, partner, isLoading: authLoading } = useAuth()
+  const plus = useBondPlus()
   const {
+    proposedByMe,
+    proposedByPartner,
     activeGoals,
     completed,
+    declined,
+    archived,
     reviewsFor,
     isLoading,
     error,
     setGoal,
     addReview,
+    acceptGoal,
+    declineGoal,
+    archiveGoal,
     completeGoal,
   } = useCoupleGoal()
 
@@ -80,13 +126,21 @@ export default function BondGoalsScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [addToCalendar, setAddToCalendar] = useState(true)
   const [calendarMarks, setCalendarMarks] = useState<Record<string, true>>({})
-  const showForm = composing || (activeGoals.length === 0 && completed.length === 0)
+  const { showToast } = useToast()
+
+  const allGoals = [
+    ...proposedByPartner,
+    ...proposedByMe,
+    ...activeGoals,
+    ...completed,
+    ...declined,
+    ...archived,
+  ]
+  const hasGoals = allGoals.length > 0
+  const showForm = composing || !hasGoals
 
   const partnerName = partner?.display_name ?? 'your partner'
-  const selected =
-    activeGoals.find((goal) => goal.id === selectedId) ??
-    completed.find((goal) => goal.id === selectedId) ??
-    null
+  const selected = allGoals.find((goal) => goal.id === selectedId) ?? null
   const selectedReviews = selected ? reviewsFor(selected.id) : []
 
   const reviewerName = useMemo(() => {
@@ -101,18 +155,28 @@ export default function BondGoalsScreen() {
   }, [])
 
   if (authLoading || isLoading) return <LoadingScreen />
+  const plusLock = plusGate('goals', plus)
+  if (plusLock) return plusLock
 
   const updateDraft = (key: keyof SmartGoalDraft, value: string) => {
     setDraft((prev) => ({ ...prev, [key]: value }))
   }
 
+  const selectGoal = (goalId: string) => {
+    setComposing(false)
+    setSelectedId((current) => (current === goalId ? null : goalId))
+    setReview('')
+    setFormError(null)
+  }
+
   const onSetGoal = async () => {
+    if (saving) return
     setFormError(null)
     setSaving(true)
     const result = await setGoal(draft)
     setSaving(false)
     if (result.error || !result.goal) {
-      setFormError(result.error ?? 'Could not save this goal.')
+      setFormError(result.error ?? 'Could not offer this goal.')
       return
     }
 
@@ -137,10 +201,11 @@ export default function BondGoalsScreen() {
     setAddToCalendar(true)
     setComposing(false)
     setSelectedId(created.id)
+    showToast(`Offered. Waiting for ${partnerName} to agree.`)
   }
 
   const onAddReview = async () => {
-    if (!selected) return
+    if (!selected || saving) return
     setFormError(null)
     setSaving(true)
     const result = await addReview(selected.id, review)
@@ -150,10 +215,11 @@ export default function BondGoalsScreen() {
       return
     }
     setReview('')
+    showToast('Review saved')
   }
 
   const onComplete = async () => {
-    if (!selected) return
+    if (!selected || completing) return
     setFormError(null)
     setCompleting(true)
     const result = await completeGoal(selected.id)
@@ -163,6 +229,51 @@ export default function BondGoalsScreen() {
       return
     }
     setReview('')
+    showToast(
+      result.waiting
+        ? `Waiting for ${partnerName} to confirm this is done.`
+        : 'You both marked this complete.',
+    )
+  }
+
+  const onAccept = async () => {
+    if (!selected || completing) return
+    setFormError(null)
+    setCompleting(true)
+    const result = await acceptGoal(selected.id)
+    setCompleting(false)
+    if (result.error) {
+      setFormError(result.error)
+      return
+    }
+    showToast('This is a shared goal now.')
+  }
+
+  const onDecline = async () => {
+    if (!selected || completing) return
+    setFormError(null)
+    setCompleting(true)
+    const result = await declineGoal(selected.id)
+    setCompleting(false)
+    if (result.error) {
+      setFormError(result.error)
+      return
+    }
+    showToast('Passed on this goal.')
+  }
+
+  const onArchive = async () => {
+    if (!selected || completing) return
+    const withdrawing = selected.status === 'proposed'
+    setFormError(null)
+    setCompleting(true)
+    const result = await archiveGoal(selected.id)
+    setCompleting(false)
+    if (result.error) {
+      setFormError(result.error)
+      return
+    }
+    showToast(withdrawing ? 'Offer withdrawn.' : 'Goal archived.')
   }
 
   const onAddToCalendar = async (goal: CoupleGoal) => {
@@ -193,25 +304,76 @@ export default function BondGoalsScreen() {
     draft.why.trim().length >= 8 &&
     draft.deadline.trim().length === 10
 
-  const hasGoals = activeGoals.length > 0 || completed.length > 0
+  const detailFor = (goal: CoupleGoal, readOnly = false) =>
+    selectedId === goal.id ? (
+      <GoalDetail
+        goal={goal}
+        me={user?.id}
+        partnerName={partnerName}
+        reviews={selectedReviews}
+        reviewerName={reviewerName}
+        review={review}
+        onChangeReview={setReview}
+        onSaveReview={() => void onAddReview()}
+        onComplete={() => void onComplete()}
+        onAccept={() => void onAccept()}
+        onDecline={() => void onDecline()}
+        onArchive={() => void onArchive()}
+        onCalendar={
+          goal.deadline ? () => void onAddToCalendar(goal) : undefined
+        }
+        calendarAdded={Boolean(calendarMarks[goal.id])}
+        saving={saving}
+        completing={completing}
+        readOnly={readOnly}
+      />
+    ) : null
+
+  const listFor = (
+    goals: CoupleGoal[],
+    opts?: { calendar?: boolean; readOnly?: boolean },
+  ) =>
+    goals.map((goal) => (
+      <View key={goal.id}>
+        <GoalListItem
+          goal={goal}
+          me={user?.id}
+          partnerName={partnerName}
+          selected={selectedId === goal.id}
+          onCalendar={
+            opts?.calendar && goal.deadline
+              ? () => void onAddToCalendar(goal)
+              : undefined
+          }
+          calendarAdded={Boolean(calendarMarks[goal.id])}
+          onPress={() => selectGoal(goal.id)}
+        />
+        {detailFor(goal, opts?.readOnly)}
+      </View>
+    ))
 
   return (
-    <Screen style={styles.screen}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+    <Screen style={styles.screen} keyboard>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <BondSectionHeader
           title="Goals"
-          subtitle={`Keep more than one SMART goal going${
-            partner ? ` with ${partnerName}` : ''
-          }. Deadlines can go straight to Google Calendar.`}
+          subtitle={`Offer a SMART goal${
+            partner ? ` to ${partnerName}` : ''
+          }. It becomes shared after they agree. Completing takes both of you.`}
         />
 
-        <ErrorText message={error} />
+        {error ? (
+          <StatusPanel message="Couldn't load your goals." />
+        ) : null}
         <ErrorText message={formError} />
 
         {hasGoals && !showForm ? (
           <View style={styles.addRow}>
             <TextLink
-              label="Add another goal"
+              label="Offer another goal"
               onPress={() => {
                 setFormError(null)
                 setComposing(true)
@@ -223,12 +385,11 @@ export default function BondGoalsScreen() {
 
         {showForm ? (
           <View style={styles.section}>
-            <Text style={styles.emptyTitle}>
-              {hasGoals ? 'Add a SMART goal' : 'Set a SMART goal'}
-            </Text>
+            <Text style={styles.emptyTitle}>Offer a SMART goal</Text>
             <Text style={styles.emptyBody}>
               Name a well-defined outcome. Make it measurable, realistic, tied
-              to what you value, and give it a deadline.
+              to what you value, and give it a deadline. {partnerName} will
+              need to agree before it is yours together.
             </Text>
 
             <Label>S · Specific outcome</Label>
@@ -239,6 +400,7 @@ export default function BondGoalsScreen() {
               value={draft.outcome}
               onChangeText={(value) => updateDraft('outcome', value)}
               placeholder="Book a weekend trip just for us"
+              accessibilityLabel="Specific outcome"
               autoCapitalize="sentences"
               maxLength={140}
             />
@@ -251,6 +413,7 @@ export default function BondGoalsScreen() {
               value={draft.successCriteria}
               onChangeText={(value) => updateDraft('successCriteria', value)}
               placeholder="Dates booked, paid, and on the calendar"
+              accessibilityLabel="Success criteria"
               autoCapitalize="sentences"
               multiline
               style={styles.shortArea}
@@ -266,6 +429,7 @@ export default function BondGoalsScreen() {
               value={draft.realisticPlan}
               onChangeText={(value) => updateDraft('realisticPlan', value)}
               placeholder="Two evenings to research and a set budget"
+              accessibilityLabel="Achievable plan"
               autoCapitalize="sentences"
               multiline
               style={styles.shortArea}
@@ -280,6 +444,7 @@ export default function BondGoalsScreen() {
               value={draft.why}
               onChangeText={(value) => updateDraft('why', value)}
               placeholder="More unhurried time together this season"
+              accessibilityLabel="Why this goal matters"
               autoCapitalize="sentences"
               multiline
               style={styles.shortArea}
@@ -298,11 +463,15 @@ export default function BondGoalsScreen() {
                   <Pressable
                     key={preset.id}
                     accessibilityRole="button"
+                    accessibilityLabel={preset.label}
                     accessibilityState={{ selected: isSelected }}
                     onPress={() => updateDraft('deadline', value)}
-                    style={[
+                    style={(state) => [
                       styles.presetChip,
                       isSelected && styles.presetChipSelected,
+                      state.pressed && { opacity: 0.8 },
+                      Boolean((state as { focused?: boolean }).focused) &&
+                        styles.presetFocus,
                     ]}
                   >
                     <Text
@@ -321,6 +490,7 @@ export default function BondGoalsScreen() {
               value={draft.deadline}
               onChangeText={(value) => updateDraft('deadline', value)}
               placeholder="YYYY-MM-DD"
+              accessibilityLabel="Deadline"
               autoCapitalize="none"
               keyboardType="numbers-and-punctuation"
               maxLength={10}
@@ -348,7 +518,7 @@ export default function BondGoalsScreen() {
             </Pressable>
 
             <PrimaryButton
-              label="Save this SMART goal"
+              label="Offer this SMART goal"
               onPress={() => void onSetGoal()}
               loading={saving}
               disabled={!canSaveDraft}
@@ -365,90 +535,55 @@ export default function BondGoalsScreen() {
           </View>
         ) : null}
 
+        {proposedByPartner.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Waiting on you</Text>
+            <Text style={styles.sectionHint}>
+              {partnerName} offered {proposedByPartner.length === 1 ? 'this' : 'these'}.
+              Agree or pass.
+            </Text>
+            {listFor(proposedByPartner)}
+          </View>
+        ) : null}
+
+        {proposedByMe.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Waiting on them</Text>
+            <Text style={styles.sectionHint}>
+              {partnerName} has not agreed yet. You can withdraw an offer.
+            </Text>
+            {listFor(proposedByMe)}
+          </View>
+        ) : null}
+
         {activeGoals.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Your goals</Text>
             <Text style={styles.sectionHint}>
-              Tap a goal to review it. Add as many as you want to work on
-              together.
+              You both agreed to these. Completing takes both of you.
             </Text>
-            {activeGoals.map((goal) => (
-              <View key={goal.id}>
-                <GoalListItem
-                  goal={goal}
-                  selected={selectedId === goal.id}
-                  onCalendar={
-                    goal.deadline ? () => void onAddToCalendar(goal) : undefined
-                  }
-                  calendarAdded={Boolean(calendarMarks[goal.id])}
-                  onPress={() => {
-                    setComposing(false)
-                    setSelectedId((current) =>
-                      current === goal.id ? null : goal.id,
-                    )
-                    setReview('')
-                    setFormError(null)
-                  }}
-                />
-                {selectedId === goal.id ? (
-                  <GoalDetail
-                    goal={goal}
-                    reviews={selectedReviews}
-                    reviewerName={reviewerName}
-                    review={review}
-                    onChangeReview={setReview}
-                    onSaveReview={() => void onAddReview()}
-                    onComplete={() => void onComplete()}
-                    onCalendar={() => void onAddToCalendar(goal)}
-                    calendarAdded={Boolean(calendarMarks[goal.id])}
-                    saving={saving}
-                    completing={completing}
-                  />
-                ) : null}
-              </View>
-            ))}
+            {listFor(activeGoals, { calendar: true })}
           </View>
         ) : null}
 
         {completed.length > 0 ? (
-          <View style={styles.sectionLast}>
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>Reached together</Text>
-            {completed.map((goal) => (
-              <View key={goal.id}>
-                <GoalListItem
-                  goal={goal}
-                  selected={selectedId === goal.id}
-                  onPress={() => {
-                    setComposing(false)
-                    setSelectedId((current) =>
-                      current === goal.id ? null : goal.id,
-                    )
-                    setReview('')
-                    setFormError(null)
-                  }}
-                />
-                {selectedId === goal.id ? (
-                  <GoalDetail
-                    goal={goal}
-                    reviews={selectedReviews}
-                    reviewerName={reviewerName}
-                    review={review}
-                    onChangeReview={setReview}
-                    onSaveReview={() => void onAddReview()}
-                    onComplete={() => void onComplete()}
-                    onCalendar={
-                      goal.deadline
-                        ? () => void onAddToCalendar(goal)
-                        : undefined
-                    }
-                    calendarAdded={Boolean(calendarMarks[goal.id])}
-                    saving={saving}
-                    completing={completing}
-                    readOnly
-                  />
-                ) : null}
-              </View>
-            ))}
+            {listFor(completed, { readOnly: true })}
+          </View>
+        ) : null}
+
+        {declined.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Not this one</Text>
+            {listFor(declined, { readOnly: true })}
+          </View>
+        ) : null}
+
+        {archived.length > 0 ? (
+          <View style={styles.sectionLast}>
+            <Text style={styles.sectionTitle}>Archived</Text>
+            {listFor(archived, { readOnly: true })}
           </View>
         ) : null}
       </ScrollView>
@@ -458,12 +593,16 @@ export default function BondGoalsScreen() {
 
 function GoalListItem({
   goal,
+  me,
+  partnerName,
   selected,
   onPress,
   onCalendar,
   calendarAdded,
 }: {
   goal: CoupleGoal
+  me?: string
+  partnerName: string
   selected: boolean
   onPress: () => void
   onCalendar?: () => void
@@ -482,14 +621,14 @@ function GoalListItem({
         ]}
       >
         <Icon
-          name={goal.status === 'completed' ? 'check' : 'target'}
+          name={goalIcon(goal)}
           size={16}
           color={overdue ? colors.danger : colors.ink}
         />
         <View style={styles.goalCopy}>
           <Text style={styles.goalOutcome}>{goal.outcome}</Text>
           <Text style={[styles.meta, overdue && styles.deadlineOverdue]}>
-            {deadlineLabel(goal)}
+            {listMeta(goal, me, partnerName)}
             {calendarAdded ? ' · On Google Calendar' : ''}
           </Text>
         </View>
@@ -520,12 +659,17 @@ function GoalListItem({
 
 function GoalDetail({
   goal,
+  me,
+  partnerName,
   reviews,
   reviewerName,
   review,
   onChangeReview,
   onSaveReview,
   onComplete,
+  onAccept,
+  onDecline,
+  onArchive,
   onCalendar,
   calendarAdded,
   saving,
@@ -533,18 +677,33 @@ function GoalDetail({
   readOnly = false,
 }: {
   goal: CoupleGoal
+  me?: string
+  partnerName: string
   reviews: CoupleGoalReview[]
   reviewerName: (userId: string) => string
   review: string
   onChangeReview: (value: string) => void
   onSaveReview: () => void
   onComplete: () => void
+  onAccept: () => void
+  onDecline: () => void
+  onArchive: () => void
   onCalendar?: () => void
   calendarAdded: boolean
   saving: boolean
   completing: boolean
   readOnly?: boolean
 }) {
+  const offeredByMe = goal.created_by === me
+  const waitingOnMe = Boolean(
+    goal.status === 'active' &&
+      goal.completion_requested_by &&
+      goal.completion_requested_by !== me,
+  )
+  const waitingOnThem = Boolean(
+    goal.status === 'active' && goal.completion_requested_by === me,
+  )
+
   return (
     <View style={styles.goalDetail}>
       <View style={styles.smartList}>
@@ -594,28 +753,106 @@ function GoalDetail({
         />
       ) : null}
 
-      <Text style={styles.sectionTitle}>Review together</Text>
-      <Text style={styles.sectionHint}>
-        Check progress against the success criteria. Both of you can write
-        here.
-      </Text>
+      {goal.status === 'proposed' && !offeredByMe ? (
+        <>
+          <Text style={styles.sectionHint}>
+            {partnerName} offered this. It is not a shared goal until you
+            agree.
+          </Text>
+          <PrimaryButton
+            label="Yes, this is ours"
+            onPress={onAccept}
+            loading={completing}
+          />
+          <TextLink
+            label="Not this one"
+            onPress={onDecline}
+            disabled={completing}
+          />
+        </>
+      ) : null}
 
-      {reviews.length === 0 ? (
-        <Text style={styles.emptyReviews}>
-          No reviews yet.
-          {readOnly ? '' : ' Write the first one together.'}
+      {goal.status === 'proposed' && offeredByMe ? (
+        <>
+          <Text style={styles.sectionHint}>
+            Waiting for {partnerName} to agree. They will see this on Goals.
+          </Text>
+          <TextLink
+            label="Withdraw this offer"
+            onPress={onArchive}
+            disabled={completing}
+          />
+        </>
+      ) : null}
+
+      {goal.status === 'completed' ? (
+        <Text style={styles.sectionHint}>
+          You both marked this complete.
+          {goal.completion_requested_by
+            ? ` ${reviewerName(goal.completion_requested_by)} said it was done first.`
+            : ''}
+          {goal.completed_by
+            ? ` ${reviewerName(goal.completed_by)} confirmed${
+                goal.completed_at ? ` on ${shortDate(goal.completed_at)}` : ''
+              }.`
+            : ''}
         </Text>
-      ) : (
-        reviews.map((item) => (
-          <View key={item.id} style={styles.reviewRow}>
-            <Text style={styles.reviewAuthor}>{reviewerName(item.user_id)}</Text>
-            <Text style={styles.reviewNote}>{item.note}</Text>
-            <Text style={styles.reviewWhen}>{shortDate(item.created_at)}</Text>
-          </View>
-        ))
-      )}
+      ) : null}
 
-      {readOnly ? null : (
+      {goal.status === 'declined' ? (
+        <>
+          <Text style={styles.sectionHint}>
+            {goal.declined_by
+              ? `${reviewerName(goal.declined_by)} passed on this.`
+              : 'This was passed on.'}{' '}
+            Either of you can archive it.
+          </Text>
+          <TextLink
+            label="Archive"
+            onPress={onArchive}
+            disabled={completing}
+          />
+        </>
+      ) : null}
+
+      {goal.status === 'archived' ? (
+        <Text style={styles.sectionHint}>
+          Archived
+          {goal.archived_by ? ` by ${reviewerName(goal.archived_by)}` : ''}
+          {goal.archived_at ? ` on ${shortDate(goal.archived_at)}` : ''}.
+        </Text>
+      ) : null}
+
+      {goal.status === 'active' || goal.status === 'completed' ? (
+        <>
+          <Text style={styles.sectionTitle}>Progress notes</Text>
+          <Text style={styles.sectionHint}>
+            Check progress against the success criteria. Either of you can write
+            here. You do not have to review this out loud together.
+          </Text>
+
+          {reviews.length === 0 ? (
+            <Text style={styles.emptyReviews}>
+              No notes yet.
+              {readOnly || goal.status !== 'active'
+                ? ''
+                : ' You can add one from here.'}
+            </Text>
+          ) : (
+            reviews.map((item) => (
+              <View key={item.id} style={styles.reviewRow}>
+                <Text style={styles.reviewAuthor}>
+                  {reviewerName(item.user_id)}
+                </Text>
+                <Text style={styles.reviewNote}>{item.note}</Text>
+                <Text style={styles.reviewWhen}>{shortDate(item.created_at)}</Text>
+              </View>
+            ))
+          )}
+        </>
+      ) : null}
+
+      {goal.status === 'active' ? (
         <>
           <Label>Today's review</Label>
           <Field
@@ -636,13 +873,28 @@ function GoalDetail({
             loading={saving}
             disabled={review.trim().length === 0}
           />
+          {waitingOnThem ? (
+            <Text style={styles.sectionHint}>
+              Waiting for {partnerName} to confirm this is done.
+            </Text>
+          ) : (
+            <TextLink
+              label={
+                waitingOnMe
+                  ? 'Yes — we met the success criteria'
+                  : 'I think we met the success criteria'
+              }
+              onPress={onComplete}
+              disabled={completing}
+            />
+          )}
           <TextLink
-            label="We met the success criteria"
-            onPress={onComplete}
+            label="Archive this goal"
+            onPress={onArchive}
             disabled={completing}
           />
         </>
-      )}
+      ) : null}
     </View>
   )
 }
@@ -783,12 +1035,18 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: colors.border,
     borderRadius: radii.pill,
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   presetChipSelected: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
+    backgroundColor: colors.accentFill,
+    borderColor: colors.accentFill,
+  },
+  presetFocus: {
+    borderWidth: 2,
+    borderColor: colors.ink,
   },
   presetLabel: {
     ...type.label,
@@ -802,6 +1060,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    minHeight: 44,
     paddingVertical: 10,
     marginBottom: 8,
   },

@@ -11,10 +11,15 @@ type ProfileRow = {
   id: string
   display_name: string
   expo_push_token: string | null
-  quiet_hours_enabled: boolean | null
-  quiet_hours_start: number | null
-  quiet_hours_end: number | null
-  timezone: string | null
+}
+
+type PrefsRow = {
+  user_id: string
+  reveal_enabled: boolean
+  quiet_hours_enabled: boolean
+  quiet_hours_start: number
+  quiet_hours_end: number
+  timezone: string
 }
 
 type WebhookBody = {
@@ -25,6 +30,9 @@ type WebhookBody = {
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 const MILESTONE_THRESHOLDS = [7, 25, 50, 100] as const
+/** Lock-screen copy must stay generic. Never include scores, notes, or names. */
+const PUSH_TITLE = 'Bond'
+const PUSH_BODY = 'Open the app when you have a minute.'
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') {
@@ -58,7 +66,7 @@ Deno.serve(async (req: Request) => {
   const readHeaders = { ...headers, Prefer: 'return=representation' }
 
   const profilesRes = await fetch(
-    `${supabaseUrl}/rest/v1/profiles?couple_id=eq.${record.couple_id}&select=id,display_name,expo_push_token,quiet_hours_enabled,quiet_hours_start,quiet_hours_end,timezone`,
+    `${supabaseUrl}/rest/v1/profiles?couple_id=eq.${record.couple_id}&select=id,display_name,expo_push_token`,
     { headers: readHeaders },
   )
   if (!profilesRes.ok) {
@@ -67,6 +75,11 @@ Deno.serve(async (req: Request) => {
 
   const profiles = (await profilesRes.json()) as ProfileRow[]
   const partner = profiles.find((p) => p.id !== record.user_id)
+  const prefsByUser = await fetchPrefs(
+    supabaseUrl,
+    readHeaders,
+    profiles.map((p) => p.id),
+  )
 
   const partnerCheckRes = await fetch(
     `${supabaseUrl}/rest/v1/daily_check_ins?couple_id=eq.${record.couple_id}&user_id=eq.${partner?.id ?? '00000000-0000-0000-0000-000000000000'}&check_in_date=eq.${record.check_in_date}&select=id`,
@@ -86,18 +99,18 @@ Deno.serve(async (req: Request) => {
       supabaseUrl,
       headers,
       recipient: partner,
+      prefs: prefsByUser.get(partner.id) ?? null,
       coupleId: record.couple_id,
       eventDate: record.check_in_date,
       eventType,
-      title: 'Bond',
-      body: bothIn
-        ? 'Your check-in together is ready.'
-        : 'Your partner checked in. Add yours when you’re ready.',
+      title: PUSH_TITLE,
+      body: PUSH_BODY,
       channelId: 'partner-activity',
       data: {
         type: eventType,
         check_in_date: record.check_in_date,
         couple_id: record.couple_id,
+        url: '/',
       },
     })
   }
@@ -117,18 +130,20 @@ Deno.serve(async (req: Request) => {
             supabaseUrl,
             headers,
             recipient,
+            prefs: prefsByUser.get(recipient.id) ?? null,
             coupleId: record.couple_id,
             // Once per lifetime threshold (fixed date + typed event)
             eventDate: '1970-01-01',
             eventType: `milestone_${threshold}`,
-            title: 'Bond',
-            body: `You’ve made space for each other ${threshold} times.`,
+            title: PUSH_TITLE,
+            body: PUSH_BODY,
             channelId: 'partner-activity',
             data: {
               type: 'milestone',
               threshold,
               couple_id: record.couple_id,
               check_in_date: record.check_in_date,
+              url: '/',
             },
           })
           milestones.push({
@@ -174,10 +189,29 @@ async function countMutualReveals(
   return mutual
 }
 
+async function fetchPrefs(
+  supabaseUrl: string,
+  headers: Record<string, string>,
+  userIds: string[],
+): Promise<Map<string, PrefsRow>> {
+  const map = new Map<string, PrefsRow>()
+  if (userIds.length === 0) return map
+  const filter = userIds.join(',')
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/notification_preferences?user_id=in.(${filter})&select=user_id,reveal_enabled,quiet_hours_enabled,quiet_hours_start,quiet_hours_end,timezone`,
+    { headers },
+  )
+  if (!res.ok) return map
+  const rows = (await res.json()) as PrefsRow[]
+  for (const row of rows) map.set(row.user_id, row)
+  return map
+}
+
 async function notifyRecipient(args: {
   supabaseUrl: string
   headers: Record<string, string>
   recipient: ProfileRow
+  prefs: PrefsRow | null
   coupleId: string
   eventDate: string
   eventType: string
@@ -186,17 +220,23 @@ async function notifyRecipient(args: {
   channelId: string
   data: Record<string, unknown>
 }): Promise<Record<string, unknown>> {
-  const { recipient } = args
+  const { recipient, prefs } = args
+  if (args.eventType === 'partner_checked_in') {
+    return { skipped: 'partner_checked_in_off' }
+  }
+  if (args.eventType === 'reveal_ready' && !prefs?.reveal_enabled) {
+    return { skipped: 'reveal_off' }
+  }
   if (!recipient.expo_push_token) {
     return { skipped: 'no_partner_token' }
   }
 
   if (
     isInQuietHoursNow(
-      recipient.quiet_hours_enabled ?? false,
-      recipient.quiet_hours_start ?? 22,
-      recipient.quiet_hours_end ?? 8,
-      recipient.timezone ?? 'America/New_York',
+      prefs?.quiet_hours_enabled ?? false,
+      prefs?.quiet_hours_start ?? 22,
+      prefs?.quiet_hours_end ?? 8,
+      prefs?.timezone ?? 'UTC',
     )
   ) {
     return { skipped: 'quiet_hours' }

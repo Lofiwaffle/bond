@@ -1,7 +1,8 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { colors, type } from '../lib/theme'
+import { reportError } from '../lib/monitor'
+import { colors, hit, radii, type } from '../lib/theme'
 
 type Props = { children: ReactNode }
 type State = { error: Error | null }
@@ -14,7 +15,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('Bond crashed', error, info.componentStack)
+    reportError('app', error, { stack: info.componentStack?.slice(0, 200) ?? '' })
   }
 
   render() {
@@ -26,6 +27,14 @@ export class ErrorBoundary extends Component<Props, State> {
         <Text style={styles.body}>
           {this.state.error.message || 'The app failed to start.'}
         </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Try again"
+          onPress={() => this.setState({ error: null })}
+          style={styles.retry}
+        >
+          <Text style={styles.retryLabel}>Try again</Text>
+        </Pressable>
       </View>
     )
   }
@@ -45,5 +54,19 @@ const styles = StyleSheet.create({
   body: {
     ...type.body,
     color: colors.muted,
+    marginBottom: 16,
+  },
+  retry: {
+    alignSelf: 'flex-start',
+    minHeight: hit,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    backgroundColor: colors.accentFill,
+    borderRadius: radii.pill,
+  },
+  retryLabel: {
+    color: colors.onAccent,
+    fontSize: 16,
+    fontWeight: '500',
   },
 })

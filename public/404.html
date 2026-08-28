@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Bond</title>
+    <script>
+      (function () {
+        var params = new URLSearchParams(location.search)
+        var path = location.pathname.replace(/^\/bond/, '')
+        var parts = path.split('/').filter(Boolean)
+        if (parts[0] === 'join' && parts[1] && !params.get('invite')) {
+          params.set('invite', String(parts[1]).toUpperCase())
+        }
+        var query = params.toString()
+        location.replace('/bond/' + (query ? '?' + query : ''))
+      })()
+    </script>
+  </head>
+  <body>Opening Bond…</body>
+</html>

@@ -45,10 +45,56 @@ export function dateKey(year: number, monthIndex: number, day: number): string {
   return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
+export function startOfMonth(year: number, monthIndex: number): string {
+  return dateKey(year, monthIndex, 1)
+}
+
+export function endOfMonth(year: number, monthIndex: number): string {
+  return dateKey(year, monthIndex, new Date(year, monthIndex + 1, 0).getDate())
+}
+
+export function addMonths(
+  year: number,
+  monthIndex: number,
+  delta: number,
+): { year: number; month: number } {
+  const date = new Date(year, monthIndex + delta, 1)
+  return { year: date.getFullYear(), month: date.getMonth() }
+}
+
+export function monthFromDate(iso: string): { year: number; month: number } {
+  const [year, month] = iso.split('-').map(Number)
+  return { year, month: (month ?? 1) - 1 }
+}
+
 /** Shift YYYY-MM-DD by delta days */
 export function addDays(isoDate: string, delta: number): string {
   const [y, m, d] = isoDate.split('-').map(Number)
   const date = new Date(y, m - 1, d)
   date.setDate(date.getDate() + delta)
   return localDateString(date)
+}
+
+/** Sunday-start week that contains `date`. */
+export function startOfWeek(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  date.setDate(date.getDate() - date.getDay())
+  return localDateString(date)
+}
+
+export function endOfWeek(isoDate: string): string {
+  return addDays(startOfWeek(isoDate), 6)
+}
+
+/** Sunday–Saturday week that already ended. Not the week that is still in progress. */
+export function previousCompletedWeek(today = localDateString()): {
+  weekStart: string
+  weekEnd: string
+} {
+  const currentStart = startOfWeek(today)
+  return {
+    weekStart: addDays(currentStart, -7),
+    weekEnd: addDays(currentStart, -1),
+  }
 }

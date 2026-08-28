@@ -1,20 +1,23 @@
 export const colors = {
   bg: '#F7F2EF',
   bgSoft: '#F1EAEB',
+  frame: '#E4D8DE',
   ink: '#3D2C33',
-  muted: '#9A8690',
+  muted: '#5E4A52',
   accent: '#FF6B9D',
-  accentPressed: '#F0558A',
+  accentPressed: '#B83B68',
+  accentFill: '#B83B68',
+  /** Dark enough for small text and white labels (WCAG AA). */
+  danger: '#B4233A',
   accentSoft: '#FFE4EE',
   onAccent: '#FFFFFF',
   border: '#E8DDE2',
   hairline: '#E4D8DE',
-  danger: '#FF6B7A',
   success: '#7ED9A8',
   card: '#FFFFFF',
   tabBar: '#FFFFFF',
   tabBarIcon: '#3D2C33',
-  tabBarIconMuted: '#9A8690',
+  tabBarIconMuted: '#5E4A52',
   white: '#FFFFFF',
   black: '#3D2C33',
   overlay: 'rgba(61, 44, 51, 0.38)',
@@ -38,19 +41,11 @@ export const scoreColorsSoft: Record<number, string> = {
 }
 
 export const SCORE_LABELS: Record<number, string> = {
-  1: 'Disconnected',
-  2: 'Uneasy & aloof',
-  3: 'Stagnant',
+  1: 'Distant',
+  2: 'A little disconnected',
+  3: 'Neutral',
   4: 'Connected',
-  5: 'Proud & united',
-}
-
-export const SCORE_HINTS: Record<number, string> = {
-  1: 'Distant & hurt',
-  2: 'Communication breakdown',
-  3: 'Roommates, not partners',
-  4: 'Supporting each other',
-  5: 'A formidable team',
+  5: 'Very connected',
 }
 
 export const radii = {
@@ -63,6 +58,9 @@ export const radii = {
 
 export const hit = 44
 
+/** Desktop web frames the app at this width so layouts match a phone. */
+export const phoneMaxWidth = 430
+
 export const hairlineWidth = 0.5
 
 export const weights = {
@@ -73,7 +71,7 @@ export const weights = {
 export const type = {
   label: {
     fontSize: 12,
-    lineHeight: 16,
+    lineHeight: 18,
     fontWeight: '400' as const,
     color: colors.muted,
   },

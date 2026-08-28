@@ -1,9 +1,16 @@
-import { useState } from 'react'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
-import { Redirect, router } from 'expo-router'
-import * as Clipboard from 'expo-clipboard'
+import { useEffect, useRef, useState } from 'react'
+import {
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type TextInput,
+} from 'react-native'
+import { Redirect, router, type Href } from 'expo-router'
 
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { InviteShare } from '../../components/InviteShare'
 import {
   ErrorText,
   Field,
@@ -14,7 +21,19 @@ import {
   TextLink,
 } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
-import { FaceIcon, Icon } from '../../lib/icons'
+import { ACCOUNT_DELETION_REQUEST_URL } from '../../lib/appUrls'
+import { Icon } from '../../lib/icons'
+import {
+  classifyJoinError,
+  joinErrorCopy,
+  loadPendingInvite,
+  normalizeInviteCode,
+  savePendingInvite,
+  type JoinErrorKind,
+} from '../../lib/invite'
+import { DELETE_SEMANTICS, UNPAIR_SEMANTICS } from '../../lib/privacy'
+import { focusInput } from '../../lib/formFocus'
+import { useToast } from '../../lib/toast'
 import { colors, type } from '../../lib/theme'
 
 export default function SetupScreen() {
@@ -25,57 +44,114 @@ export default function SetupScreen() {
     isLoading,
     createCouple,
     joinCouple,
-    updateDisplayName,
     signOut,
     deleteAccount,
+    leaveCouple,
   } = useAuth()
-  const [name, setName] = useState(profile?.display_name?.trim() ?? '')
   const [inviteCode, setInviteCode] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [savingName, setSavingName] = useState(false)
+  const [errorKind, setErrorKind] = useState<JoinErrorKind | null>(null)
   const [creating, setCreating] = useState(false)
   const [joining, setJoining] = useState(false)
-  const [copied, setCopied] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const autoJoinTried = useRef(false)
+  const inviteRef = useRef<TextInput>(null)
+  const { showToast } = useToast()
+
+  useEffect(() => {
+    void loadPendingInvite().then((code) => {
+      if (code) setInviteCode((current) => current || code)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (isLoading || profile?.couple_id || autoJoinTried.current) return
+    let cancelled = false
+    void loadPendingInvite().then(async (code) => {
+      if (!code || cancelled) return
+      autoJoinTried.current = true
+      setInviteCode(code)
+      setJoining(true)
+      setError(null)
+      setErrorKind(null)
+      const result = await joinCouple(code)
+      if (cancelled) return
+      setJoining(false)
+      if (result.error) {
+        const kind = classifyJoinError(result.error)
+        setErrorKind(kind)
+        setError(joinErrorCopy(kind))
+        return
+      }
+      showToast('You are paired')
+      router.replace('/(app)/(tabs)')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isLoading, joinCouple, profile?.couple_id, showToast])
 
   if (isLoading) return <LoadingScreen />
   if (profile?.couple_id && partner) {
     return <Redirect href="/(app)/(tabs)" />
   }
 
-  const onSaveName = async () => {
-    setError(null)
-    setSavingName(true)
-    const result = await updateDisplayName(name)
-    setSavingName(false)
-    if (result.error) setError(result.error)
-  }
-
   const onCreate = async () => {
+    if (creating || joining) return
     setError(null)
+    setErrorKind(null)
     setCreating(true)
     const result = await createCouple()
     setCreating(false)
     if (result.error) setError(result.error)
+    else showToast('Invite ready')
   }
 
   const onJoin = async () => {
+    if (joining || creating) return
+    const code = normalizeInviteCode(inviteCode)
+    if (!code) {
+      setErrorKind('invalid')
+      setError(joinErrorCopy('invalid'))
+      focusInput(inviteRef)
+      return
+    }
     setError(null)
+    setErrorKind(null)
     setJoining(true)
-    const result = await joinCouple(inviteCode)
+    await savePendingInvite(code)
+    const result = await joinCouple(code)
     setJoining(false)
-    if (result.error) setError(result.error)
-    else router.replace('/(app)/(tabs)')
+    if (result.error) {
+      const kind = classifyJoinError(result.error)
+      setErrorKind(kind)
+      setError(joinErrorCopy(kind))
+      focusInput(inviteRef)
+      return
+    }
+    showToast('You are paired')
+    router.replace('/(app)/(tabs)')
   }
 
-  const copyCode = async (code: string) => {
-    await Clipboard.setStringAsync(code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const onLeave = async () => {
+    if (leaving) return
+    setLeaving(true)
+    const result = await leaveCouple()
+    setLeaving(false)
+    if (result.error) {
+      setConfirmLeave(false)
+      setError(result.error)
+      return
+    }
+    setConfirmLeave(false)
+    showToast('You left this Bond')
   }
 
   const onDelete = async () => {
+    if (deleting) return
     setDeleting(true)
     const result = await deleteAccount()
     setDeleting(false)
@@ -90,6 +166,15 @@ export default function SetupScreen() {
   const accountLinks = (
     <View style={styles.account}>
       <TextLink label="Sign out" onPress={() => void signOut()} />
+      <TextLink label="Privacy" onPress={() => router.push('/privacy')} />
+      <TextLink
+        label="Help & safety"
+        onPress={() => router.push('/help' as Href)}
+      />
+      <TextLink
+        label="Request account & data deletion"
+        onPress={() => void Linking.openURL(ACCOUNT_DELETION_REQUEST_URL)}
+      />
       <TextLink
         label="Delete account"
         onPress={() => setConfirmDelete(true)}
@@ -99,7 +184,7 @@ export default function SetupScreen() {
 
   if (profile?.couple_id && couple && !partner) {
     return (
-      <Screen>
+      <Screen keyboard>
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scroll}
@@ -108,25 +193,40 @@ export default function SetupScreen() {
           <Text style={styles.kicker}>Almost there</Text>
           <Text style={styles.title}>Invite your person</Text>
           <Text style={styles.subtitle}>
-            Bond is for two. Share this code so your partner can join. You can
-            keep going and they can catch up later.
+            Share the link, show the QR, or send the six-character code. You
+            can keep going and they can catch up later.
           </Text>
-          <Text style={styles.code}>{couple.invite_code}</Text>
-          <PrimaryButton
-            label={copied ? 'Copied' : 'Copy invite code'}
-            onPress={() => void copyCode(couple.invite_code)}
+          <InviteShare
+            code={couple.invite_code}
+            fromName={profile.display_name}
+            onCopied={(message) => showToast(message)}
           />
           <PrimaryButton
             label="Enter Bond"
             onPress={() => router.replace('/(app)/(tabs)')}
           />
           <ErrorText message={error} />
+          <TextLink
+            label={leaving ? 'Leaving...' : 'Leave this Bond'}
+            onPress={() => setConfirmLeave(true)}
+            disabled={leaving}
+          />
           {accountLinks}
         </ScrollView>
         <ConfirmDialog
+          visible={confirmLeave}
+          title="Leave this Bond?"
+          body={UNPAIR_SEMANTICS}
+          confirmLabel="Leave this Bond"
+          destructive
+          busy={leaving}
+          onCancel={() => setConfirmLeave(false)}
+          onConfirm={() => void onLeave()}
+        />
+        <ConfirmDialog
           visible={confirmDelete}
           title="Delete account?"
-          body="This permanently removes your profile and sign-in."
+          body={DELETE_SEMANTICS}
           confirmLabel="Delete account"
           destructive
           busy={deleting}
@@ -137,75 +237,63 @@ export default function SetupScreen() {
     )
   }
 
+  const blockedTitle =
+    errorKind === 'full'
+      ? 'This Bond is full'
+      : errorKind === 'expired'
+        ? 'This invite expired'
+        : errorKind === 'invalid'
+          ? 'This invite is not valid'
+          : null
+
   return (
-    <Screen>
+    <Screen keyboard>
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scroll}
       >
         <Icon name="heart" size={28} color={colors.ink} />
-        <Text style={styles.kicker}>Set up your Bond</Text>
-        <Text style={styles.title}>How should we call you?</Text>
+        <Text style={styles.kicker}>Create a Bond</Text>
+        <Text style={styles.title}>Invite your person</Text>
         <Text style={styles.subtitle}>
-          Your partner will see this name after you both check in.
-        </Text>
-        <Label>Display name</Label>
-        <Field
-          value={name}
-          onChangeText={setName}
-          autoCapitalize="words"
-          placeholder="Alex"
-        />
-        <PrimaryButton
-          label="Save name"
-          onPress={() => void onSaveName()}
-          loading={savingName}
-          disabled={!name.trim()}
-        />
-
-        <Text style={styles.sectionTitle}>Pair with your partner</Text>
-        <Text style={styles.subtitle}>
-          Generate a code, or enter the one they already sent you.
+          This ritual is for two. Generate an invite, or enter the one they
+          sent you.
         </Text>
         <PrimaryButton
-          label="Generate invite code"
+          label="Generate invite"
           onPress={() => void onCreate()}
           loading={creating}
         />
         <Text style={styles.or}>or</Text>
         <Label>Their invite code</Label>
         <Field
+          ref={inviteRef}
           value={inviteCode}
-          onChangeText={(text) => setInviteCode(text.toUpperCase())}
+          onChangeText={(text) => {
+            setInviteCode(text.toUpperCase())
+            setErrorKind(null)
+          }}
           autoCapitalize="characters"
+          accessibilityLabel="Their invite code"
           placeholder="ABC123"
           maxLength={6}
         />
-        <ErrorText message={error} />
+        {blockedTitle ? (
+          <Text style={styles.errorTitle}>{blockedTitle}</Text>
+        ) : null}
+        <ErrorText nativeID="setup-error" message={error} />
         <PrimaryButton
           label="Join couple"
           onPress={() => void onJoin()}
           loading={joining}
-          disabled={inviteCode.trim().length !== 6}
         />
 
-        <View style={styles.preview}>
-          <Text style={styles.previewLabel}>Daily check-ins look like this</Text>
-          <View style={styles.faces}>
-            {[1, 2, 3, 4, 5].map((score) => (
-              <FaceIcon key={score} score={score} size={28} />
-            ))}
-          </View>
-          <Text style={styles.previewHint}>
-            Their day stays hidden until they check in too.
-          </Text>
-        </View>
         {accountLinks}
       </ScrollView>
       <ConfirmDialog
         visible={confirmDelete}
         title="Delete account?"
-        body="This permanently removes your profile and sign-in."
+        body={DELETE_SEMANTICS}
         confirmLabel="Delete account"
         destructive
         busy={deleting}
@@ -234,40 +322,16 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginBottom: 16,
   },
-  sectionTitle: {
-    ...type.heading,
-    marginTop: 28,
-    marginBottom: 8,
-  },
   or: {
     ...type.label,
     textAlign: 'center',
     marginVertical: 12,
   },
-  code: {
-    ...type.heading,
-    letterSpacing: 6,
-    textAlign: 'center',
-    marginVertical: 20,
-  },
-  preview: {
-    marginTop: 28,
-    paddingTop: 20,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-  },
-  previewLabel: {
-    ...type.label,
-    marginBottom: 10,
-  },
-  faces: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  previewHint: {
+  errorTitle: {
     ...type.body,
-    color: colors.muted,
-    marginTop: 10,
+    fontWeight: '500',
+    marginTop: 8,
+    marginBottom: 4,
   },
   account: {
     marginTop: 28,

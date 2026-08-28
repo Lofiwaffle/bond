@@ -1,36 +1,41 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useRef, useState } from 'react'
 import {
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  type TextInput,
 } from 'react-native'
-import { Redirect, router } from 'expo-router'
-import * as Clipboard from 'expo-clipboard'
+import { Redirect, router, type Href } from 'expo-router'
 
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
+import { InviteShare } from '../../../components/InviteShare'
+import { NotificationSettings } from '../../../components/NotificationSettings'
 import {
   ErrorText,
+  Field,
   LoadingScreen,
   PrimaryButton,
   Screen,
+  StatusPanel,
   TextLink,
 } from '../../../components/ui'
-import { computeStreak, useCheckInHistory } from '../../../hooks/useCheckIn'
-import { useHabitBadges } from '../../../hooks/useHabitBadges'
+import { useTodayCheckIn } from '../../../hooks/useCheckIn'
+import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useAuth } from '../../../lib/auth'
-import { BADGES, badgesForProgress } from '../../../lib/badges'
-import { localDateString } from '../../../lib/dates'
-import { Icon, type IconName } from '../../../lib/icons'
 import {
-  areNotificationsEnabled,
-  disableNotifications,
-  enableNotifications,
-  syncCheckInReminder,
-} from '../../../lib/notifications'
-import { colors, hairlineWidth, type } from '../../../lib/theme'
+  ACCOUNT_DELETION_REQUEST_URL,
+  SUPPORT_URL,
+} from '../../../lib/appUrls'
+import { buildExportBundle, shareExportBundle } from '../../../lib/exportData'
+import { DELETE_SEMANTICS, UNPAIR_SEMANTICS } from '../../../lib/privacy'
+import { PLUS_LIFETIME_COPY, PLUS_PROMO_HINT } from '../../../lib/bondPlus'
+import { focusInput } from '../../../lib/formFocus'
+import { useToast } from '../../../lib/toast'
+import { colors, hairlineWidth, hit, type } from '../../../lib/theme'
 
 function initialOf(name: string): string {
   return name.trim().slice(0, 1).toUpperCase() || '?'
@@ -46,93 +51,41 @@ function togetherSinceLabel(iso: string | null | undefined): string {
   })}`
 }
 
-const LINKS: Array<{
-  id: string
-  icon: IconName
-  title: string
-  body: string
-  href: '/(app)/bond/achievements' | '/(app)/bond/streaks' | '/(app)/bond/goals' | '/(app)/bond/reviews' | '/(app)/weekly-review'
-}> = [
-  {
-    id: 'achievements',
-    icon: 'calendar',
-    title: 'Achievements',
-    body: 'Calendar and notes',
-    href: '/(app)/bond/achievements',
-  },
-  {
-    id: 'streaks',
-    icon: 'trending-up',
-    title: 'Streaks',
-    body: 'Daily streak and rhythm',
-    href: '/(app)/bond/streaks',
-  },
-  {
-    id: 'goals',
-    icon: 'target',
-    title: 'Goals',
-    body: 'Shared SMART goals',
-    href: '/(app)/bond/goals',
-  },
-  {
-    id: 'reviews',
-    icon: 'book-open',
-    title: 'Reviews',
-    body: 'Past weekly review summaries',
-    href: '/(app)/bond/reviews',
-  },
-  {
-    id: 'weekly',
-    icon: 'edit-3',
-    title: 'Weekly review',
-    body: 'Look back on the week together',
-    href: '/(app)/weekly-review',
-  },
-]
-
-export default function MoreScreen() {
+export default function UsScreen() {
   const {
     profile,
     couple,
     partner,
     user,
     isLoading,
+    updateDisplayName,
     signOut,
     refreshProfile,
     deleteAccount,
+    leaveCouple,
   } = useAuth()
-  const { days, isLoading: historyLoading, refresh: refreshHistory } =
-    useCheckInHistory()
-  const {
-    counts,
-    isLoading: habitsLoading,
-    refresh: refreshHabits,
-  } = useHabitBadges()
-  const [copied, setCopied] = useState(false)
+  const plus = useBondPlus()
+  const { isLoading: historyLoading, error: historyError, refresh: refreshHistory } =
+    useTodayCheckIn()
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState(profile?.display_name?.trim() ?? '')
+  const [savingName, setSavingName] = useState(false)
+  const [nameError, setNameError] = useState<string | null>(null)
+  const nameRef = useRef<TextInput>(null)
   const [deleting, setDeleting] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [notifyOn, setNotifyOn] = useState(false)
-  const [notifyBusy, setNotifyBusy] = useState(false)
-  const [notifyError, setNotifyError] = useState<string | null>(null)
+  const [leaveError, setLeaveError] = useState<string | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [promoDraft, setPromoDraft] = useState('')
+  const [applyingPromo, setApplyingPromo] = useState(false)
+  const [promoError, setPromoError] = useState<string | null>(null)
+  const { showToast } = useToast()
 
-  useEffect(() => {
-    void areNotificationsEnabled().then(setNotifyOn)
-  }, [])
-
-  const stats = useMemo(() => {
-    const today = localDateString()
-    const myDates = days.filter((d) => d.mine).map((d) => d.date)
-    const streak = computeStreak(myDates, today)
-    const myCheckIns = days.filter((d) => d.mine).length
-    const syncDays = days.filter((d) => d.revealed).length
-    const badges = badgesForProgress({ completions: counts })
-    const earned = badges.filter((b) => b.earned)
-    const habitLogs = Object.values(counts).reduce((a, n) => a + n, 0)
-    return { streak, myCheckIns, syncDays, badges, earned, habitLogs }
-  }, [counts, days])
-
-  if (isLoading || historyLoading || habitsLoading) return <LoadingScreen />
+  if (isLoading || historyLoading) return <LoadingScreen />
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
 
   const myName = profile.display_name?.trim() || 'You'
@@ -140,43 +93,82 @@ export default function MoreScreen() {
   const coupleTitle = partnerName ? `${myName} & ${partnerName}` : myName
   const since = togetherSinceLabel(couple?.paired_at ?? couple?.created_at)
 
-  const copyInviteCode = async () => {
-    if (!couple?.invite_code) return
-    await Clipboard.setStringAsync(couple.invite_code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const onSaveName = async () => {
+    if (savingName) return
+    if (!nameDraft.trim()) {
+      setNameError('Enter a display name')
+      focusInput(nameRef)
+      return
+    }
+    setNameError(null)
+    setSavingName(true)
+    const result = await updateDisplayName(nameDraft)
+    setSavingName(false)
+    if (result.error) {
+      setNameError(result.error)
+      focusInput(nameRef)
+      return
+    }
+    setEditingName(false)
+    showToast('Name saved')
   }
 
   const refreshAll = () => {
     void refreshProfile()
     void refreshHistory()
-    void refreshHabits()
   }
 
-  const onToggleNotifications = async () => {
-    setNotifyError(null)
-    setNotifyBusy(true)
-    if (notifyOn) {
-      await disableNotifications()
-      setNotifyOn(false)
-      setNotifyBusy(false)
+  const onExport = async () => {
+    if (exporting || !user?.id) return
+    setExportError(null)
+    setExporting(true)
+    const bundle = await buildExportBundle(user.id)
+    const result = await shareExportBundle(bundle)
+    setExporting(false)
+    if (result.error) {
+      setExportError(result.error)
       return
     }
-    const granted = await enableNotifications(user?.id)
-    setNotifyOn(granted)
-    setNotifyBusy(false)
-    if (!granted) {
-      setNotifyError(
-        'Allow notifications in your browser or phone settings to get reminders.',
-      )
+    showToast('Data export ready')
+  }
+
+  const onApplyPromo = async () => {
+    if (applyingPromo) return
+    const code = promoDraft.trim()
+    if (!code) {
+      setPromoError('Enter a promo code')
       return
     }
-    const today = localDateString()
-    const hasCompletedToday = days.some((day) => day.date === today && day.mine)
-    await syncCheckInReminder(Boolean(hasCompletedToday))
+    setPromoError(null)
+    setApplyingPromo(true)
+    const result = await plus.redeemPromo(code)
+    setApplyingPromo(false)
+    if (result.error) {
+      setPromoError(result.error)
+      return
+    }
+    setPromoDraft('')
+    showToast('Lifetime Bond Plus is on')
+  }
+
+  const onLeaveCouple = async () => {
+    if (leaving) return
+    setLeaveError(null)
+    setLeaving(true)
+    const result = await leaveCouple()
+    setLeaving(false)
+    if (result.error) {
+      setConfirmLeave(false)
+      setLeaveError(result.error)
+      return
+    }
+    setConfirmLeave(false)
+    showToast('You left this Bond')
+    router.replace('/(app)/setup')
   }
 
   const onDeleteAccount = async () => {
+    if (deleting) return
     setDeleteError(null)
     setDeleting(true)
     const result = await deleteAccount()
@@ -195,9 +187,15 @@ export default function MoreScreen() {
           <RefreshControl refreshing={false} onRefresh={refreshAll} />
         }
       >
-        <Text style={styles.label}>Couple portfolio</Text>
+        <Text style={styles.label}>Us</Text>
         <Text style={styles.heroTitle}>{coupleTitle}</Text>
         <Text style={styles.heroSub}>{since}</Text>
+        {historyError ? (
+          <StatusPanel
+            message="Couldn't refresh your couple."
+            onRetry={refreshAll}
+          />
+        ) : null}
 
         <View style={styles.avatarRow}>
           <View style={styles.avatar}>
@@ -229,119 +227,145 @@ export default function MoreScreen() {
           </View>
         </View>
 
-        <View style={styles.statStrip}>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{stats.streak}</Text>
-            <Text style={styles.statLabel}>day streak</Text>
+        {editingName ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Your name</Text>
+            <Field
+              ref={nameRef}
+              value={nameDraft}
+              onChangeText={setNameDraft}
+              autoCapitalize="words"
+              accessibilityLabel="Display name"
+              placeholder="Alex"
+            />
+            <ErrorText nativeID="name-error" message={nameError} />
+            <PrimaryButton
+              label="Save name"
+              onPress={() => void onSaveName()}
+              loading={savingName}
+            />
+            <TextLink
+              label="Cancel"
+              onPress={() => {
+                setEditingName(false)
+                setNameDraft(myName === 'You' ? '' : myName)
+                setNameError(null)
+              }}
+            />
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{stats.earned.length}/5</Text>
-            <Text style={styles.statLabel}>earned</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{stats.syncDays}</Text>
-            <Text style={styles.statLabel}>sync days</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Highlights</Text>
-          <Text style={styles.sectionHint}>
-            Achievements you've unlocked together.
-          </Text>
-          <View style={styles.chipWrap}>
-            {BADGES.map((badge) => {
-              const earned = stats.badges.find((b) => b.id === badge.id)
-              const count = earned?.count ?? 0
-              const on = count > 0
-              return (
-                <View
-                  key={badge.id}
-                  style={[styles.chip, on && styles.chipOn]}
-                >
-                  <Icon
-                    name={badge.icon}
-                    size={14}
-                    color={on ? colors.onAccent : colors.ink}
-                  />
-                  <Text style={[styles.chipName, on && styles.chipNameOn]}>
-                    {badge.label}
-                  </Text>
-                </View>
-              )
-            })}
-          </View>
-          <Text style={styles.emptyHint}>
-            {stats.habitLogs === 0
-              ? 'No achievements yet. Open Achievements to start filling your portfolio.'
-              : `${stats.habitLogs} achievement${stats.habitLogs === 1 ? '' : 's'} logged · ${stats.myCheckIns} check-in${stats.myCheckIns === 1 ? '' : 's'}`}
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Together</Text>
-          <Text style={styles.sectionHint}>Jump into how you're growing.</Text>
-          {LINKS.map((item, index) => (
-            <Pressable
-              key={item.id}
-              accessibilityRole="button"
-              onPress={() => router.push(item.href)}
-              style={({ pressed }) => [
-                styles.linkRow,
-                index === LINKS.length - 1 && styles.linkRowLast,
-                pressed && styles.linkRowPressed,
-              ]}
-            >
-              <Icon name={item.icon} size={18} color={colors.ink} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.linkTitle}>{item.title}</Text>
-                <Text style={styles.linkBody}>{item.body}</Text>
-              </View>
-              <Icon name="chevron-right" size={16} color={colors.muted} />
-            </Pressable>
-          ))}
-        </View>
+        ) : (
+          <TextLink
+            label="Edit my name"
+            onPress={() => {
+              setNameDraft(profile.display_name?.trim() ?? '')
+              setEditingName(true)
+            }}
+          />
+        )}
 
         {!partner && couple?.invite_code ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Invite your partner</Text>
+            <Text style={styles.sectionTitle}>Pairing</Text>
             <Text style={styles.sectionHint}>
-              Share this code so your portfolio becomes a pair.
+              Share the link, show the QR, or send the code.
             </Text>
-            <Text style={styles.code}>{couple.invite_code}</Text>
-            <PrimaryButton
-              label={copied ? 'Copied' : 'Copy invite code'}
-              onPress={() => void copyInviteCode()}
+            <InviteShare
+              code={couple.invite_code}
+              fromName={profile.display_name}
+              onCopied={(message) => showToast(message)}
             />
           </View>
         ) : null}
 
         <View style={styles.accountBlock}>
           <Text style={styles.label}>Notifications</Text>
-          <Text style={styles.sectionHint}>
-            Daily check-in reminder at 8:00 PM, plus an alert when your partner
-            checks in, logs an achievement, or updates a goal.
-          </Text>
-          <TextLink
-            label={
-              notifyBusy
-                ? 'Working...'
-                : notifyOn
-                  ? 'Turn notifications off'
-                  : 'Turn notifications on'
-            }
-            onPress={() => void onToggleNotifications()}
-          />
-          {notifyError ? <ErrorText message={notifyError} /> : null}
+          <NotificationSettings />
 
-          <Text style={[styles.label, styles.accountLabel]}>Account</Text>
+          <Text style={[styles.label, styles.accountLabel]}>Purchases</Text>
+          <Text style={styles.sectionHint}>
+            {plus.plan === 'lifetime'
+              ? PLUS_LIFETIME_COPY
+              : plus.active
+                ? plus.status === 'trialing'
+                  ? 'Trial is on for both of you.'
+                  : 'Bond Plus is on for both of you.'
+                : `Deeper growth after three opened days. ${PLUS_PROMO_HINT} You never pay to see an answer already shared.`}
+          </Text>
+          {plus.plan === 'lifetime' ? null : (
+            <>
+              <Field
+                value={promoDraft}
+                onChangeText={setPromoDraft}
+                placeholder="Promo code"
+                accessibilityLabel="Promo code"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!applyingPromo}
+              />
+              {promoError ? <ErrorText message={promoError} /> : null}
+              <PrimaryButton
+                label={applyingPromo ? 'Applying…' : 'Apply code'}
+                onPress={() => void onApplyPromo()}
+                loading={applyingPromo}
+                disabled={applyingPromo}
+              />
+            </>
+          )}
+          <TextLink
+            label={plus.active ? 'Manage Bond Plus' : 'See Bond Plus'}
+            onPress={() => router.push('/(app)/plus' as Href)}
+          />
+
+          <Text style={[styles.label, styles.accountLabel]}>Privacy & safety</Text>
+          <Text style={styles.sectionHint}>
+            Bond is not therapy or emergency support. Who can see each entry is
+            listed in Privacy.
+          </Text>
           <TextLink
             label="Privacy"
             onPress={() => router.push('/privacy')}
           />
+          <TextLink
+            label="Help & safety"
+            onPress={() => router.push('/help' as Href)}
+          />
+          <TextLink
+            label="Report a problem"
+            onPress={() => void Linking.openURL(SUPPORT_URL)}
+          />
+          <TextLink
+            label={exporting ? 'Preparing download...' : 'Download my data'}
+            onPress={() => void onExport()}
+            disabled={exporting}
+          />
+          {exportError ? <ErrorText message={exportError} /> : null}
+
+          <Text style={[styles.label, styles.accountLabel]}>Account</Text>
           <TextLink label="Sign out" onPress={() => void signOut()} />
+          <TextLink
+            label="Request account & data deletion"
+            onPress={() => void Linking.openURL(ACCOUNT_DELETION_REQUEST_URL)}
+          />
+          {leaveError ? <ErrorText message={leaveError} /> : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Leave this Bond"
+            onPress={() => {
+              setLeaveError(null)
+              setConfirmLeave(true)
+            }}
+            disabled={leaving}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.deleteBtn,
+              pressed && styles.deleteBtnPressed,
+              leaving && styles.deleteBtnDisabled,
+            ]}
+          >
+            <Text style={styles.leaveLabel}>
+              {leaving ? 'Leaving...' : 'Leave this Bond'}
+            </Text>
+          </Pressable>
           {deleteError ? <ErrorText message={deleteError} /> : null}
           <Pressable
             accessibilityRole="button"
@@ -365,9 +389,19 @@ export default function MoreScreen() {
         </View>
       </ScrollView>
       <ConfirmDialog
+        visible={confirmLeave}
+        title="Leave this Bond?"
+        body={UNPAIR_SEMANTICS}
+        confirmLabel="Leave this Bond"
+        destructive
+        busy={leaving}
+        onCancel={() => setConfirmLeave(false)}
+        onConfirm={() => void onLeaveCouple()}
+      />
+      <ConfirmDialog
         visible={confirmDelete}
         title="Delete account?"
-        body="This permanently removes your profile and sign-in. Shared couple data stays for your partner until they delete their account too."
+        body={DELETE_SEMANTICS}
         confirmLabel="Delete account"
         destructive
         busy={deleting}
@@ -494,9 +528,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  chipOn: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
+    chipOn: {
+    backgroundColor: colors.accentFill,
+    borderColor: colors.accentFill,
   },
   chipName: {
     ...type.label,
@@ -515,6 +549,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    minHeight: hit,
     paddingVertical: 14,
     borderBottomWidth: hairlineWidth,
     borderBottomColor: colors.hairline,
@@ -524,6 +559,11 @@ const styles = StyleSheet.create({
   },
   linkRowPressed: {
     opacity: 0.7,
+  },
+  linkFocus: {
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.ink,
   },
   linkTitle: {
     ...type.body,
@@ -549,7 +589,9 @@ const styles = StyleSheet.create({
   },
   deleteBtn: {
     alignSelf: 'flex-start',
-    paddingVertical: 8,
+    minHeight: hit,
+    justifyContent: 'center',
+    paddingVertical: 12,
   },
   deleteBtnPressed: {
     opacity: 0.6,
@@ -560,5 +602,9 @@ const styles = StyleSheet.create({
   deleteLabel: {
     ...type.body,
     color: colors.danger,
+  },
+  leaveLabel: {
+    ...type.body,
+    color: colors.muted,
   },
 })

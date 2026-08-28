@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../lib/auth'
+import { isOnlineNow } from '../lib/network'
 import { supabase } from '../lib/supabase'
 import type { CoupleGoal, CoupleGoalReview } from '../types/database'
 import {
@@ -8,11 +9,25 @@ import {
   type SmartGoalDraft,
 } from '../lib/smartGoal'
 
+const OFFLINE =
+  'Reconnect to share this. It is not in the relationship until Bond confirms it.'
+
 function isSchemaMissing(message: string): boolean {
   return (
     message.includes('schema cache') ||
     message.toLowerCase().includes('does not exist')
   )
+}
+
+function sortByDeadline(goals: CoupleGoal[]): CoupleGoal[] {
+  return [...goals].sort((a, b) => {
+    if (a.deadline && b.deadline && a.deadline !== b.deadline) {
+      return a.deadline.localeCompare(b.deadline)
+    }
+    if (a.deadline && !b.deadline) return -1
+    if (!a.deadline && b.deadline) return 1
+    return b.created_at.localeCompare(a.created_at)
+  })
 }
 
 export function useCoupleGoal() {
@@ -70,20 +85,64 @@ export function useCoupleGoal() {
     void refresh()
   }, [refresh])
 
-  const activeGoals = useMemo(
+  useEffect(() => {
+    if (!user?.id || !profile?.couple_id) return
+
+    const channel = supabase
+      .channel(
+        `couple_goals:${profile.couple_id}:${Math.random().toString(36).slice(2)}`,
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'couple_goals',
+          filter: `couple_id=eq.${profile.couple_id}`,
+        },
+        () => {
+          void refresh()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [profile?.couple_id, refresh, user?.id])
+
+  const proposedByMe = useMemo(
     () =>
-      [...goals.filter((goal) => goal.status === 'active')].sort((a, b) => {
-        if (a.deadline && b.deadline && a.deadline !== b.deadline) {
-          return a.deadline.localeCompare(b.deadline)
-        }
-        if (a.deadline && !b.deadline) return -1
-        if (!a.deadline && b.deadline) return 1
-        return b.created_at.localeCompare(a.created_at)
-      }),
+      sortByDeadline(
+        goals.filter(
+          (goal) => goal.status === 'proposed' && goal.created_by === user?.id,
+        ),
+      ),
+    [goals, user?.id],
+  )
+  const proposedByPartner = useMemo(
+    () =>
+      sortByDeadline(
+        goals.filter(
+          (goal) => goal.status === 'proposed' && goal.created_by !== user?.id,
+        ),
+      ),
+    [goals, user?.id],
+  )
+  const activeGoals = useMemo(
+    () => sortByDeadline(goals.filter((goal) => goal.status === 'active')),
     [goals],
   )
   const completed = useMemo(
     () => goals.filter((goal) => goal.status === 'completed'),
+    [goals],
+  )
+  const declined = useMemo(
+    () => goals.filter((goal) => goal.status === 'declined'),
+    [goals],
+  )
+  const archived = useMemo(
+    () => goals.filter((goal) => goal.status === 'archived'),
     [goals],
   )
 
@@ -95,11 +154,12 @@ export function useCoupleGoal() {
   const setGoal = useCallback(
     async (draft: SmartGoalDraft) => {
       if (!user?.id || !profile?.couple_id) {
-        return { goal: null, error: 'You must be paired to set a goal' }
+        return { goal: null, error: 'You must be paired to offer a goal' }
       }
 
       const invalid = validateSmartGoal(draft)
       if (invalid) return { goal: null, error: invalid }
+      if (!isOnlineNow()) return { goal: null, error: OFFLINE }
 
       const payload = {
         couple_id: profile.couple_id,
@@ -109,7 +169,7 @@ export function useCoupleGoal() {
         realistic_plan: draft.realisticPlan.trim(),
         why: draft.why.trim(),
         deadline: draft.deadline.trim(),
-        status: 'active' as const,
+        status: 'proposed' as const,
       }
 
       const { data, error: insertError } = await supabase
@@ -138,7 +198,7 @@ export function useCoupleGoal() {
               created_by: user.id,
               outcome: draft.outcome.trim(),
               why: packedWhy.slice(0, 280),
-              status: 'active',
+              status: 'proposed',
             })
             .select('*')
             .single()
@@ -160,7 +220,7 @@ export function useCoupleGoal() {
   const addReview = useCallback(
     async (goalId: string, note: string) => {
       if (!user?.id || !profile?.couple_id) {
-        return { error: 'Set a shared goal first' }
+        return { error: 'Agree on a shared goal first' }
       }
 
       const trimmed = note.trim()
@@ -170,6 +230,7 @@ export function useCoupleGoal() {
       if (trimmed.length > 500) {
         return { error: 'Keep the review under 500 characters' }
       }
+      if (!isOnlineNow()) return { error: OFFLINE }
 
       const { error: insertError } = await supabase
         .from('couple_goal_reviews')
@@ -187,14 +248,12 @@ export function useCoupleGoal() {
     [profile?.couple_id, refresh, user?.id],
   )
 
-  const completeGoal = useCallback(
+  const acceptGoal = useCallback(
     async (goalId: string) => {
+      if (!isOnlineNow()) return { error: OFFLINE }
       const { error: updateError } = await supabase
         .from('couple_goals')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-        })
+        .update({ status: 'active' })
         .eq('id', goalId)
 
       if (updateError) return { error: updateError.message }
@@ -204,16 +263,97 @@ export function useCoupleGoal() {
     [refresh],
   )
 
+  const declineGoal = useCallback(
+    async (goalId: string) => {
+      if (!isOnlineNow()) return { error: OFFLINE }
+      const { error: updateError } = await supabase
+        .from('couple_goals')
+        .update({ status: 'declined' })
+        .eq('id', goalId)
+
+      if (updateError) return { error: updateError.message }
+      await refresh()
+      return { error: null }
+    },
+    [refresh],
+  )
+
+  const archiveGoal = useCallback(
+    async (goalId: string) => {
+      if (!isOnlineNow()) return { error: OFFLINE }
+      const { error: updateError } = await supabase
+        .from('couple_goals')
+        .update({ status: 'archived' })
+        .eq('id', goalId)
+
+      if (updateError) return { error: updateError.message }
+      await refresh()
+      return { error: null }
+    },
+    [refresh],
+  )
+
+  const completeGoal = useCallback(
+    async (goalId: string) => {
+      const goal = goals.find((item) => item.id === goalId)
+      if (!goal || goal.status !== 'active') {
+        return { error: 'This goal is not active yet.', waiting: false }
+      }
+      if (!user?.id) {
+        return { error: 'You must be signed in.', waiting: false }
+      }
+      if (!isOnlineNow()) return { error: OFFLINE, waiting: false }
+
+      if (goal.completion_requested_by === user.id) {
+        return {
+          error: 'Waiting for the other person to confirm this is done.',
+          waiting: true,
+        }
+      }
+
+      if (!goal.completion_requested_by) {
+        const { error: updateError } = await supabase
+          .from('couple_goals')
+          .update({
+            completion_requested_by: user.id,
+            completion_requested_at: new Date().toISOString(),
+          })
+          .eq('id', goalId)
+
+        if (updateError) return { error: updateError.message, waiting: false }
+        await refresh()
+        return { error: null, waiting: true }
+      }
+
+      const { error: updateError } = await supabase
+        .from('couple_goals')
+        .update({ status: 'completed' })
+        .eq('id', goalId)
+
+      if (updateError) return { error: updateError.message, waiting: false }
+      await refresh()
+      return { error: null, waiting: false }
+    },
+    [goals, refresh, user?.id],
+  )
+
   return {
     goals,
+    proposedByMe,
+    proposedByPartner,
     activeGoals,
     completed,
+    declined,
+    archived,
     reviewsFor,
     isLoading,
     error,
     refresh,
     setGoal,
     addReview,
+    acceptGoal,
+    declineGoal,
+    archiveGoal,
     completeGoal,
   }
 }

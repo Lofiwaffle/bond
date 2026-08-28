@@ -34,6 +34,10 @@ yarn-error.*
 .env
 .env*.local
 
+# generated screenshots
+artifacts/
+store/screenshots/*.png
+
 # typescript
 *.tsbuildinfo
 
@@ -47,3 +51,4 @@ play-service-account.json
 pc-api-*.json
 *.keystore
 credentials/
+credentials.json

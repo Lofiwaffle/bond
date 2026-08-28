@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
-import { useMemo } from 'react'
+import { forwardRef, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,8 +12,10 @@ import {
   View,
   useWindowDimensions,
   type TextInputProps,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ACTIVITIES, type ActivityId } from '../lib/activities'
 import {
@@ -26,22 +30,52 @@ import {
 import { localDateString } from '../lib/dates'
 import { FaceIcon, Icon, type IconName } from '../lib/icons'
 import {
-  SCORE_HINTS,
   SCORE_LABELS,
   colors,
   hairlineWidth,
+  hit,
+  phoneMaxWidth,
   radii,
   type,
 } from '../lib/theme'
 
+function isFocused(state: { pressed: boolean }): boolean {
+  return Boolean((state as { pressed: boolean; focused?: boolean }).focused)
+}
+
 export function Screen({
   children,
   style,
+  keyboard = false,
 }: {
   children: ReactNode
   style?: ViewStyle
+  keyboard?: boolean
 }) {
-  return <View style={[styles.screen, style]}>{children}</View>
+  const insets = useSafeAreaInsets()
+  const inner = (
+    <View
+      style={[
+        styles.screen,
+        {
+          paddingTop: Math.max(insets.top, 12) + 12,
+          paddingBottom: Math.max(insets.bottom, 16),
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  )
+  if (!keyboard) return inner
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.flex}
+    >
+      {inner}
+    </KeyboardAvoidingView>
+  )
 }
 
 export function Title({ children }: { children: ReactNode }) {
@@ -56,15 +90,49 @@ export function Label({ children }: { children: ReactNode }) {
   return <Text style={styles.label}>{children}</Text>
 }
 
-export function Field(props: TextInputProps) {
+export const Field = forwardRef<TextInput, TextInputProps>(function Field(
+  props,
+  ref,
+) {
+  const [focused, setFocused] = useState(false)
   return (
     <TextInput
+      ref={ref}
       placeholderTextColor={colors.muted}
       autoCapitalize="none"
       autoCorrect={false}
+      accessibilityLabel={props.accessibilityLabel ?? props.placeholder}
       {...props}
-      style={[styles.input, props.style]}
+      onFocus={(event) => {
+        setFocused(true)
+        props.onFocus?.(event)
+      }}
+      onBlur={(event) => {
+        setFocused(false)
+        props.onBlur?.(event)
+      }}
+      style={[styles.input, focused && styles.inputFocus, props.style]}
     />
+  )
+})
+
+export function ErrorText({
+  message,
+  nativeID,
+}: {
+  message: string | null
+  nativeID?: string
+}) {
+  if (!message) return null
+  return (
+    <Text
+      nativeID={nativeID}
+      accessibilityRole="alert"
+      accessibilityLiveRegion="assertive"
+      style={styles.error}
+    >
+      {message}
+    </Text>
   )
 }
 
@@ -79,16 +147,22 @@ export function PrimaryButton({
   disabled?: boolean
   loading?: boolean
 }) {
+  const busy = disabled || loading
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPress={onPress}
-      disabled={disabled || loading}
-      style={({ pressed }) => [
+      accessibilityState={{ disabled: busy, busy: Boolean(loading) }}
+      onPress={() => {
+        if (busy) return
+        onPress()
+      }}
+      disabled={busy}
+      style={(state) => [
         styles.button,
-        (disabled || loading) && styles.buttonDisabled,
-        pressed && !disabled && !loading && styles.buttonPressed,
+        busy && styles.buttonDisabled,
+        state.pressed && !busy && styles.buttonPressed,
+        isFocused(state) && styles.focusRing,
       ]}
     >
       {loading ? (
@@ -116,10 +190,11 @@ export function TextLink({
       onPress={onPress}
       disabled={disabled}
       hitSlop={8}
-      style={({ pressed }) => [
+      style={(state) => [
         styles.textLink,
         disabled && styles.buttonDisabled,
-        pressed && !disabled && styles.textLinkPressed,
+        state.pressed && !disabled && styles.textLinkPressed,
+        isFocused(state) && styles.focusRing,
       ]}
     >
       <Text style={styles.textLinkLabel}>{label}</Text>
@@ -152,23 +227,72 @@ export function IconButton({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
-      hitSlop={12}
-      style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.6 }]}
+      hitSlop={8}
+      style={(state) => [
+        styles.iconButton,
+        state.pressed && { opacity: 0.6 },
+        isFocused(state) && styles.focusRing,
+      ]}
     >
       <Icon name={name} size={18} color={color} />
     </Pressable>
   )
 }
 
-export function ErrorText({ message }: { message: string | null }) {
-  if (!message) return null
-  return <Text style={styles.error}>{message}</Text>
+export function LoadingScreen({ label = 'Loading Bond' }: { label?: string }) {
+  return (
+    <View
+      style={styles.loading}
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
+    >
+      <ActivityIndicator size="large" color={colors.muted} />
+      <Text style={styles.loadingLabel}>{label}</Text>
+    </View>
+  )
 }
 
-export function LoadingScreen() {
+export function EmptyState({
+  title,
+  body,
+  actionLabel,
+  onAction,
+}: {
+  title: string
+  body: string
+  actionLabel?: string
+  onAction?: () => void
+}) {
   return (
-    <View style={styles.loading}>
-      <ActivityIndicator size="large" color={colors.muted} />
+    <View style={styles.empty} accessibilityRole="summary">
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptyBody}>{body}</Text>
+      {actionLabel && onAction ? (
+        <PrimaryButton label={actionLabel} onPress={onAction} />
+      ) : null}
+    </View>
+  )
+}
+
+export function StatusPanel({
+  message,
+  onRetry,
+  retryLabel = 'Try again',
+}: {
+  message: string
+  onRetry?: () => void
+  retryLabel?: string
+}) {
+  return (
+    <View
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
+      style={styles.status}
+    >
+      <Text style={styles.statusText}>{message}</Text>
+      {onRetry ? (
+        <PrimaryButton label={retryLabel} onPress={onRetry} />
+      ) : null}
     </View>
   )
 }
@@ -253,6 +377,8 @@ export function ScoreScale({
   value: number | null
   onChange: (score: number) => void
 }) {
+  const { width } = useWindowDimensions()
+  const face = width < 360 ? 40 : 52
   return (
     <View>
       <View style={styles.scaleRow}>
@@ -263,15 +389,16 @@ export function ScoreScale({
               key={score}
               accessibilityRole="button"
               accessibilityState={{ selected }}
-              accessibilityLabel={`${score}, ${SCORE_LABELS[score]}`}
+              accessibilityLabel={SCORE_LABELS[score]}
               onPress={() => onChange(score)}
-              style={({ pressed }) => [
+              style={(state) => [
                 styles.scaleCell,
                 selected && styles.scaleCellSelected,
-                pressed && styles.scaleCellPressed,
+                state.pressed && styles.scaleCellPressed,
+                isFocused(state) && styles.focusRing,
               ]}
             >
-              <FaceIcon score={score} size={52} />
+              <FaceIcon score={score} size={face} />
             </Pressable>
           )
         })}
@@ -281,9 +408,7 @@ export function ScoreScale({
         <Text style={styles.label}>{SCORE_LABELS[5]}</Text>
       </View>
       {value != null ? (
-        <Text style={styles.scaleHint}>
-          {SCORE_LABELS[value]} · {SCORE_HINTS[value]}
-        </Text>
+        <Text style={styles.scaleHint}>{SCORE_LABELS[value]}</Text>
       ) : null}
     </View>
   )
@@ -324,17 +449,19 @@ export function ActivityChips({
         const selected = value.includes(activity.id)
         const blocked = !selected && value.length >= max
         return (
-          <Pressable
+            <Pressable
             key={activity.id}
             accessibilityRole="button"
             accessibilityState={{ selected, disabled: blocked }}
             accessibilityLabel={activity.label}
             disabled={blocked}
             onPress={() => toggle(activity.id)}
-            style={[
+            style={(state) => [
               styles.chip,
               selected && styles.chipSelected,
               blocked && styles.chipBlocked,
+              state.pressed && !blocked && { opacity: 0.8 },
+              isFocused(state) && styles.focusRing,
             ]}
           >
             <Icon
@@ -383,7 +510,7 @@ export function ReadOnlyChips({ ids }: { ids: string[] }) {
 export function StreakChip({ streak }: { streak: number }) {
   return (
     <Text style={styles.streakLabel}>
-      {streak} day streak
+      {streak} day{streak === 1 ? '' : 's'} connected
     </Text>
   )
 }
@@ -407,6 +534,7 @@ export function AchievementCalendar({
   weekCount?: number
 }) {
   const { width } = useWindowDimensions()
+  const frameWidth = Math.min(width, phoneMaxWidth)
   const weeks = useMemo(() => habitCalendarWeeks(weekCount), [weekCount])
   const dayCounts = useMemo(() => habitDayCounts(completions), [completions])
   const noteDates = useMemo(() => {
@@ -435,7 +563,7 @@ export function AchievementCalendar({
     return badgesForProgress({ completions: counts })
   }, [dayCounts])
 
-  const available = Math.max(220, width - 40 - WEEKDAY_COL - 8)
+  const available = Math.max(220, frameWidth - 40 - WEEKDAY_COL - 8)
   const cell = Math.max(
     22,
     Math.min(
@@ -603,12 +731,13 @@ export function BadgeRow({
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
     paddingHorizontal: 20,
-    paddingTop: 56,
-    paddingBottom: 24,
   },
   title: {
     ...type.heading,
@@ -631,17 +760,34 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 15,
-    lineHeight: 21,
+    minHeight: hit,
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: '400',
     color: colors.ink,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
+  inputFocus: Platform.select<TextStyle>({
+    web: {
+      outlineWidth: 2,
+      outlineColor: colors.ink,
+      outlineStyle: 'solid',
+      outlineOffset: 2,
+    },
+    default: {
+      borderColor: colors.ink,
+    },
+  }),
   button: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.accentFill,
     borderRadius: radii.pill,
-    paddingVertical: 15,
+    minHeight: hit,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 8,
   },
   buttonPressed: {
@@ -652,13 +798,15 @@ const styles = StyleSheet.create({
   },
   buttonLabel: {
     color: colors.onAccent,
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: '500',
   },
   textLink: {
     alignItems: 'center',
-    paddingVertical: 14,
+    justifyContent: 'center',
+    minHeight: hit,
+    paddingVertical: 12,
   },
   textLinkPressed: {
     opacity: 0.6,
@@ -668,16 +816,25 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   iconButton: {
-    width: 32,
-    height: 32,
+    width: hit,
+    height: hit,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  focusRing: Platform.select({
+    web: {
+      outlineWidth: 2,
+      outlineColor: colors.ink,
+      outlineStyle: 'solid',
+      outlineOffset: 2,
+    },
+    default: {},
+  }) as ViewStyle,
   error: {
     color: colors.danger,
     marginBottom: 8,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 15,
+    lineHeight: 21,
     fontWeight: '400',
   },
   loading: {
@@ -685,6 +842,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.bg,
+    gap: 12,
+  },
+  loadingLabel: {
+    ...type.label,
+    marginBottom: 0,
+  },
+  empty: {
+    paddingVertical: 28,
+    paddingHorizontal: 8,
+  },
+  emptyTitle: {
+    ...type.heading,
+    marginBottom: 8,
+  },
+  emptyBody: {
+    ...type.body,
+    color: colors.muted,
+    marginBottom: 16,
+  },
+  status: {
+    paddingVertical: 12,
+    gap: 8,
+  },
+  statusText: {
+    ...type.body,
+    color: colors.danger,
   },
   divider: {
     height: hairlineWidth,
@@ -730,6 +913,8 @@ const styles = StyleSheet.create({
   },
   scaleCell: {
     flex: 1,
+    minWidth: hit,
+    minHeight: hit,
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -762,17 +947,18 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: hit,
     gap: 6,
     borderWidth: hairlineWidth,
     borderColor: colors.border,
     borderRadius: radii.pill,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     backgroundColor: 'transparent',
   },
   chipSelected: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
+    backgroundColor: colors.accentFill,
+    borderColor: colors.accentFill,
   },
   chipBlocked: {
     opacity: 0.35,

@@ -2,11 +2,11 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router, useLocalSearchParams } from 'expo-router'
 
 import {
-  ErrorText,
   LoadingScreen,
   PrimaryButton,
   ScoreMark,
   Screen,
+  StatusPanel,
   TextLink,
 } from '../../../components/ui'
 import { useDayDetail } from '../../../hooks/useCheckIn'
@@ -37,14 +37,16 @@ export default function DayDetailScreen() {
         {isToday ? "Today's check-in details" : 'Historical check-in and notes'}
       </Text>
 
-      <ErrorText message={error} />
+      {error ? (
+        <StatusPanel message="Couldn't load this day." />
+      ) : null}
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         {!detail?.mine && isToday ? (
           <View style={styles.section}>
             <Text style={styles.emptyTitle}>No check-in yet today</Text>
             <Text style={styles.emptyBody}>
-              Save today's connection score to start building your streak.
+              How connected do you feel today? One question at a time.
             </Text>
             <PrimaryButton
               label="Check in now"
@@ -70,7 +72,7 @@ export default function DayDetailScreen() {
               <View style={styles.scoreLine}>
                 <ScoreMark score={detail.mine.score} size={28} />
                 <Text style={styles.scoreText}>
-                  {detail.mine.score} · {SCORE_LABELS[detail.mine.score]}
+                  {SCORE_LABELS[detail.mine.score]}
                 </Text>
               </View>
               <Text style={styles.noteHeading}>Today's prompt</Text>
@@ -79,9 +81,9 @@ export default function DayDetailScreen() {
               </Text>
               <Text style={styles.noteHeading}>Your answer</Text>
               <Text style={styles.note}>
-                {detail.mine.prompt_answer?.trim() ||
-                  detail.mine.note?.trim() ||
-                  'No answer written.'}
+                {detail.mine.prompt_answer?.trim()
+                  ? detail.mine.prompt_answer
+                  : "I didn't have words today."}
               </Text>
             </View>
 
@@ -94,15 +96,14 @@ export default function DayDetailScreen() {
                   <View style={styles.scoreLine}>
                     <ScoreMark score={detail.partner.score} size={28} />
                     <Text style={styles.scoreText}>
-                      {detail.partner.score} ·{' '}
                       {SCORE_LABELS[detail.partner.score]}
                     </Text>
                   </View>
                   <Text style={styles.noteHeading}>Their answer</Text>
                   <Text style={styles.note}>
-                    {detail.partner.prompt_answer?.trim() ||
-                      detail.partner.note?.trim() ||
-                      'No answer written.'}
+                    {detail.partner.prompt_answer?.trim()
+                      ? detail.partner.prompt_answer
+                      : "I didn't have words today."}
                   </Text>
                 </>
               ) : (

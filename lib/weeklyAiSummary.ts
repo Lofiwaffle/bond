@@ -1,11 +1,11 @@
 /**
- * Client-side fallback narrative when the edge function / OpenAI is unavailable.
- * Still walks every daily check-in in the week.
+ * Client-side fallback when the edge function is unavailable.
+ * Quotes original words. No diagnosis, blame, or partner ranking.
  */
 import { SCORE_LABELS } from './theme'
 import { activityById } from './activities'
 import { formatDisplayDate } from './dates'
-import type { WeeklyAnswer } from './weeklyPrompts'
+import { displayWeeklyAnswer, type WeeklyAnswer } from './weeklyPrompts'
 
 export type WeekCheckInSlice = {
   date: string
@@ -13,11 +13,13 @@ export type WeekCheckInSlice = {
     score: number
     note: string | null
     activities?: string[] | null
+    prompt_answer?: string | null
   } | null
   partner: {
     score: number
     note: string | null
     activities?: string[] | null
+    prompt_answer?: string | null
   } | null
   revealed: boolean
 }
@@ -27,7 +29,7 @@ function activityLine(ids: string[] | null | undefined): string {
   const labels = ids
     .map((id) => activityById(id)?.label ?? id)
     .filter(Boolean)
-  return labels.length ? ` Activities: ${labels.join(', ')}.` : ''
+  return labels.length ? ` ${labels.join(', ')}.` : ''
 }
 
 export function buildFallbackWeeklySummary(input: {
@@ -35,69 +37,59 @@ export function buildFallbackWeeklySummary(input: {
   weekEnd: string
   partnerName: string
   days: WeekCheckInSlice[]
+  mineAnswers?: WeeklyAnswer[]
+  partnerAnswers?: WeeklyAnswer[]
 }): string {
   const { weekStart, weekEnd, partnerName, days } = input
   const lines: string[] = []
   lines.push(
-    `Bond week summary (${formatDisplayDate(weekStart)} – ${formatDisplayDate(weekEnd)}).`,
+    `A suggested reading of ${formatDisplayDate(weekStart)} – ${formatDisplayDate(weekEnd)}. Not a verdict.`,
   )
 
-  const myScores = days
-    .map((d) => d.mine?.score)
-    .filter((s): s is number => typeof s === 'number')
-  const partnerScores = days
-    .filter((d) => d.revealed && d.partner)
-    .map((d) => d.partner!.score)
+  const myDays = days.filter((d) => d.mine).length
+  const openDays = days.filter((d) => d.revealed).length
+  lines.push(
+    `You checked in on ${myDays} day${myDays === 1 ? '' : 's'}. ${openDays} day${openDays === 1 ? '' : 's'} opened for both of you.`,
+  )
 
-  if (myScores.length) {
-    const avg = myScores.reduce((a, b) => a + b, 0) / myScores.length
-    lines.push(
-      `Your average connection was ${avg.toFixed(1)} (${SCORE_LABELS[Math.round(avg)] ?? 'Stagnant'}) across ${myScores.length} check-in${myScores.length === 1 ? '' : 's'}.`,
-    )
-  } else {
-    lines.push('You have no daily check-ins logged for this week yet.')
-  }
-
-  if (partnerScores.length) {
-    const avg = partnerScores.reduce((a, b) => a + b, 0) / partnerScores.length
-    lines.push(
-      `${partnerName}'s revealed average was ${avg.toFixed(1)} (${SCORE_LABELS[Math.round(avg)] ?? 'Stagnant'}).`,
-    )
-  }
-
-  lines.push('Day by day:')
+  lines.push('Days you named:')
   for (const day of [...days].sort((a, b) => a.date.localeCompare(b.date))) {
+    if (!day.mine && !(day.revealed && day.partner)) continue
     const label = formatDisplayDate(day.date)
-    if (!day.mine && !day.partner) {
-      lines.push(`• ${label}: no check-ins.`)
-      continue
-    }
     const parts: string[] = [`• ${label}:`]
     if (day.mine) {
-      parts.push(
-        `you ${day.mine.score}/5 (${SCORE_LABELS[day.mine.score]})${activityLine(day.mine.activities)}.`,
-      )
-      if (day.mine.note?.trim()) {
-        parts.push(`Your note: “${day.mine.note.trim()}”.`)
-      }
-    } else {
-      parts.push('you did not check in.')
+      parts.push(`you felt ${SCORE_LABELS[day.mine.score] ?? 'Neutral'}.${activityLine(day.mine.activities)}`)
+      const words = day.mine.prompt_answer?.trim() || day.mine.note?.trim()
+      if (words) parts.push(`You wrote: “${words}”.`)
     }
     if (day.revealed && day.partner) {
       parts.push(
-        `${partnerName} ${day.partner.score}/5 (${SCORE_LABELS[day.partner.score]})${activityLine(day.partner.activities)}.`,
+        `${partnerName} felt ${SCORE_LABELS[day.partner.score] ?? 'Neutral'}.${activityLine(day.partner.activities)}`,
       )
-      if (day.partner.note?.trim()) {
-        parts.push(`Their note: “${day.partner.note.trim()}”.`)
-      }
-    } else if (day.mine && !day.revealed) {
-      parts.push(`${partnerName}'s entry is still hidden.`)
+      const words = day.partner.prompt_answer?.trim() || day.partner.note?.trim()
+      if (words) parts.push(`They wrote: “${words}”.`)
     }
     lines.push(parts.join(' '))
   }
 
+  const prompts = input.mineAnswers?.length
+    ? input.mineAnswers
+    : input.partnerAnswers ?? []
+  if (prompts.length && input.mineAnswers && input.partnerAnswers) {
+    lines.push('Your words from last week’s review:')
+    for (let i = 0; i < prompts.length; i++) {
+      const prompt = prompts[i]?.prompt_text?.trim()
+      if (!prompt) continue
+      const yours = displayWeeklyAnswer(input.mineAnswers[i])
+      const theirs = displayWeeklyAnswer(input.partnerAnswers[i])
+      lines.push(prompt)
+      if (yours) lines.push(`You: ${yours}`)
+      if (theirs) lines.push(`${partnerName}: ${theirs}`)
+    }
+  }
+
   lines.push(
-    'Keep showing up for each other. Small daily check-ins are how Bond grows.',
+    'This is a suggestion for conversation, not a diagnosis of the relationship.',
   )
   return lines.join('\n')
 }
@@ -119,8 +111,8 @@ export function buildCompletedReviewSummary(input: {
   for (let i = 0; i < prompts.length; i++) {
     const prompt = prompts[i]?.prompt_text?.trim()
     if (!prompt) continue
-    const yours = input.mine[i]?.answer?.trim()
-    const theirs = input.partner[i]?.answer?.trim()
+    const yours = displayWeeklyAnswer(input.mine[i])
+    const theirs = displayWeeklyAnswer(input.partner[i])
     lines.push(prompt)
     if (yours) lines.push(`${input.myName}: ${yours}`)
     if (theirs) lines.push(`${input.partnerName}: ${theirs}`)

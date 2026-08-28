@@ -24,6 +24,23 @@ export default function Root({ children }: PropsWithChildren) {
         <link rel="manifest" href={`${base}/manifest.webmanifest`} />
         <link rel="apple-touch-icon" href={`${base}/pwa-192.png`} />
         <ScrollViewStyleReset />
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              html, body, #root {
+                height: 100%;
+                margin: 0;
+              }
+              body {
+                background: #E4D8DE;
+              }
+              #root {
+                display: flex;
+                justify-content: center;
+              }
+            `,
+          }}
+        />
       </head>
       <body>{children}</body>
     </html>

@@ -1,20 +1,53 @@
-import { useState } from 'react'
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native'
-import { Link, Redirect } from 'expo-router'
+import { useEffect, useRef, useState } from 'react'
+import { ScrollView, StyleSheet, Text, type TextInput } from 'react-native'
+import { Link, Redirect, useLocalSearchParams, type Href } from 'expo-router'
 
-import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen } from '../../components/ui'
+import { AuthFooter } from '../../components/AuthFooter'
+import { GoogleSignInButton } from '../../components/GoogleSignInButton'
+import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen, StatusPanel } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
+import { CONFIRM_EMAIL_MESSAGE, RESEND_COOLDOWN_MS } from '../../lib/authRedirect'
+import { savePendingInvite } from '../../lib/invite'
+import { focusFirstInvalid } from '../../lib/formFocus'
 import { Icon } from '../../lib/icons'
 import { colors, type } from '../../lib/theme'
 
 export default function LoginScreen() {
-  const { session, profile, isLoading, signIn } = useAuth()
+  const {
+    session,
+    profile,
+    isLoading,
+    signIn,
+    signInWithGoogle,
+    sessionError,
+    retrySession,
+    passwordRecovery,
+    resendConfirmation,
+  } = useAuth()
+  const params = useLocalSearchParams<{ invite?: string | string[] }>()
+  const inviteParam = Array.isArray(params.invite) ? params.invite[0] : params.invite
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [needsConfirmation, setNeedsConfirmation] = useState(false)
+  const [cooldownUntil, setCooldownUntil] = useState(0)
+  const [now, setNow] = useState(Date.now())
+  const emailRef = useRef<TextInput>(null)
+  const passwordRef = useRef<TextInput>(null)
+
+  useEffect(() => {
+    if (inviteParam) void savePendingInvite(inviteParam)
+  }, [inviteParam])
+
+  useEffect(() => {
+    if (cooldownUntil <= Date.now()) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [cooldownUntil])
 
   if (isLoading) return <LoadingScreen />
+  if (passwordRecovery) return <Redirect href={'/update-password' as Href} />
   if (session) {
     return (
       <Redirect
@@ -23,68 +56,151 @@ export default function LoginScreen() {
     )
   }
 
+  const remaining = Math.max(0, Math.ceil((cooldownUntil - now) / 1000))
+
   const onSubmit = async () => {
+    if (submitting) return
+    const emailMissing = !email.trim()
+    const emailInvalid = !emailMissing && !email.includes('@')
+    const passwordMissing = !password
+    if (emailMissing || emailInvalid || passwordMissing) {
+      setError(
+        emailMissing
+          ? 'Enter an email'
+          : emailInvalid
+            ? 'Enter a valid email'
+            : 'Enter a password',
+      )
+      focusFirstInvalid([
+        { ref: emailRef, invalid: emailMissing || emailInvalid },
+        { ref: passwordRef, invalid: passwordMissing },
+      ])
+      return
+    }
     setError(null)
+    setNeedsConfirmation(false)
     setSubmitting(true)
     const result = await signIn(email, password)
+    setSubmitting(false)
+    if (result.emailNotConfirmed) {
+      setNeedsConfirmation(true)
+      setError(result.error)
+      emailRef.current?.focus()
+      return
+    }
+    if (result.error) {
+      setError(result.error)
+      passwordRef.current?.focus()
+    }
+  }
+
+  const onGoogle = async () => {
+    if (submitting) return
+    setError(null)
+    setNeedsConfirmation(false)
+    setSubmitting(true)
+    const result = await signInWithGoogle()
     setSubmitting(false)
     if (result.error) setError(result.error)
   }
 
+  const onResend = async () => {
+    if (submitting || remaining > 0) return
+    setError(null)
+    setSubmitting(true)
+    const result = await resendConfirmation(email)
+    setSubmitting(false)
+    setCooldownUntil(Date.now() + RESEND_COOLDOWN_MS)
+    if (result.error) setError(result.error)
+    else setError(CONFIRM_EMAIL_MESSAGE)
+  }
+
   return (
-    <Screen>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
+    <Screen keyboard>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ flexGrow: 1 }}
       >
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ flexGrow: 1 }}
-        >
-          <Icon name="heart" size={28} color={colors.ink} />
-          <Text style={styles.title}>Bond</Text>
-          <Text style={styles.subtitle}>Sign in to check in with your partner.</Text>
-
-          <Label>Email</Label>
-          <Field
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            autoComplete="email"
-            placeholder="you@example.com"
+        <Icon name="heart" size={28} color={colors.ink} />
+        <Text style={styles.title}>Bond</Text>
+        <Text style={styles.subtitle}>
+          {inviteParam
+            ? 'Sign in to join the Bond waiting for you.'
+            : 'Welcome back to your daily ritual.'}
+        </Text>
+        {sessionError ? (
+          <StatusPanel
+            message="Couldn't restore your session."
+            onRetry={() => void retrySession()}
           />
+        ) : null}
 
-          <Label>Password</Label>
-          <Field
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            textContentType="password"
-            autoComplete="password"
-            placeholder="••••••••"
-          />
+        <GoogleSignInButton
+          onPress={() => void onGoogle()}
+          loading={submitting}
+        />
+        <Text style={styles.or}>or</Text>
 
-          <ErrorText message={error} />
+        <Label>Email</Label>
+        <Field
+          ref={emailRef}
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          autoComplete="email"
+          accessibilityLabel="Email"
+          placeholder="you@example.com"
+        />
 
+        <Label>Password</Label>
+        <Field
+          ref={passwordRef}
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          textContentType="password"
+          autoComplete="password"
+          accessibilityLabel="Password"
+          placeholder="••••••••"
+        />
+
+        <ErrorText nativeID="login-error" message={error} />
+
+        <PrimaryButton
+          label="Sign in"
+          onPress={() => void onSubmit()}
+          loading={submitting}
+        />
+
+        {needsConfirmation ? (
           <PrimaryButton
-            label="Sign in"
-            onPress={onSubmit}
+            label={
+              remaining > 0
+                ? `Resend in ${remaining}s`
+                : 'Send confirmation link'
+            }
+            onPress={() => void onResend()}
             loading={submitting}
-            disabled={!email || !password}
+            disabled={remaining > 0 || !email}
           />
+        ) : null}
 
-          <Link href="/(auth)/signup" style={styles.link}>
-            Need an account? Sign up
-          </Link>
-          <Link href="/connect" style={styles.privacy}>
-            Change server
-          </Link>
-          <Link href="/privacy" style={styles.privacy}>
-            Privacy
-          </Link>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <Link href={'/forgot-password' as Href} style={styles.link}>
+          Forgot password?
+        </Link>
+        <Link
+          href={
+            inviteParam
+              ? ({ pathname: '/(auth)/signup', params: { invite: inviteParam } } as Href)
+              : '/(auth)/signup'
+          }
+          style={styles.link}
+        >
+          Create a Bond
+        </Link>
+        <AuthFooter />
+      </ScrollView>
     </Screen>
   )
 }
@@ -100,16 +216,15 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginBottom: 22,
   },
+  or: {
+    ...type.label,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
   link: {
     marginTop: 20,
     textAlign: 'center',
     ...type.body,
-    color: colors.muted,
-  },
-  privacy: {
-    marginTop: 12,
-    textAlign: 'center',
-    ...type.label,
     color: colors.muted,
   },
 })

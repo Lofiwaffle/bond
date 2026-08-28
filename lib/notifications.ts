@@ -1,99 +1,109 @@
-import { Platform } from 'react-native'
+import { AppState, Platform } from 'react-native'
 import * as Device from 'expo-device'
 import * as Notifications from 'expo-notifications'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import Constants from 'expo-constants'
 
+import { reportError } from './monitor'
+import { LOCK_SCREEN_BODY, LOCK_SCREEN_TITLE } from './notificationCopy'
+import {
+  NOTIFICATION_DESTINATION,
+  type NotificationPrefs,
+  nextDailyReminderAt,
+  nextSnoozeAt,
+  safeNotificationUrl,
+} from './notificationSchedule'
 import { supabase } from './supabase'
 
-const ENABLED_KEY = 'bond.notifications.enabled'
-const REMINDER_ID_KEY = 'bond.checkin.reminderId'
-const WEB_REMINDER_DATE_KEY = 'bond.checkin.webReminderDate'
+const DAILY_ID = 'bond.daily'
+const SNOOZE_ID = 'bond.snooze'
+const LEGACY_REMINDER_ID_KEY = 'bond.checkin.reminderId'
+const LEGACY_REMINDER_IDS_KEY = 'bond.checkin.reminderIds'
+const CATEGORY_ID = 'bondcheckin'
+const SNOOZE_ACTION = 'snooze_hour'
 
-/** Local hour (24h) to remind if today's check-in is missing */
 export const CHECK_IN_REMINDER_HOUR = 20
 export const CHECK_IN_REMINDER_MINUTE = 0
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async () => {
+    const inApp = AppState.currentState === 'active'
+    return {
+      shouldShowBanner: !inApp,
+      shouldShowList: true,
+      shouldPlaySound: !inApp,
+      shouldSetBadge: false,
+    }
+  },
 })
 
-type WebNotificationApi = {
-  permission: NotificationPermission
-  requestPermission: () => Promise<NotificationPermission>
-  new (title: string, options?: NotificationOptions): Notification
+const LOCK_SCREEN_CONTENT = {
+  title: LOCK_SCREEN_TITLE,
+  body: LOCK_SCREEN_BODY,
+  sound: 'default' as const,
+  interruptionLevel: 'passive' as const,
+  categoryIdentifier: CATEGORY_ID,
 }
 
-function webNotificationApi(): WebNotificationApi | null {
-  if (typeof window === 'undefined') return null
-  const ctor = (window as unknown as { Notification?: WebNotificationApi }).Notification
-  return ctor ?? null
-}
-
-export async function areNotificationsEnabled(): Promise<boolean> {
-  const value = await AsyncStorage.getItem(ENABLED_KEY)
-  return value === 'true'
+function destinationData(type: 'daily' | 'snooze' | 'reveal') {
+  return { url: NOTIFICATION_DESTINATION, type }
 }
 
 export async function requestNotificationPermission(): Promise<boolean> {
-  if (Platform.OS === 'web') {
-    const NotificationApi = webNotificationApi()
-    if (!NotificationApi) return false
-    if (NotificationApi.permission === 'granted') return true
-    if (NotificationApi.permission === 'denied') return false
-    const result = await NotificationApi.requestPermission()
-    return result === 'granted'
+  try {
+    if (!Device.isDevice) return false
+    const current = await Notifications.getPermissionsAsync()
+    if (current.granted) return true
+    const requested = await Notifications.requestPermissionsAsync()
+    return requested.granted
+  } catch (error) {
+    reportError('notifications', error, { platform: Platform.OS })
+    return false
   }
+}
 
-  if (!Device.isDevice) {
-    console.warn('Notifications work best on a physical device')
+export async function areNotificationsEnabled(): Promise<boolean> {
+  try {
+    const current = await Notifications.getPermissionsAsync()
+    return current.granted
+  } catch {
+    return false
   }
-
-  const current = await Notifications.getPermissionsAsync()
-  if (current.granted) return true
-  const requested = await Notifications.requestPermissionsAsync()
-  return requested.granted
 }
 
 async function ensureAndroidChannels(): Promise<void> {
   if (Platform.OS !== 'android') return
+  const lockScreen = {
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+  }
   await Notifications.setNotificationChannelAsync('bond-reminders', {
     name: 'Check-in reminders',
     importance: Notifications.AndroidImportance.DEFAULT,
+    ...lockScreen,
   })
   await Notifications.setNotificationChannelAsync('partner-activity', {
     name: 'Partner activity',
     importance: Notifications.AndroidImportance.DEFAULT,
+    ...lockScreen,
   })
 }
 
-export async function enableNotifications(userId?: string | null): Promise<boolean> {
-  const granted = await requestNotificationPermission()
-  await AsyncStorage.setItem(ENABLED_KEY, granted ? 'true' : 'false')
-  if (!granted) return false
-  await ensureAndroidChannels()
-  if (userId) await registerPushToken(userId)
-  return true
-}
-
-export async function disableNotifications(): Promise<void> {
-  await AsyncStorage.setItem(ENABLED_KEY, 'false')
-  clearWebReminder()
+async function ensureCategories(): Promise<void> {
   if (Platform.OS === 'web') return
-  const existingId = await AsyncStorage.getItem(REMINDER_ID_KEY)
-  if (existingId) {
-    await Notifications.cancelScheduledNotificationAsync(existingId)
-    await AsyncStorage.removeItem(REMINDER_ID_KEY)
+  try {
+    await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
+      {
+        identifier: SNOOZE_ACTION,
+        buttonTitle: 'Remind me in one hour',
+        options: { opensAppToForeground: false },
+      },
+    ])
+  } catch (error) {
+    reportError('notifications', error, { op: 'category' })
   }
 }
 
 export async function registerPushToken(userId: string): Promise<void> {
-  if (Platform.OS === 'web') return
   try {
     const projectId =
       Constants.easConfig?.projectId ??
@@ -102,127 +112,189 @@ export async function registerPushToken(userId: string): Promise<void> {
       projectId ? { projectId } : {},
     )
     if (!result.data) return
-    await supabase
+    const { error } = await supabase
       .from('profiles')
       .update({ expo_push_token: result.data })
       .eq('id', userId)
+    if (error) reportError('notifications', error.message, { op: 'token' })
   } catch (error) {
-    console.warn('Could not register push token', error)
+    reportError('notifications', error, { op: 'token' })
   }
+}
+
+export async function clearPushToken(userId: string): Promise<void> {
+  try {
+    await supabase
+      .from('profiles')
+      .update({ expo_push_token: null })
+      .eq('id', userId)
+  } catch (error) {
+    reportError('notifications', error, { op: 'clear-token' })
+  }
+}
+
+async function cancelId(id: string): Promise<void> {
+  try {
+    await Notifications.cancelScheduledNotificationAsync(id)
+  } catch {
+    // Already gone.
+  }
+}
+
+export async function cancelAllBondNotifications(): Promise<void> {
+  await cancelId(DAILY_ID)
+  await cancelId(SNOOZE_ID)
+  const legacy = await AsyncStorage.getItem(LEGACY_REMINDER_ID_KEY)
+  if (legacy) {
+    await cancelId(legacy)
+    await AsyncStorage.removeItem(LEGACY_REMINDER_ID_KEY)
+  }
+  const rawIds = await AsyncStorage.getItem(LEGACY_REMINDER_IDS_KEY)
+  if (rawIds) {
+    try {
+      const ids = JSON.parse(rawIds) as unknown
+      if (Array.isArray(ids)) {
+        for (const id of ids) {
+          if (typeof id === 'string') await cancelId(id)
+        }
+      }
+    } catch {
+      // Ignore malformed storage.
+    }
+    await AsyncStorage.removeItem(LEGACY_REMINDER_IDS_KEY)
+  }
+}
+
+export async function disableNotifications(): Promise<void> {
+  await cancelAllBondNotifications()
+}
+
+export async function enableNotifications(
+  userId?: string | null,
+): Promise<boolean> {
+  const granted = await requestNotificationPermission()
+  if (!granted) return false
+  await ensureAndroidChannels()
+  await ensureCategories()
+  if (userId) await registerPushToken(userId)
+  return true
 }
 
 export async function showLocalNotification(
-  title: string,
-  body: string,
+  _title?: string,
+  _body?: string,
   channelId = 'partner-activity',
 ): Promise<void> {
-  const enabled = await areNotificationsEnabled()
-  if (!enabled) return
-
-  if (Platform.OS === 'web') {
-    const granted = await requestNotificationPermission()
-    if (!granted) return
-    const payload = { type: 'notify', title, body }
-    const worker = typeof navigator !== 'undefined' ? navigator.serviceWorker : undefined
-    if (worker?.controller) {
-      worker.controller.postMessage(payload)
-      return
-    }
-    const NotificationApi = webNotificationApi()
-    if (NotificationApi && NotificationApi.permission === 'granted') {
-      new NotificationApi(title, { body })
-    }
-    return
+  if (AppState.currentState === 'active') return
+  try {
+    const allowed = await requestNotificationPermission()
+    if (!allowed) return
+    await ensureAndroidChannels()
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        ...LOCK_SCREEN_CONTENT,
+        data: destinationData('reveal'),
+        ...(Platform.OS === 'android' ? { channelId } : {}),
+      },
+      trigger: null,
+    })
+  } catch (error) {
+    reportError('notifications', error, { op: 'local' })
   }
-
-  const allowed = await requestNotificationPermission()
-  if (!allowed) return
-  await ensureAndroidChannels()
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title,
-      body,
-      sound: 'default',
-      ...(Platform.OS === 'android' ? { channelId } : {}),
-    },
-    trigger: null,
-  })
 }
 
-let webReminderTimer: ReturnType<typeof setTimeout> | null = null
-
-function clearWebReminder() {
-  if (!webReminderTimer) return
-  clearTimeout(webReminderTimer)
-  webReminderTimer = null
-}
-
-function msUntilDailyReminder(): number {
-  const now = new Date()
-  const fire = new Date()
-  fire.setHours(CHECK_IN_REMINDER_HOUR, CHECK_IN_REMINDER_MINUTE, 0, 0)
-  if (fire.getTime() <= now.getTime()) {
-    fire.setDate(fire.getDate() + 1)
-  }
-  return fire.getTime() - now.getTime()
-}
-
-/**
- * Schedule a daily local reminder at CHECK_IN_REMINDER_HOUR.
- * Cancels when today's check-in exists.
- * On web, fires while the install/tab stays open.
- */
-export async function syncCheckInReminder(
-  hasCompletedToday: boolean,
+async function scheduleAt(
+  id: string,
+  when: Date,
+  type: 'daily' | 'snooze',
 ): Promise<void> {
-  const enabled = await areNotificationsEnabled()
-
-  if (Platform.OS === 'web') {
-    clearWebReminder()
-    if (!enabled || hasCompletedToday) return
-    const granted = await requestNotificationPermission()
-    if (!granted) return
-    webReminderTimer = setTimeout(() => {
-      void (async () => {
-        const today = new Date().toISOString().slice(0, 10)
-        const shown = await AsyncStorage.getItem(WEB_REMINDER_DATE_KEY)
-        if (shown === today) return
-        await AsyncStorage.setItem(WEB_REMINDER_DATE_KEY, today)
-        await showLocalNotification(
-          'Bond check-in',
-          'How connected did you feel today? Take a moment to check in.',
-          'bond-reminders',
-        )
-      })()
-    }, msUntilDailyReminder())
-    return
-  }
-
-  const existingId = await AsyncStorage.getItem(REMINDER_ID_KEY)
-  if (existingId) {
-    await Notifications.cancelScheduledNotificationAsync(existingId)
-    await AsyncStorage.removeItem(REMINDER_ID_KEY)
-  }
-
-  if (!enabled || hasCompletedToday) return
-
-  const allowed = await requestNotificationPermission()
-  if (!allowed) return
+  await cancelId(id)
+  if (when.getTime() <= Date.now() + 2000) return
   await ensureAndroidChannels()
-
-  const id = await Notifications.scheduleNotificationAsync({
+  await ensureCategories()
+  await Notifications.scheduleNotificationAsync({
+    identifier: id,
     content: {
-      title: 'Bond check-in',
-      body: 'How connected did you feel today? Take a moment to check in.',
-      sound: 'default',
+      ...LOCK_SCREEN_CONTENT,
+      data: destinationData(type),
       ...(Platform.OS === 'android' ? { channelId: 'bond-reminders' } : {}),
     },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: CHECK_IN_REMINDER_HOUR,
-      minute: CHECK_IN_REMINDER_MINUTE,
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: when,
     },
   })
+}
 
-  await AsyncStorage.setItem(REMINDER_ID_KEY, id)
+export async function syncLocalReminder(
+  prefs: NotificationPrefs,
+  options: { paired: boolean; completedToday: boolean },
+): Promise<void> {
+  try {
+    await cancelId(DAILY_ID)
+    if (options.completedToday) await cancelId(SNOOZE_ID)
+    const next = nextDailyReminderAt(new Date(), prefs, options)
+    if (!next) return
+    const granted = await requestNotificationPermission()
+    if (!granted) return
+    await scheduleAt(DAILY_ID, next, 'daily')
+  } catch (error) {
+    reportError('notifications', error, { op: 'reminder' })
+  }
+}
+
+export async function scheduleOneHourReminder(
+  prefs: NotificationPrefs,
+  completedToday: boolean,
+): Promise<{ error: string | null; when: Date | null }> {
+  if (completedToday) {
+    return { error: "Today's check-in is already saved.", when: null }
+  }
+  try {
+    const granted = await requestNotificationPermission()
+    if (!granted) {
+      return {
+        error: 'Allow notifications to set a one-hour reminder.',
+        when: null,
+      }
+    }
+    const when = nextSnoozeAt(new Date(), prefs)
+    await scheduleAt(SNOOZE_ID, when, 'snooze')
+    return { error: null, when }
+  } catch (error) {
+    reportError('notifications', error, { op: 'snooze' })
+    return { error: 'Could not set a reminder.', when: null }
+  }
+}
+
+export function subscribeNotificationTaps(handlers: {
+  onOpen: (url: string) => void
+  onSnooze: () => void
+}): () => void {
+  const respond = (response: Notifications.NotificationResponse) => {
+    if (response.actionIdentifier === SNOOZE_ACTION) {
+      handlers.onSnooze()
+      return
+    }
+    const data = response.notification.request.content.data as
+      | { url?: unknown }
+      | undefined
+    handlers.onOpen(safeNotificationUrl(data?.url))
+  }
+
+  const sub = Notifications.addNotificationResponseReceivedListener(respond)
+  void Notifications.getLastNotificationResponseAsync().then((last) => {
+    if (!last) return
+    respond(last)
+    void Notifications.clearLastNotificationResponseAsync()
+  })
+  return () => sub.remove()
+}
+
+export function expoGoAndroidRemoteUnsupported(): boolean {
+  return (
+    Platform.OS === 'android' &&
+    (Constants.appOwnership === 'expo' ||
+      Constants.executionEnvironment === 'storeClient')
+  )
 }

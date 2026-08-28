@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-const ONBOARDING_SEEN_KEY = 'bond.onboarding.seen'
+const ONBOARDING_SEEN_KEY = 'bond.onboarding.seen.v2'
 
 export async function hasSeenOnboarding(): Promise<boolean> {
   const value = await AsyncStorage.getItem(ONBOARDING_SEEN_KEY)

@@ -42,7 +42,7 @@ export function growthUnlocks({
 }
 
 export type GrowthDestination = {
-  id: 'weekly' | 'patterns' | 'goals' | 'achievements' | 'prompts'
+  id: 'weekly' | 'reviews' | 'patterns' | 'goals' | 'achievements' | 'prompts'
   title: string
   body: string
   href:
@@ -52,6 +52,48 @@ export type GrowthDestination = {
     | '/(app)/bond/achievements'
     | '/(app)/bond/reviews'
     | '/(app)/bond/prompts'
+}
+
+/** Always-visible Bond hub. Paid checkout is off, so these stay reachable. */
+export function bondHubItems(): GrowthDestination[] {
+  return [
+    {
+      id: 'achievements',
+      title: 'Achievements',
+      body: 'Calendar and notes you log together',
+      href: '/(app)/bond/achievements',
+    },
+    {
+      id: 'prompts',
+      title: 'Prompts',
+      body: 'Questions only the two of you see',
+      href: '/(app)/bond/prompts',
+    },
+    {
+      id: 'goals',
+      title: 'Goals',
+      body: 'Shared aims',
+      href: '/(app)/bond/goals',
+    },
+    {
+      id: 'patterns',
+      title: 'Rhythm',
+      body: 'Days connected',
+      href: '/(app)/bond/streaks',
+    },
+    {
+      id: 'weekly',
+      title: 'Weekly review',
+      body: 'Look back on the week together',
+      href: '/(app)/weekly-review',
+    },
+    {
+      id: 'reviews',
+      title: 'Reviews',
+      body: 'Past weekly summaries',
+      href: '/(app)/bond/reviews',
+    },
+  ]
 }
 
 function rhythmBody(revealedDays: number): string {
@@ -142,8 +184,8 @@ export function unlockedGrowthItems(
   if (unlocks.achievements) {
     items.push({
       id: 'achievements',
-      title: 'Milestones',
-      body: 'Constructive moments you already lived',
+      title: 'Achievements',
+      body: 'Calendar and notes you log together',
       href: '/(app)/bond/achievements',
     })
   }

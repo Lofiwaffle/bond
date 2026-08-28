@@ -6,6 +6,7 @@ import { useBondPlus } from '../hooks/useBondPlus'
 import {
   OFFER_AFTER_REVEALS,
   PLUS_FEATURES,
+  PLUS_PAID_CHECKOUT_READY,
   PLUS_TRUST_LINE,
   type PlusFeature,
 } from '../lib/bondPlus'
@@ -29,7 +30,7 @@ export function PlusPreview({
   }, [plus.isLoading, plus.offerEligible, plus.markPreviewViewed])
 
   if (plus.isLoading) return <LoadingScreen />
-  if (plus.active) return <>{children}</>
+  if (plus.active || !PLUS_PAID_CHECKOUT_READY) return <>{children}</>
 
   const remaining = Math.max(0, OFFER_AFTER_REVEALS - plus.mutualReveals)
   const ready = remaining === 0
@@ -70,10 +71,8 @@ export function plusGate(
   plus: { isLoading: boolean; active: boolean },
 ) {
   if (plus.isLoading) return <LoadingScreen />
-  if (!plus.active) {
-    return <PlusPreview feature={feature}>{null}</PlusPreview>
-  }
-  return null
+  if (plus.active || !PLUS_PAID_CHECKOUT_READY) return null
+  return <PlusPreview feature={feature}>{null}</PlusPreview>
 }
 
 const styles = StyleSheet.create({

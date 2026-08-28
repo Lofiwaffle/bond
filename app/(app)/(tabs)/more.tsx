@@ -33,6 +33,8 @@ import {
 import { buildExportBundle, shareExportBundle } from '../../../lib/exportData'
 import { DELETE_SEMANTICS, UNPAIR_SEMANTICS } from '../../../lib/privacy'
 import { PLUS_LIFETIME_COPY, PLUS_PROMO_HINT } from '../../../lib/bondPlus'
+import { Icon } from '../../../lib/icons'
+import { bondHubItems } from '../../../lib/nextStep'
 import { focusInput } from '../../../lib/formFocus'
 import { useToast } from '../../../lib/toast'
 import { colors, hairlineWidth, hit, type } from '../../../lib/theme'
@@ -262,6 +264,31 @@ export default function UsScreen() {
             }}
           />
         )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Bond</Text>
+          {bondHubItems().map((item, index, list) => (
+            <Pressable
+              key={item.id}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.title}. ${item.body}`}
+              onPress={() => router.push(item.href as Href)}
+              style={(state) => [
+                styles.linkRow,
+                index === list.length - 1 && styles.linkRowLast,
+                state.pressed && styles.linkRowPressed,
+                Boolean((state as { focused?: boolean }).focused) &&
+                  styles.linkFocus,
+              ]}
+            >
+              <View style={styles.linkCopy}>
+                <Text style={styles.linkTitle}>{item.title}</Text>
+                <Text style={styles.linkBody}>{item.body}</Text>
+              </View>
+              <Icon name="chevron-right" size={16} color={colors.muted} />
+            </Pressable>
+          ))}
+        </View>
 
         {!partner && couple?.invite_code ? (
           <View style={styles.section}>
@@ -564,6 +591,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 2,
     borderColor: colors.ink,
+  },
+  linkCopy: {
+    flex: 1,
   },
   linkTitle: {
     ...type.body,

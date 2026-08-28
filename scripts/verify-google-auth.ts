@@ -16,8 +16,14 @@ assert('success is not cancelled', googleAuthCancelled('success') === false)
 assert(
   'provider off',
   friendlyGoogleAuthError('Unsupported provider: provider is not enabled').includes(
-    'not enabled',
+    'Providers',
   ),
+)
+assert(
+  'provider off json',
+  friendlyGoogleAuthError(
+    '{"code":400,"error_code":"validation_failed","msg":"Unsupported provider: provider is not enabled"}',
+  ).includes('Providers'),
 )
 assert(
   'existing email',

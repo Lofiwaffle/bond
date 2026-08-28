@@ -18,9 +18,9 @@ import {
 } from '../../../lib/growthObservations'
 import { Icon } from '../../../lib/icons'
 import {
+  bondHubItems,
   growthUnlocks,
   pickGrowthNext,
-  unlockedGrowthItems,
 } from '../../../lib/nextStep'
 import { colors, hairlineWidth, type } from '../../../lib/theme'
 
@@ -49,7 +49,7 @@ export default function GrowthScreen() {
     [myCheckIns, revealedDays, weeklyUnlocked],
   )
 
-  const { next, remaining } = pickGrowthNext({
+  const { next } = pickGrowthNext({
     unlocks,
     needsReview,
     activeGoalCount: activeGoals.length,
@@ -57,9 +57,7 @@ export default function GrowthScreen() {
     revealedDays,
   })
 
-  const items = unlockedGrowthItems(unlocks, { revealedDays }).filter(
-    (item) => item.id !== next?.id,
-  )
+  const items = bondHubItems().filter((item) => item.id !== next?.id)
 
   if (isLoading || goalsLoading || checkInLoading || indexLoading || plus.isLoading) {
     return <LoadingScreen />
@@ -80,19 +78,7 @@ export default function GrowthScreen() {
           actionLabel={`Open ${next.title.toLowerCase()}`}
           onAction={() => router.push(next.href as Href)}
         />
-      ) : (
-        <NextStepCard
-          kicker="Not yet"
-          title="Rhythm opens after a few check-ins."
-          body={
-            remaining > 0
-              ? `${remaining} more day${remaining === 1 ? '' : 's'} on Today, then this home fills in.`
-              : 'Keep the daily ritual. This page stays quiet until it can help.'
-          }
-          actionLabel="Go to Today"
-          onAction={() => router.push('/(app)/(tabs)')}
-        />
-      )}
+      ) : null}
 
       {plus.active ? (
         <GrowthObservations observations={observations} />

@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router, useFocusEffect } from 'expo-router'
 
 import { NextStepCard } from '../../../components/NextStepCard'
 import { PlusOfferCard } from '../../../components/PlusOfferCard'
-import { RevealMoment, SharedActionCard, WaitingMoment } from '../../../components/CheckInMoment'
+import { CheckInDayFeed } from '../../../components/CheckInDayFeed'
+import { SharedActionCard } from '../../../components/CheckInMoment'
 import { LoadingScreen, Screen, StatusPanel, TextLink } from '../../../components/ui'
-import { useTodayCheckIn, useCheckInGrowth, useCheckInIndex } from '../../../hooks/useCheckIn'
+import { useTodayCheckIn, useCheckInGrowth, useCheckInIndex, useCheckInRange } from '../../../hooks/useCheckIn'
 import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useDailyAction } from '../../../hooks/useDailyAction'
 import { useNotificationPreferences } from '../../../hooks/useNotificationPreferences'
 import { useAuth } from '../../../lib/auth'
-import { hasSentNudge, markNudgeSent } from '../../../lib/checkInDraft'
 import { promptForDate } from '../../../lib/dailyPrompts'
 import { formatDisplayDate, localDateString } from '../../../lib/dates'
 import { useQueuedCheckIn } from '../../../lib/checkInOutbox'
@@ -27,13 +27,11 @@ export default function TodayScreen() {
   const { user, profile, partner, isLoading: authLoading } = useAuth()
   const {
     mine,
-    partnerCheckIn,
     bothSubmitted,
     waitingForPartner,
     isLoading,
     error,
     refresh,
-    sendNudge,
   } = useTodayCheckIn()
   const { myCheckIns, lastDate } = useCheckInGrowth()
   const { days: indexDays } = useCheckInIndex()
@@ -41,27 +39,29 @@ export default function TodayScreen() {
   const { accepted } = useDailyAction()
   const { remindInOneHour } = useNotificationPreferences()
   const { showToast } = useToast()
-  const [nudged, setNudged] = useState(false)
-  const [nudging, setNudging] = useState(false)
   const [snoozing, setSnoozing] = useState(false)
   const today = localDateString()
   const queued = useQueuedCheckIn(user?.id, today)
+  const feedQuery = useCheckInRange('2020-01-01', today)
 
   const insight = useMemo(
     () => firstInsight(observationDaysFromIndex(indexDays)),
     [indexDays],
   )
+  const feed = useMemo(
+    () =>
+      feedQuery.days.filter(
+        (day) => day.mine || (day.revealed && day.partner),
+      ),
+    [feedQuery.days],
+  )
 
   useFocusEffect(
     useCallback(() => {
       void refresh()
-    }, [refresh]),
+      void feedQuery.refresh()
+    }, [feedQuery.refresh, refresh]),
   )
-
-  useEffect(() => {
-    if (!user?.id || !mine) return
-    void hasSentNudge(user.id, today).then(setNudged)
-  }, [mine, today, user?.id])
 
   if (authLoading || isLoading) return <LoadingScreen />
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
@@ -94,16 +94,6 @@ export default function TodayScreen() {
       })
     : null
 
-  const onNudge = async () => {
-    if (!user?.id || nudged || nudging) return
-    setNudging(true)
-    const result = await sendNudge()
-    setNudging(false)
-    if (result.error) return
-    await markNudgeSent(user.id, today)
-    setNudged(true)
-  }
-
   const onSnooze = async () => {
     if (snoozing || mine) return
     setSnoozing(true)
@@ -132,7 +122,13 @@ export default function TodayScreen() {
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         refreshControl={
-          <RefreshControl refreshing={false} onRefresh={() => void refresh()} />
+          <RefreshControl
+            refreshing={false}
+            onRefresh={() => {
+              void refresh()
+              void feedQuery.refresh()
+            }}
+          />
         }
       >
         {error ? (
@@ -142,6 +138,7 @@ export default function TodayScreen() {
           />
         ) : null}
 
+        <View style={styles.padded}>
         {accepted
           .filter(
             (action) => phase !== 'reveal' || action.check_in_date !== today,
@@ -158,7 +155,7 @@ export default function TodayScreen() {
         {phase === 'compose' ? (
           <>
             <NextStepCard
-              kicker="What now"
+              kicker="Today's prompt"
               title={prompt.text}
               body={
                 queued
@@ -179,32 +176,11 @@ export default function TodayScreen() {
           </>
         ) : null}
 
-        {phase === 'waiting' && mine && partner ? (
-          <WaitingMoment
-            mine={mine}
-            partnerName={partnerName}
-            userId={user?.id ?? ''}
-            nudged={nudged}
-            nudging={nudging}
-            onNudge={() => void onNudge()}
-            onRefresh={() => void refresh()}
-            onEdit={() => router.push('/(app)/check-in?edit=1')}
-          />
-        ) : null}
-
         {phase === 'waiting' && mine && !partner ? (
           <NextStepCard
             kicker="Saved"
             title="Your check-in is safe."
             body="Invite your person from Us when you are ready. There is no rush."
-          />
-        ) : null}
-
-        {phase === 'reveal' && mine && partnerCheckIn && user?.id ? (
-          <RevealMoment
-            mine={mine}
-            partner={partnerCheckIn}
-            partnerName={partnerName}
           />
         ) : null}
 
@@ -214,6 +190,30 @@ export default function TodayScreen() {
             onNotNow={() => void plus.snoozeOffer()}
           />
         ) : null}
+        </View>
+
+        <View style={styles.feed}>
+          <Text style={styles.feedTitle}>Feed</Text>
+          {feedQuery.error ? (
+            <View style={styles.padded}>
+              <StatusPanel
+                message="Couldn't load the feed."
+                onRetry={() => void feedQuery.refresh()}
+              />
+            </View>
+          ) : feed.length === 0 ? (
+            <Text style={styles.feedEmpty}>
+              Check-ins show up here in a thread, newest first.
+            </Text>
+          ) : (
+            <CheckInDayFeed
+              days={feed}
+              today={today}
+              myName={profile.display_name?.trim() || 'You'}
+              partnerName={partner ? partnerName : null}
+            />
+          )}
+        </View>
       </ScrollView>
     </Screen>
   )
@@ -237,7 +237,23 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   scroll: {
-    paddingHorizontal: 20,
     paddingBottom: 28,
+  },
+  padded: {
+    paddingHorizontal: 20,
+  },
+  feed: {
+    marginTop: 8,
+  },
+  feedTitle: {
+    ...type.label,
+    marginBottom: 4,
+    paddingHorizontal: 20,
+  },
+  feedEmpty: {
+    ...type.body,
+    color: colors.muted,
+    paddingHorizontal: 20,
+    marginTop: 8,
   },
 })

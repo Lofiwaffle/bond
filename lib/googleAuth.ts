@@ -23,16 +23,24 @@ export async function signInWithGoogle(): Promise<{ error: string | null }> {
   }
 
   const redirectTo = authRedirectUrl('app')
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo,
-      skipBrowserRedirect: Platform.OS !== 'web',
-      queryParams: { prompt: 'select_account' },
-    },
-  })
-  if (error) {
-    return { error: friendlyGoogleAuthError(error.message) }
+  let data: { url?: string | null } | null = null
+  try {
+    const result = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo,
+        skipBrowserRedirect: Platform.OS !== 'web',
+        queryParams: { prompt: 'select_account' },
+      },
+    })
+    if (result.error) {
+      return { error: friendlyGoogleAuthError(result.error.message) }
+    }
+    data = result.data
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Could not start Google sign-in'
+    return { error: friendlyGoogleAuthError(message) }
   }
 
   if (Platform.OS === 'web') {

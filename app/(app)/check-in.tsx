@@ -282,7 +282,11 @@ export default function CheckInScreen() {
         {composing ? (
           <>
             {step === 'score' ? (
-              <ScoreStep value={score} onChange={setScore} />
+              <ScoreStep
+                value={score}
+                onChange={setScore}
+                prompt={todayPrompt.text}
+              />
             ) : null}
             {step === 'words' ? (
               <WordsStep

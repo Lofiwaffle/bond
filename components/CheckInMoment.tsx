@@ -496,13 +496,21 @@ export function SharedActionCard({
 export function ScoreStep({
   value,
   onChange,
+  prompt,
 }: {
   value: number | null
   onChange: (score: number) => void
+  prompt?: string
 }) {
   return (
     <View>
       <CheckInProgress step={1} />
+      {prompt ? (
+        <>
+          <Text style={styles.kicker}>Today's prompt</Text>
+          <Text style={styles.body}>{prompt}</Text>
+        </>
+      ) : null}
       <Text style={styles.title}>How connected do you feel today?</Text>
       <ScoreScale value={value} onChange={onChange} />
       <PrivacyLine />
@@ -526,6 +534,7 @@ export function WordsStep({
   return (
     <View>
       <CheckInProgress step={2} />
+      <Text style={styles.kicker}>Today's prompt</Text>
       <Text style={styles.title}>{prompt}</Text>
       {noWords ? (
         <Text style={styles.body}>{displaySharedWords(null)}</Text>

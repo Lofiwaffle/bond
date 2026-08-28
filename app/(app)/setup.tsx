@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { ScrollView, StyleSheet, Text, View, type TextInput } from 'react-native'
+import {
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type TextInput,
+} from 'react-native'
 import { Redirect, router, type Href } from 'expo-router'
 
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -14,6 +21,7 @@ import {
   TextLink,
 } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
+import { ACCOUNT_DELETION_REQUEST_URL } from '../../lib/appUrls'
 import { Icon } from '../../lib/icons'
 import {
   classifyJoinError,
@@ -162,6 +170,10 @@ export default function SetupScreen() {
       <TextLink
         label="Help & safety"
         onPress={() => router.push('/help' as Href)}
+      />
+      <TextLink
+        label="Request account & data deletion"
+        onPress={() => void Linking.openURL(ACCOUNT_DELETION_REQUEST_URL)}
       />
       <TextLink
         label="Delete account"

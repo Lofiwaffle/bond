@@ -532,9 +532,11 @@ create table public.appreciations (
   to_user_id uuid not null references public.profiles (id) on delete cascade,
   category text not null check (category in ('support','humor','effort','presence','other')),
   message text null default null,
-  timestamp timestamptz not null default now(),
-  constraint appreciations_unique unique (from_user_id, to_user_id, date(timestamp))
+  timestamp timestamptz not null default now()
 );
+
+create unique index appreciations_unique
+  on public.appreciations (from_user_id, to_user_id, ((timestamp at time zone 'utc')::date));
 
 create index appreciations_couple_idx
   on public.appreciations (couple_id, timestamp desc);
@@ -546,7 +548,8 @@ create policy "appreciations_select_own_and_partner"
   for select
   to authenticated
   using (
-    user_id = (select auth.uid())
+    from_user_id = (select auth.uid())
+    or to_user_id = (select auth.uid())
     or (
       couple_id = public.current_couple_id()
     )
@@ -557,7 +560,7 @@ create policy "appreciations_insert_own"
   for insert
   to authenticated
   with check (
-    user_id = (select auth.uid())
+    from_user_id = (select auth.uid())
     and couple_id = public.current_couple_id()
   );
 
@@ -585,10 +588,7 @@ create policy "rituals_select_own_and_partner"
   for select
   to authenticated
   using (
-    user_id = (select auth.uid())
-    or (
-      couple_id = public.current_couple_id()
-    )
+    couple_id = public.current_couple_id()
   );
 
 create policy "rituals_insert_own"
@@ -596,8 +596,7 @@ create policy "rituals_insert_own"
   for insert
   to authenticated
   with check (
-    user_id = (select auth.uid())
-    and couple_id = public.current_couple_id()
+    couple_id = public.current_couple_id()
   );
 
 create policy "rituals_update_own_streak"
@@ -605,12 +604,10 @@ create policy "rituals_update_own_streak"
   for update
   to authenticated
   using (
-    user_id = (select auth.uid())
-    and couple_id = public.current_couple_id()
+    couple_id = public.current_couple_id()
   )
   with check (
-    user_id = (select auth.uid())
-    and couple_id = public.current_couple_id()
+    couple_id = public.current_couple_id()
   );
 
 -------------------------------------------------------------------

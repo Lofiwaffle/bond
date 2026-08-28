@@ -47,6 +47,11 @@ export default function TodayScreen() {
   const today = localDateString()
   const queued = useQueuedCheckIn(user?.id, today)
 
+  const insight = useMemo(
+    () => firstInsight(observationDaysFromIndex(indexDays)),
+    [indexDays],
+  )
+
   useFocusEffect(
     useCallback(() => {
       void refresh()
@@ -88,10 +93,6 @@ export default function TodayScreen() {
         welcomeBack: gapDays >= 2,
       })
     : null
-  const insight = useMemo(
-    () => firstInsight(observationDaysFromIndex(indexDays)),
-    [indexDays],
-  )
 
   const onNudge = async () => {
     if (!user?.id || nudged || nudging) return

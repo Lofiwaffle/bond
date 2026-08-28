@@ -23,12 +23,14 @@ Optional, for partner “reveal is ready” remote alerts: Firebase Cloud Messag
 
 ## 1. Package name
 
-`com.bond.app` in `app.json`. Permanent. Change it before the first upload if it is taken.
+`com.bondcouple.app` in `app.json` (`android.package`). Permanent. Play rejected `com.bond.app` because that application id and `com.bond.app.firebaseinitprovider` are already used by another developer.
+
+Play already has an **upload key** for this listing (`SHA1 88:54:EE:F1:…`). EAS credentials are per package, so generating a new keystore for `com.bondcouple.app` signs the AAB with the wrong cert. Reuse the existing default keystore from `com.bond.app` (Expo dashboard → Project → Credentials → Android) as the default for `com.bondcouple.app`. Then run a new production AAB. Do not re-upload a bundle signed with `55:7C:78:EA:…`. If you use FCM, add an Android app with this package in Firebase and replace `google-services.json`.
 
 ## 2. Credentials and AAB
 
 ```sh
-eas credentials --platform android   # production profile; let EAS make the upload keystore
+eas credentials --platform android   # production; keep the Play upload key (SHA1 88:54:EE:F1:…), do not generate a new keystore
 npm run build:android               # AAB, not APK
 ```
 
@@ -144,7 +146,7 @@ Bond Plus paid plans stay off until Play subscriptions and `PLUS_PAID_CHECKOUT_R
 
 - Expo login, Play signup, and the $25 fee
 - `eas init` project id
-- A unique package name if `com.bond.app` is taken
+- A unique package name if `com.bondcouple.app` is taken
 - 12 closed testers and 14 days of opt-in
 - Firebase `google-services.json`
 - GitHub Pages deploy of privacy/support HTML

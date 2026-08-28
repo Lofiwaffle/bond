@@ -51,3 +51,4 @@ play-service-account.json
 pc-api-*.json
 *.keystore
 credentials/
+credentials.json

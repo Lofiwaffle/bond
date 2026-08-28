@@ -26,7 +26,10 @@ import {
 import { useTodayCheckIn } from '../../../hooks/useCheckIn'
 import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useAuth } from '../../../lib/auth'
-import { SUPPORT_URL } from '../../../lib/appUrls'
+import {
+  ACCOUNT_DELETION_REQUEST_URL,
+  SUPPORT_URL,
+} from '../../../lib/appUrls'
 import { buildExportBundle, shareExportBundle } from '../../../lib/exportData'
 import { DELETE_SEMANTICS, UNPAIR_SEMANTICS } from '../../../lib/privacy'
 import { PLUS_LIFETIME_COPY, PLUS_PROMO_HINT } from '../../../lib/bondPlus'
@@ -339,6 +342,10 @@ export default function UsScreen() {
 
           <Text style={[styles.label, styles.accountLabel]}>Account</Text>
           <TextLink label="Sign out" onPress={() => void signOut()} />
+          <TextLink
+            label="Request account & data deletion"
+            onPress={() => void Linking.openURL(ACCOUNT_DELETION_REQUEST_URL)}
+          />
           {leaveError ? <ErrorText message={leaveError} /> : null}
           <Pressable
             accessibilityRole="button"

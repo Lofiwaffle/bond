@@ -1,3 +1,7 @@
+import { fonts } from './fonts'
+
+export { fonts }
+
 export const colors = {
   bg: '#F7F2EF',
   bgSoft: '#F1EAEB',
@@ -70,18 +74,21 @@ export const weights = {
 
 export const type = {
   label: {
+    fontFamily: fonts.regular,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '400' as const,
     color: colors.muted,
   },
   body: {
+    fontFamily: fonts.regular,
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '400' as const,
     color: colors.ink,
   },
   heading: {
+    fontFamily: fonts.medium,
     fontSize: 18,
     lineHeight: 24,
     fontWeight: '500' as const,

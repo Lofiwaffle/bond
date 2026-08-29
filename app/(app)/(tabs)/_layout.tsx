@@ -7,7 +7,7 @@ import { LoadingScreen } from '../../../components/ui'
 import { useTodayCheckIn } from '../../../hooks/useCheckIn'
 import { useAuth } from '../../../lib/auth'
 import { todayPhase } from '../../../lib/nextStep'
-import { colors, elevation, radii } from '../../../lib/theme'
+import { colors, elevation, fonts, radii } from '../../../lib/theme'
 
 function CheckInFab() {
   const { mine, waitingForPartner, bothSubmitted } = useTodayCheckIn()
@@ -135,6 +135,7 @@ const styles = StyleSheet.create({
     overflow: 'visible' as const,
   },
   tabLabel: {
+    fontFamily: fonts.regular,
     fontSize: 12,
     fontWeight: '400',
   },
@@ -157,6 +158,7 @@ const styles = StyleSheet.create({
   },
   fabLabel: {
     marginTop: 4,
+    fontFamily: fonts.regular,
     fontSize: 12,
     fontWeight: '400',
     color: colors.tabBarIconMuted,

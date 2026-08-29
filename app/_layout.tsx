@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useFonts } from 'expo-font'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+} from '@expo-google-fonts/inter'
 
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { PhoneShell } from '../components/PhoneShell'
@@ -17,6 +22,10 @@ import { ToastProvider } from '../lib/toast'
 registerWebInstall()
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+  })
   const [ready, setReady] = useState(false)
   const [configured, setConfigured] = useState(false)
 
@@ -28,7 +37,7 @@ export default function RootLayout() {
     return subscribeSupabaseConfig(() => setConfigured(supabaseConfigured))
   }, [])
 
-  if (!ready) return <LoadingScreen />
+  if (!ready || (!fontsLoaded && !fontError)) return <LoadingScreen />
 
   return (
     <ErrorBoundary>

@@ -32,6 +32,7 @@ import { FaceIcon, Icon, type IconName } from '../lib/icons'
 import {
   SCORE_LABELS,
   colors,
+  fonts,
   hairlineWidth,
   hit,
   phoneMaxWidth,
@@ -761,6 +762,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     minHeight: hit,
+    fontFamily: fonts.regular,
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '400',
@@ -798,6 +800,7 @@ const styles = StyleSheet.create({
   },
   buttonLabel: {
     color: colors.onAccent,
+    fontFamily: fonts.medium,
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '500',
@@ -833,6 +836,7 @@ const styles = StyleSheet.create({
   error: {
     color: colors.danger,
     marginBottom: 8,
+    fontFamily: fonts.regular,
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '400',
@@ -964,6 +968,7 @@ const styles = StyleSheet.create({
     opacity: 0.35,
   },
   chipLabel: {
+    fontFamily: fonts.regular,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '400',
@@ -989,6 +994,7 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   habitCalWeekday: {
+    fontFamily: fonts.regular,
     fontSize: 10,
     color: colors.muted,
     textAlign: 'center',

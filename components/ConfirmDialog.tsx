@@ -1,6 +1,6 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
-import { colors, hit, radii, type } from '../lib/theme'
+import { colors, fonts, hit, radii, type } from '../lib/theme'
 
 export function ConfirmDialog({
   visible,
@@ -131,6 +131,7 @@ const styles = StyleSheet.create({
   },
   confirmLabel: {
     color: colors.onAccent,
+    fontFamily: fonts.medium,
     fontSize: 15,
     fontWeight: '500',
   },

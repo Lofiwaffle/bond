@@ -33,6 +33,7 @@ export default function Root({ children }: PropsWithChildren) {
               }
               body {
                 background: #E4D8DE;
+                font-family: Inter_400Regular, Inter, system-ui, sans-serif;
               }
               #root {
                 display: flex;

@@ -2,7 +2,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { reportError } from '../lib/monitor'
-import { colors, hit, radii, type } from '../lib/theme'
+import { colors, fonts, hit, radii, type } from '../lib/theme'
 
 type Props = { children: ReactNode }
 type State = { error: Error | null }
@@ -66,6 +66,7 @@ const styles = StyleSheet.create({
   },
   retryLabel: {
     color: colors.onAccent,
+    fontFamily: fonts.medium,
     fontSize: 16,
     fontWeight: '500',
   },

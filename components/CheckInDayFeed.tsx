@@ -5,7 +5,7 @@ import Svg, { Circle } from 'react-native-svg'
 import { ScoreMark } from './ui'
 import { ACTIVITIES } from '../lib/activities'
 import { formatDisplayDate } from '../lib/dates'
-import { colors, hairlineWidth, radii, type } from '../lib/theme'
+import { colors, fonts, hairlineWidth, radii, type } from '../lib/theme'
 import type { HistoryDay } from '../hooks/useCheckIn'
 import type { DailyCheckIn } from '../types/database'
 
@@ -322,6 +322,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success,
   },
   avatarLetter: {
+    fontFamily: fonts.medium,
     fontSize: 13,
     lineHeight: 16,
     fontWeight: '500',
@@ -337,6 +338,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   waitingLetter: {
+    fontFamily: fonts.medium,
     fontSize: 13,
     lineHeight: 16,
     fontWeight: '500',
@@ -356,6 +358,7 @@ const styles = StyleSheet.create({
   },
   entryName: {
     ...type.body,
+    fontFamily: fonts.medium,
     fontWeight: '500',
   },
   entryMood: {

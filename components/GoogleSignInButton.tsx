@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text } from 'react-native'
 
-import { colors, hit, radii, type } from '../lib/theme'
+import { colors, fonts, hit, radii, type } from '../lib/theme'
 
 export function GoogleSignInButton({
   onPress,
@@ -50,6 +50,7 @@ const styles = StyleSheet.create({
   },
   label: {
     ...type.body,
+    fontFamily: fonts.medium,
     fontWeight: '500',
     color: colors.ink,
   },

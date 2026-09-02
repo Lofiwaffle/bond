@@ -21,6 +21,8 @@ type ExportBundle = {
   bid_logs: unknown[]
   appreciations: unknown[]
   rituals: unknown[]
+  couple_plays: unknown[]
+  couple_play_answers: unknown[]
   notification_preferences: unknown
 }
 
@@ -63,6 +65,8 @@ export async function buildExportBundle(userId: string): Promise<ExportBundle> {
     bid_logs,
     appreciations,
     rituals,
+    couple_plays,
+    couple_play_answers,
     prefsRow,
   ] = await Promise.all([
     rows('daily_check_ins'),
@@ -76,6 +80,8 @@ export async function buildExportBundle(userId: string): Promise<ExportBundle> {
     rows('bid_logs'),
     rows('appreciations'),
     rows('rituals'),
+    rows('couple_plays'),
+    rows('couple_play_answers'),
     rows('notification_preferences'),
   ])
 
@@ -95,6 +101,8 @@ export async function buildExportBundle(userId: string): Promise<ExportBundle> {
     bid_logs,
     appreciations,
     rituals,
+    couple_plays,
+    couple_play_answers,
     notification_preferences: prefsRow[0] ?? null,
   }
 }

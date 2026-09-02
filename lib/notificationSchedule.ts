@@ -1,4 +1,4 @@
-/** Safe in-app destination for notification taps. Today lives at `/`. */
+/** Safe in-app destination for notification taps. Feed lives at `/`. */
 export const NOTIFICATION_DESTINATION = '/'
 
 export const DEFAULT_DAILY_TIME = '20:00'

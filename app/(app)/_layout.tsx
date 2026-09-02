@@ -25,6 +25,13 @@ export default function AppLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="bond" />
               <Stack.Screen
+                name="play"
+                options={{
+                  presentation: 'modal',
+                  animation: 'slide_from_bottom',
+                }}
+              />
+              <Stack.Screen
                 name="check-in"
                 options={{
                   presentation: 'modal',

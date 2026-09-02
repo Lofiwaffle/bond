@@ -13,7 +13,8 @@ import {
 import { colors, type } from '../lib/theme'
 
 export function NotificationSettings() {
-  const { prefs, busy, error, expoGoNote, patch } = useNotificationPreferences()
+  const { prefs, busy, error, deviceOnly, expoGoNote, patch } =
+    useNotificationPreferences()
   const plus = useBondPlus()
 
   return (
@@ -129,6 +130,11 @@ export function NotificationSettings() {
         />
       </View>
       <Text style={styles.meta}>Timezone: {prefs.timezone}</Text>
+      {deviceOnly ? (
+        <Text style={styles.meta}>
+          Reminders save on this device until the couple table is ready.
+        </Text>
+      ) : null}
       {plus.active ? null : (
         <TextLink
           label="Personalized reminder times are Bond Plus"

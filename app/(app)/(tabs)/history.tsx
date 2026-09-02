@@ -380,7 +380,7 @@ export default function HistoryScreen() {
               filtersOn
                 ? 'Clear filters'
                 : viewingToday
-                  ? 'Go to Today'
+                  ? 'Go to Feed'
                   : 'Return to today'
             }
             onAction={() => {

@@ -3,7 +3,8 @@ import { router } from 'expo-router'
 import Svg, { Circle } from 'react-native-svg'
 
 import { ScoreMark } from './ui'
-import { ACTIVITIES } from '../lib/activities'
+import { Icon } from '../lib/icons'
+import { activityById } from '../lib/activities'
 import { formatDisplayDate } from '../lib/dates'
 import { colors, fonts, hairlineWidth, radii, type } from '../lib/theme'
 import type { HistoryDay } from '../hooks/useCheckIn'
@@ -201,10 +202,11 @@ function EntryChips({ ids }: { ids: string[] }) {
   return (
     <View style={styles.chipWrap}>
       {ids.map((id) => {
-        const activity = ACTIVITIES.find((item) => item.id === id)
+        const activity = activityById(id)
         if (!activity) return null
         return (
           <View key={id} style={styles.chip}>
+            <Icon name={activity.icon} size={12} color={colors.ink} />
             <Text style={styles.chipLabel}>{activity.label}</Text>
           </View>
         )
@@ -386,6 +388,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     borderWidth: hairlineWidth,
     borderColor: colors.border,
     borderRadius: radii.pill,

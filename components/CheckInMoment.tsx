@@ -197,7 +197,7 @@ export function RevealMoment({
     }
     showToast(
       status === 'accepted'
-        ? 'Accepted. It will stay on Today until you mark it done.'
+        ? 'Accepted. It will stay on Feed until you mark it done.'
         : 'Passed for tonight. No follow-up from Bond.',
     )
   }
@@ -376,7 +376,7 @@ function OneSmallAction({
             {kindLabel}: {action.text}
           </Text>
           <Text style={styles.hint}>
-            This stays on Today until one of you marks it done.
+            This stays on Feed until one of you marks it done.
           </Text>
           <PrimaryButton
             label="We did it"
@@ -507,7 +507,7 @@ export function ScoreStep({
       <CheckInProgress step={1} />
       {prompt ? (
         <>
-          <Text style={styles.kicker}>Today's prompt</Text>
+          <Text style={styles.kicker}>Daily question</Text>
           <Text style={styles.body}>{prompt}</Text>
         </>
       ) : null}
@@ -534,7 +534,7 @@ export function WordsStep({
   return (
     <View>
       <CheckInProgress step={2} />
-      <Text style={styles.kicker}>Today's prompt</Text>
+      <Text style={styles.kicker}>Daily question</Text>
       <Text style={styles.title}>{prompt}</Text>
       {noWords ? (
         <Text style={styles.body}>{displaySharedWords(null)}</Text>
@@ -543,7 +543,7 @@ export function WordsStep({
           value={value}
           onChangeText={onChange}
           placeholder="A few sentences, if you have them"
-          accessibilityLabel="Today's prompt answer"
+          accessibilityLabel="Daily question answer"
           autoCapitalize="sentences"
           multiline
           maxLength={500}

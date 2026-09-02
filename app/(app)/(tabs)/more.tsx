@@ -267,7 +267,7 @@ export default function UsScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Bond</Text>
-          {bondHubItems().map((item, index, list) => (
+          {bondHubItems().map((item) => (
             <Pressable
               key={item.id}
               accessibilityRole="button"
@@ -275,7 +275,6 @@ export default function UsScreen() {
               onPress={() => router.push(item.href as Href)}
               style={(state) => [
                 styles.linkRow,
-                index === list.length - 1 && styles.linkRowLast,
                 state.pressed && styles.linkRowPressed,
                 Boolean((state as { focused?: boolean }).focused) &&
                   styles.linkFocus,
@@ -288,6 +287,26 @@ export default function UsScreen() {
               <Icon name="chevron-right" size={16} color={colors.muted} />
             </Pressable>
           ))}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Repair together. Optional guided steps after a disagreement."
+              onPress={() => router.push('/(app)/play/repair' as Href)}
+              style={(state) => [
+                styles.linkRow,
+                styles.linkRowLast,
+                state.pressed && styles.linkRowPressed,
+                Boolean((state as { focused?: boolean }).focused) &&
+                  styles.linkFocus,
+              ]}
+            >
+              <View style={styles.linkCopy}>
+                <Text style={styles.linkTitle}>Repair together</Text>
+                <Text style={styles.linkBody}>
+                  Optional. Pause, describe, and choose a next step.
+                </Text>
+              </View>
+              <Icon name="life-buoy" size={16} color={colors.muted} />
+            </Pressable>
         </View>
 
         {!partner && couple?.invite_code ? (

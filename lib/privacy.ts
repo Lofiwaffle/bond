@@ -24,7 +24,7 @@ export const VISIBILITY_ROWS: VisibilityRow[] = [
   },
   {
     entry: 'One small action',
-    who: 'Both of you, once offered. Your private thought never goes with it. After they accept, it stays on Today until marked done.',
+    who: 'Both of you, once offered. Your private thought never goes with it. After they accept, it stays on Feed until marked done.',
   },
   {
     entry: 'Weekly review draft',
@@ -39,8 +39,8 @@ export const VISIBILITY_ROWS: VisibilityRow[] = [
     who: 'Both of you, once offered. It stays proposed until the other person agrees. Completing takes both of you. Either of you can archive.',
   },
   {
-    entry: 'Achievements and rituals',
-    who: 'Both of you, once saved.',
+    entry: 'Together activities',
+    who: 'Only you until you both finish that round. Then the two of you. Repair together is optional and starts from Us.',
   },
   {
     entry: 'Optional weekly suggestion',

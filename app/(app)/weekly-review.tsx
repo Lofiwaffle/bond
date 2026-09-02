@@ -135,11 +135,11 @@ export default function WeeklyReviewScreen() {
     const remaining = Math.max(0, 7 - daysConnected)
     return (
       <Screen>
-        <Text style={styles.title}>Weekly review</Text>
+        <Text style={styles.title}>Weekly check-in</Text>
         <Text style={styles.subtitle}>
           This opens after seven days of honest reflection, even if they were
           not in a row. {remaining} more check-in{remaining === 1 ? '' : 's'} on
-          Today.
+          Feed.
         </Text>
         <TextLink label="Back" onPress={() => router.back()} />
       </Screen>
@@ -234,7 +234,7 @@ export default function WeeklyReviewScreen() {
 
   return (
     <Screen style={styles.screen} keyboard>
-      <Text style={styles.title}>Weekly review</Text>
+      <Text style={styles.title}>Weekly check-in</Text>
       <Text style={styles.subtitle}>
         Last week · {formatDisplayDate(weekStart)} – {formatDisplayDate(weekEnd)}
       </Text>

@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { AppState } from 'react-native'
 import { router, type Href } from 'expo-router'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import { useAuth } from '../lib/auth'
 import { reportError } from '../lib/monitor'
@@ -38,6 +39,7 @@ type NotificationContextValue = {
   loaded: boolean
   busy: boolean
   error: string | null
+  deviceOnly: boolean
   expoGoNote: boolean
   patch: (partial: Partial<NotificationPrefs>) => Promise<void>
   remindInOneHour: () => Promise<{ error: string | null; when: Date | null }>
@@ -70,6 +72,40 @@ function fromRow(row: PrefRow): NotificationPrefs {
   }
 }
 
+function isSchemaMissing(message: string): boolean {
+  return (
+    message.includes('schema cache') ||
+    message.toLowerCase().includes('does not exist')
+  )
+}
+
+function prefsKey(userId: string): string {
+  return `bond:notification-prefs:${userId}`
+}
+
+async function loadLocalPrefs(userId: string): Promise<NotificationPrefs | null> {
+  try {
+    const raw = await AsyncStorage.getItem(prefsKey(userId))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<NotificationPrefs>
+    return {
+      ...DEFAULT_NOTIFICATION_PREFS,
+      ...parsed,
+      timezone: parsed.timezone || detectTimezone(),
+    }
+  } catch {
+    return null
+  }
+}
+
+async function saveLocalPrefs(userId: string, prefs: NotificationPrefs): Promise<void> {
+  try {
+    await AsyncStorage.setItem(prefsKey(userId), JSON.stringify(prefs))
+  } catch {
+    // Device cache is best-effort.
+  }
+}
+
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { user, profile, partner } = useAuth()
   const { mine, isLoading: checkInLoading } = useTodayCheckIn()
@@ -77,6 +113,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [deviceOnly, setDeviceOnly] = useState(false)
   const prefsRef = useRef(prefs)
   prefsRef.current = prefs
 
@@ -86,6 +123,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const persist = useCallback(
     async (next: NotificationPrefs) => {
       if (!user?.id) return { error: 'Not signed in' }
+      await saveLocalPrefs(user.id, next)
       const time = parseDailyTime(next.daily_time)
       const { error: writeError } = await supabase
         .from('notification_preferences')
@@ -101,9 +139,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           updated_at: new Date().toISOString(),
         })
       if (writeError) {
+        if (isSchemaMissing(writeError.message)) {
+          setDeviceOnly(true)
+          return { error: null }
+        }
         reportError('notifications', writeError.message, { op: 'prefs' })
         return { error: writeError.message }
       }
+      setDeviceOnly(false)
       return { error: null }
     },
     [user?.id],
@@ -113,6 +156,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (!user?.id) {
       setPrefs(DEFAULT_NOTIFICATION_PREFS)
       setLoaded(false)
+      setDeviceOnly(false)
       return
     }
     const { data, error: readError } = await supabase
@@ -123,9 +167,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       .eq('user_id', user.id)
       .maybeSingle()
     if (readError) {
+      const local = await loadLocalPrefs(user.id)
+      const timezone = detectTimezone()
+      const next = local ?? { ...DEFAULT_NOTIFICATION_PREFS, timezone }
+      setPrefs(next)
+      setLoaded(true)
+      if (isSchemaMissing(readError.message)) {
+        setDeviceOnly(true)
+        setError(null)
+        return
+      }
       reportError('notifications', readError.message, { op: 'prefs-load' })
       setError(readError.message)
-      setLoaded(true)
       return
     }
     const timezone = detectTimezone()
@@ -133,8 +186,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       ? fromRow(data as PrefRow)
       : { ...DEFAULT_NOTIFICATION_PREFS, timezone }
     if (next.timezone !== timezone) next.timezone = timezone
+    setDeviceOnly(false)
+    setError(null)
     setPrefs(next)
     setLoaded(true)
+    await saveLocalPrefs(user.id, next)
     if (!data || (data as PrefRow).timezone !== timezone) {
       await persist(next)
     }
@@ -227,11 +283,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       loaded,
       busy,
       error,
+      deviceOnly,
       expoGoNote: expoGoAndroidRemoteUnsupported(),
       patch,
       remindInOneHour,
     }),
-    [busy, error, loaded, patch, prefs, remindInOneHour],
+    [busy, deviceOnly, error, loaded, patch, prefs, remindInOneHour],
   )
 
   return (

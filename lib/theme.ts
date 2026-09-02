@@ -62,7 +62,7 @@ export const radii = {
 
 export const hit = 44
 
-/** Desktop web frames the app at this width so layouts match a phone. */
+/** Desktop web keeps a readable column; gutters match the page background. */
 export const phoneMaxWidth = 430
 
 export const hairlineWidth = 0.5

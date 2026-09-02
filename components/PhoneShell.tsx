@@ -28,7 +28,7 @@ export function PhoneShell({ children }: { children: ReactNode }) {
   return (
     <View style={styles.outer} accessibilityRole="none">
       <View style={styles.frame} testID="phone-frame" accessibilityRole="none">
-        {!online ? (
+        {!online || queued ? (
           <View
             accessibilityLiveRegion="polite"
             accessibilityRole="alert"

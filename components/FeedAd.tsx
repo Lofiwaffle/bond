@@ -14,7 +14,8 @@ export function FeedAd() {
 
   if (plus.isLoading || !shouldShowAds(plus.active)) return null
 
-  if (nativeFailed || !ads) return <HouseAd compact />
+  const unitId = bannerUnitId(Platform.OS)
+  if (nativeFailed || !ads || !unitId) return <HouseAd compact />
 
   const { BannerAd, BannerAdSize } = ads
   return (
@@ -25,7 +26,7 @@ export function FeedAd() {
     >
       <Text style={styles.kicker}>{HOUSE_AD_KICKER}</Text>
       <BannerAd
-        unitId={bannerUnitId(Platform.OS)}
+        unitId={unitId}
         size={BannerAdSize.INLINE_ADAPTIVE_BANNER}
         requestOptions={{ requestNonPersonalizedAdsOnly: true }}
         onAdFailedToLoad={() => setNativeFailed(true)}

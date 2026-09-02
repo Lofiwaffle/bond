@@ -8,7 +8,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, Redirect, type Href } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
@@ -18,7 +18,8 @@ import {
   RevealPreview,
   SAMPLE_PROMPT,
 } from '../components/OnboardingRitual'
-import { PrimaryButton, TextLink } from '../components/ui'
+import { PrimaryButton, TextLink, LoadingScreen } from '../components/ui'
+import { useAuth } from '../lib/auth'
 import { markOnboardingSeen } from '../lib/onboarding'
 import { DEVICE_ONLY_THOUGHTS } from '../lib/privacy'
 import { colors, radii, type } from '../lib/theme'
@@ -26,6 +27,7 @@ import { colors, radii, type } from '../lib/theme'
 const SLIDE_IDS = ['promise', 'reveal', 'invite'] as const
 
 export default function OnboardingScreen() {
+  const { session, profile, isLoading } = useAuth()
   const insets = useSafeAreaInsets()
   const [index, setIndex] = useState(0)
   const [score, setScore] = useState<number | null>(null)
@@ -61,6 +63,17 @@ export default function OnboardingScreen() {
 
   const nextHint =
     current === 'reveal' && !revealed ? 'See the reveal' : 'Next'
+
+  if (isLoading) return <LoadingScreen label="Opening Bond" />
+  if (session) {
+    return (
+      <Redirect
+        href={
+          (profile?.couple_id ? '/(app)/(tabs)' : '/(app)/setup') as Href
+        }
+      />
+    )
+  }
 
   return (
     <View

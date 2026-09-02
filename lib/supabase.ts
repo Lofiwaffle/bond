@@ -1,10 +1,16 @@
 import 'react-native-url-polyfill/auto'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { Platform } from 'react-native'
+import { AppState, Platform } from 'react-native'
 
 import { reportError } from './monitor'
 import { markNetworkOffline, markNetworkOnline } from './network'
+import {
+  SUPABASE_FETCH_TIMEOUT_MS,
+  SUPABASE_INIT_TIMEOUT_MS,
+  fetchWithTimeout,
+  withTimeout,
+} from './startup'
 import type { Database } from '../types/database'
 
 const STORAGE_KEY = 'bond.supabase'
@@ -19,7 +25,7 @@ const envKey =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
 
 /** Public publishable key for the hosted Bond project (safe in the client). */
-const HOSTED_BOND: SupabaseAppConfig = {
+export const HOSTED_BOND: SupabaseAppConfig = {
   url: 'https://melmzlgzfcysbnvtuksv.supabase.co',
   key: 'sb_publishable_I3LAmPEB6tGY-1l2-_-9ng_xu-PRSGh',
 }
@@ -71,7 +77,11 @@ function makeClient(url: string, key: string, persist: boolean): SupabaseClient<
     global: {
       fetch: async (input, init) => {
         try {
-          const response = await fetch(input, init)
+          const response = await fetchWithTimeout(
+            input,
+            init,
+            SUPABASE_FETCH_TIMEOUT_MS,
+          )
           markNetworkOnline()
           if (!response.ok && response.status >= 500) {
             reportError('supabase', `HTTP ${response.status}`)
@@ -169,11 +179,44 @@ async function resolveConfig(): Promise<SupabaseAppConfig | null> {
   return stored ?? (envUrl && envKey ? { url: envUrl, key: envKey } : hosted)
 }
 
+function bootConfig(): SupabaseAppConfig {
+  if (envUrl && envKey && !configIssue(envUrl, envKey)) {
+    return { url: envUrl, key: envKey }
+  }
+  return HOSTED_BOND
+}
+
+applyConfig(bootConfig())
+
+function syncAutoRefresh(state: string) {
+  if (Platform.OS === 'web' || !supabaseConfigured) return
+  if (state === 'active') supabase.auth.startAutoRefresh()
+  else supabase.auth.stopAutoRefresh()
+}
+
+if (Platform.OS !== 'web') {
+  AppState.addEventListener('change', syncAutoRefresh)
+  if (supabaseConfigured) supabase.auth.startAutoRefresh()
+}
+
 export function initSupabase(): Promise<void> {
   if (!initPromise) {
-    initPromise = resolveConfig().then((config) => {
-      if (config) applyConfig(config)
-    })
+    initPromise = (async () => {
+      try {
+        const config = await withTimeout(
+          resolveConfig(),
+          SUPABASE_INIT_TIMEOUT_MS,
+          () => null,
+        )
+        if (config) applyConfig(config)
+        else applyConfig(HOSTED_BOND)
+      } catch {
+        applyConfig(HOSTED_BOND)
+      }
+      if (Platform.OS !== 'web' && supabaseConfigured) {
+        supabase.auth.startAutoRefresh()
+      }
+    })()
   }
   return initPromise
 }
@@ -189,4 +232,8 @@ export async function saveSupabaseConfig(
     JSON.stringify({ url: url.trim(), key: key.trim() }),
   )
   return { error: null }
+}
+
+export async function connectHostedBond(): Promise<{ error: string | null }> {
+  return saveSupabaseConfig(HOSTED_BOND.url, HOSTED_BOND.key)
 }

@@ -2,7 +2,7 @@ import { Platform } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
 
 import { consumeAuthUrl } from './authCallback'
-import { authRedirectUrl } from './authRedirect'
+import { nativeAuthReturnUrl, oauthRedirectUrl } from './authRedirect'
 import {
   friendlyGoogleAuthError,
   googleAuthCancelled,
@@ -11,7 +11,9 @@ import { supabase, supabaseConfigured, supabaseConfigError } from './supabase'
 
 export { friendlyGoogleAuthError, googleAuthCancelled }
 
-WebBrowser.maybeCompleteAuthSession()
+if (Platform.OS === 'web') {
+  WebBrowser.maybeCompleteAuthSession()
+}
 
 /**
  * Sign in or create an account with Google via Supabase OAuth.
@@ -22,7 +24,8 @@ export async function signInWithGoogle(): Promise<{ error: string | null }> {
     return { error: supabaseConfigError }
   }
 
-  const redirectTo = authRedirectUrl('app')
+  const redirectTo = oauthRedirectUrl()
+  const returnUrl = nativeAuthReturnUrl()
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
@@ -49,17 +52,25 @@ export async function signInWithGoogle(): Promise<{ error: string | null }> {
     // Warm-up is optional.
   }
 
-  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
-  if (googleAuthCancelled(result.type)) {
-    return { error: null }
-  }
-  if (result.type !== 'success' || !('url' in result) || !result.url) {
-    return { error: 'Google sign-in did not finish' }
-  }
+  try {
+    const result = await WebBrowser.openAuthSessionAsync(data.url, returnUrl)
+    if (googleAuthCancelled(result.type)) {
+      return { error: null }
+    }
+    if (result.type !== 'success' || !('url' in result) || !result.url) {
+      return { error: 'Google sign-in did not finish' }
+    }
 
-  const consumed = await consumeAuthUrl(result.url)
-  if (consumed.error) {
-    return { error: friendlyGoogleAuthError(consumed.error) }
+    const consumed = await consumeAuthUrl(result.url)
+    if (consumed.error) {
+      return { error: friendlyGoogleAuthError(consumed.error) }
+    }
+    return { error: null }
+  } finally {
+    try {
+      await WebBrowser.coolDownAsync()
+    } catch {
+      // Cool-down is optional.
+    }
   }
-  return { error: null }
 }

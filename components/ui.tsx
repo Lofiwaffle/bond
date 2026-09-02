@@ -29,6 +29,8 @@ import {
 } from '../lib/badges'
 import { localDateString } from '../lib/dates'
 import { FaceIcon, Icon, type IconName } from '../lib/icons'
+import { useAccessibleLayout } from '../lib/a11y'
+import { calendarCellSize } from '../lib/a11yLayout'
 import {
   SCORE_LABELS,
   colors,
@@ -377,8 +379,8 @@ export function ScoreScale({
   value: number | null
   onChange: (score: number) => void
 }) {
-  const { width } = useWindowDimensions()
-  const face = width < 360 ? 40 : 52
+  const { width, fontScale, highContrast } = useAccessibleLayout()
+  const face = Math.round((width < 360 ? 40 : 52) * Math.min(fontScale, 1.35))
   return (
     <View>
       <View style={styles.scaleRow}>
@@ -394,6 +396,8 @@ export function ScoreScale({
               style={(state) => [
                 styles.scaleCell,
                 selected && styles.scaleCellSelected,
+                highContrast && styles.scaleCellContrast,
+                selected && highContrast && styles.scaleCellSelectedContrast,
                 state.pressed && styles.scaleCellPressed,
                 isFocused(state) && styles.focusRing,
               ]}
@@ -563,14 +567,9 @@ export function AchievementCalendar({
     return badgesForProgress({ completions: counts })
   }, [dayCounts])
 
+  const { fontScale } = useAccessibleLayout()
   const available = Math.max(220, frameWidth - 40 - WEEKDAY_COL - 8)
-  const cell = Math.max(
-    22,
-    Math.min(
-      36,
-      Math.floor((available - (weekCount - 1) * CAL_GAP) / weekCount),
-    ),
-  )
+  const cell = calendarCellSize(available, weekCount, fontScale, CAL_GAP)
 
   return (
     <View style={styles.habitCal}>
@@ -620,6 +619,7 @@ export function AchievementCalendar({
                           : `${date}: ${summary.habits.join(', ')}`
                     }
                     onPress={() => onPressDate?.(date)}
+                    hitSlop={Math.max(0, Math.ceil((hit - cell) / 2))}
                     style={[
                       styles.habitCalCell,
                       {
@@ -924,6 +924,13 @@ const styles = StyleSheet.create({
   },
   scaleCellSelected: {
     borderColor: colors.accent,
+  },
+  scaleCellContrast: {
+    borderColor: colors.ink,
+  },
+  scaleCellSelectedContrast: {
+    borderColor: colors.ink,
+    backgroundColor: colors.accentSoft,
   },
   scaleCellPressed: {
     opacity: 0.75,

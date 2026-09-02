@@ -4,6 +4,8 @@
 import {
   FEED_AD_INTERVAL,
   HOUSE_AD_BODY,
+  bannerUnitId,
+  isGoogleTestAdId,
   isNewLocalDay,
   shouldInsertFeedAd,
   shouldShowAds,
@@ -30,5 +32,21 @@ assert(
   PLUS_PRODUCTS[2].periodLabel.includes('$48'),
 )
 assert('house copy names yearly price', HOUSE_AD_BODY.includes('$48'))
+assert(
+  'google sample id is detected',
+  isGoogleTestAdId('ca-app-pub-3940256099942544/6300978111'),
+)
+assert(
+  'real-looking id is not a sample',
+  isGoogleTestAdId('ca-app-pub-1234567890123456/1234567890') === false,
+)
+const previousEnv = process.env.APP_ENV
+process.env.APP_ENV = 'production'
+delete process.env.EXPO_PUBLIC_ADMOB_BANNER_ID
+assert(
+  'production without paid units is quiet',
+  bannerUnitId('android') === null,
+)
+process.env.APP_ENV = previousEnv
 
 console.log('verify-ads: ok')

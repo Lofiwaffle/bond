@@ -23,6 +23,7 @@ export default function LoginScreen() {
     retrySession,
     passwordRecovery,
     resendConfirmation,
+    verifyEmailOtp,
   } = useAuth()
   const params = useLocalSearchParams<{ invite?: string | string[] }>()
   const inviteParam = Array.isArray(params.invite) ? params.invite[0] : params.invite
@@ -31,10 +32,12 @@ export default function LoginScreen() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [needsConfirmation, setNeedsConfirmation] = useState(false)
+  const [code, setCode] = useState('')
   const [cooldownUntil, setCooldownUntil] = useState(0)
   const [now, setNow] = useState(Date.now())
   const emailRef = useRef<TextInput>(null)
   const passwordRef = useRef<TextInput>(null)
+  const codeRef = useRef<TextInput>(null)
 
   useEffect(() => {
     if (inviteParam) void savePendingInvite(inviteParam)
@@ -115,6 +118,23 @@ export default function LoginScreen() {
     else setError(CONFIRM_EMAIL_MESSAGE)
   }
 
+  const onConfirmCode = async () => {
+    if (submitting) return
+    if (!/^\d{6}$/.test(code.trim())) {
+      setError('Enter the 6-digit code from the email.')
+      codeRef.current?.focus()
+      return
+    }
+    setError(null)
+    setSubmitting(true)
+    const result = await verifyEmailOtp(email, code)
+    setSubmitting(false)
+    if (result.error) {
+      setError(result.error)
+      codeRef.current?.focus()
+    }
+  }
+
   return (
     <Screen keyboard>
       <ScrollView
@@ -174,16 +194,36 @@ export default function LoginScreen() {
         />
 
         {needsConfirmation ? (
-          <PrimaryButton
-            label={
-              remaining > 0
-                ? `Resend in ${remaining}s`
-                : 'Send confirmation link'
-            }
-            onPress={() => void onResend()}
-            loading={submitting}
-            disabled={remaining > 0 || !email}
-          />
+          <>
+            <Label>6-digit code</Label>
+            <Field
+              ref={codeRef}
+              value={code}
+              onChangeText={setCode}
+              keyboardType="number-pad"
+              textContentType="oneTimeCode"
+              autoComplete="one-time-code"
+              maxLength={6}
+              accessibilityLabel="6-digit confirmation code"
+              placeholder="123456"
+            />
+            <PrimaryButton
+              label="Confirm account"
+              onPress={() => void onConfirmCode()}
+              loading={submitting}
+              disabled={!email || code.trim().length < 6}
+            />
+            <PrimaryButton
+              label={
+                remaining > 0
+                  ? `Resend in ${remaining}s`
+                  : 'Send another email'
+              }
+              onPress={() => void onResend()}
+              loading={submitting}
+              disabled={remaining > 0 || !email}
+            />
+          </>
         ) : null}
 
         <Link href={'/forgot-password' as Href} style={styles.link}>

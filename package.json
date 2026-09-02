@@ -1,6 +1,6 @@
 {
   "name": "bond",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -47,6 +47,9 @@
     "test:ads": "npx --yes tsx scripts/verify-ads.ts",
     "test:google": "npx --yes tsx scripts/verify-google-auth.ts",
     "test:store-screens": "npx --yes tsx scripts/screenshot-store.ts",
+    "test:startup": "npx --yes tsx scripts/verify-startup.ts",
+    "test:production": "npx --yes tsx scripts/verify-production.ts",
+    "test:release": "npx --yes tsx scripts/verify-production.ts && npx --yes tsx scripts/verify-ads.ts && npx --yes tsx scripts/verify-bond-plus.ts && npx --yes tsx scripts/verify-growth-hub.ts && npx --yes tsx scripts/verify-startup.ts",
     "build:android": "eas build --platform android --profile production",
     "submit:android": "eas submit --platform android --profile production",
     "build:ios": "eas build --platform ios --profile production",

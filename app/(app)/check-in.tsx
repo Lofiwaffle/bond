@@ -9,6 +9,8 @@ import {
   WaitingMoment,
   WordsStep,
 } from '../../components/CheckInMoment'
+import { CheckInSyncBanner } from '../../components/CheckInSyncBanner'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import {
   IconButton,
   LoadingScreen,
@@ -19,6 +21,7 @@ import {
 } from '../../components/ui'
 import type { ActivityId } from '../../lib/activities'
 import {
+  useCheckInGrowth,
   useTodayCheckIn,
   OPENED_WHILE_EDITING,
 } from '../../hooks/useCheckIn'
@@ -39,6 +42,12 @@ import {
   QUEUED_TOAST,
   useQueuedCheckIn,
 } from '../../lib/checkInOutbox'
+import { useOnline } from '../../lib/network'
+import {
+  MUTUAL_REVEAL_BODY,
+  MUTUAL_REVEAL_CONFIRM,
+  MUTUAL_REVEAL_TITLE,
+} from '../../lib/privacy'
 import { useToast } from '../../lib/toast'
 import { colors, type } from '../../lib/theme'
 
@@ -55,7 +64,10 @@ export default function CheckInScreen() {
     revise,
     refresh,
     sendNudge,
+    syncing,
   } = useTodayCheckIn()
+  const { myCheckIns } = useCheckInGrowth()
+  const online = useOnline()
   const { showToast } = useToast()
   const params = useLocalSearchParams<{ edit?: string | string[] }>()
   const wantEdit = (Array.isArray(params.edit) ? params.edit[0] : params.edit) === '1'
@@ -72,7 +84,9 @@ export default function CheckInScreen() {
   const [nudged, setNudged] = useState(false)
   const [nudging, setNudging] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [revealOpen, setRevealOpen] = useState(false)
   const saving = useRef(false)
+  const revealAcked = useRef(false)
   const openedWhileEditing = useRef(false)
   const startedFromQuery = useRef(false)
 
@@ -182,6 +196,8 @@ export default function CheckInScreen() {
     }
   }
 
+  const needsRevealAck = !editing && !queued && myCheckIns === 0
+
   const onSubmit = async () => {
     if (saving.current || submitting) return
     if (score == null) {
@@ -189,6 +205,11 @@ export default function CheckInScreen() {
       setStep('score')
       return
     }
+    if (needsRevealAck && !revealAcked.current) {
+      setRevealOpen(true)
+      return
+    }
+    setRevealOpen(false)
     setSubmitError(null)
     saving.current = true
     setSubmitting(true)
@@ -272,11 +293,24 @@ export default function CheckInScreen() {
           </View>
         </View>
 
-        {error ? (
+        {error && !queued ? (
           <StatusPanel
             message="Couldn't load today's check-in."
             onRetry={() => void refresh()}
           />
+        ) : null}
+
+        <CheckInSyncBanner
+          queued={queued}
+          syncing={syncing}
+          online={online}
+          allowDraft={composing}
+        />
+        {error && queued ? (
+          <Text style={styles.queuedHint}>
+            Couldn't refresh from Bond. Your saved check-in is still on this
+            device.
+          </Text>
         ) : null}
 
         {composing ? (
@@ -327,12 +361,6 @@ export default function CheckInScreen() {
             ) : null}
             {step === 'extras' ? (
               <>
-                {queued && !editing ? (
-                  <Text style={styles.queuedHint}>
-                    Still on this device only. Bond will send it when you
-                    reconnect.
-                  </Text>
-                ) : null}
                 <PrimaryButton
                   label={
                     editing
@@ -396,6 +424,19 @@ export default function CheckInScreen() {
           </>
         ) : null}
       </ScrollView>
+      <ConfirmDialog
+        visible={revealOpen}
+        title={MUTUAL_REVEAL_TITLE}
+        body={MUTUAL_REVEAL_BODY}
+        confirmLabel={MUTUAL_REVEAL_CONFIRM}
+        cancelLabel="Not yet"
+        onCancel={() => setRevealOpen(false)}
+        onConfirm={() => {
+          revealAcked.current = true
+          setRevealOpen(false)
+          void onSubmit()
+        }}
+      />
     </Screen>
   )
 }

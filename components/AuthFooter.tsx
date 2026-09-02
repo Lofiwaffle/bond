@@ -9,7 +9,7 @@ export function AuthFooter() {
     <>
       {showChangeServer() ? (
         <Link href="/connect" style={styles.privacy}>
-          Change server
+          Connect to Bond
         </Link>
       ) : null}
       <Link href="/privacy" style={styles.privacy}>

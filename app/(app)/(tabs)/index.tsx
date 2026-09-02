@@ -5,6 +5,7 @@ import { Redirect, router, useFocusEffect } from 'expo-router'
 import { NextStepCard } from '../../../components/NextStepCard'
 import { PlusOfferCard } from '../../../components/PlusOfferCard'
 import { RevealMoment, SharedActionCard, WaitingMoment } from '../../../components/CheckInMoment'
+import { CheckInSyncBanner } from '../../../components/CheckInSyncBanner'
 import { LoadingScreen, Screen, StatusPanel, TextLink } from '../../../components/ui'
 import { useTodayCheckIn, useCheckInGrowth, useCheckInIndex } from '../../../hooks/useCheckIn'
 import { useBondPlus } from '../../../hooks/useBondPlus'
@@ -15,6 +16,7 @@ import { hasSentNudge, markNudgeSent } from '../../../lib/checkInDraft'
 import { promptForDate } from '../../../lib/dailyPrompts'
 import { formatDisplayDate, localDateString } from '../../../lib/dates'
 import { useQueuedCheckIn } from '../../../lib/checkInOutbox'
+import { useOnline } from '../../../lib/network'
 import { firstInsight } from '../../../lib/firstInsight'
 import { observationDaysFromIndex } from '../../../lib/growthObservations'
 import { todayPhase } from '../../../lib/nextStep'
@@ -34,6 +36,7 @@ export default function TodayScreen() {
     error,
     refresh,
     sendNudge,
+    syncing,
   } = useTodayCheckIn()
   const { myCheckIns, lastDate } = useCheckInGrowth()
   const { days: indexDays } = useCheckInIndex()
@@ -46,6 +49,7 @@ export default function TodayScreen() {
   const [snoozing, setSnoozing] = useState(false)
   const today = localDateString()
   const queued = useQueuedCheckIn(user?.id, today)
+  const online = useOnline()
 
   const insight = useMemo(
     () => firstInsight(observationDaysFromIndex(indexDays)),
@@ -135,12 +139,19 @@ export default function TodayScreen() {
           <RefreshControl refreshing={false} onRefresh={() => void refresh()} />
         }
       >
-        {error ? (
+        {error && !queued ? (
           <StatusPanel
             message="Couldn't load today."
             onRetry={() => void refresh()}
           />
         ) : null}
+
+        <CheckInSyncBanner
+          queued={queued}
+          syncing={syncing}
+          online={online}
+          allowDraft={phase === 'compose'}
+        />
 
         {accepted
           .filter(
@@ -162,7 +173,7 @@ export default function TodayScreen() {
               title={prompt.text}
               body={
                 queued
-                  ? 'Today is queued on this device. It is not in the relationship until Bond confirms it.'
+                  ? 'Saved on this device, waiting to sync. It is not in the relationship until Bond confirms it.'
                   : returning ??
                     'Two minutes. Private until you both check in.'
               }

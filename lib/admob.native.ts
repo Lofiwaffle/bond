@@ -18,11 +18,12 @@ export function getAdmob(): AdmobModule | null {
 
 export async function showDailyInterstitial(): Promise<boolean> {
   const ads = getAdmob()
-  if (!ads) return false
+  const unitId = interstitialUnitId(Platform.OS)
+  if (!ads || !unitId) return false
   try {
     await ads.MobileAds().initialize()
     const interstitial = ads.InterstitialAd.createForAdRequest(
-      interstitialUnitId(Platform.OS),
+      unitId,
       { requestNonPersonalizedAdsOnly: true },
     )
     return await new Promise((resolve) => {

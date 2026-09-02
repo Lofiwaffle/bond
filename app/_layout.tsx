@@ -4,7 +4,6 @@ import { StatusBar } from 'expo-status-bar'
 
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { PhoneShell } from '../components/PhoneShell'
-import { LoadingScreen } from '../components/ui'
 import { AuthProvider } from '../lib/auth'
 import { registerWebInstall } from '../lib/pwa'
 import {
@@ -17,18 +16,12 @@ import { ToastProvider } from '../lib/toast'
 registerWebInstall()
 
 export default function RootLayout() {
-  const [ready, setReady] = useState(false)
-  const [configured, setConfigured] = useState(false)
+  const [configured, setConfigured] = useState(supabaseConfigured)
 
   useEffect(() => {
-    void initSupabase().finally(() => {
-      setConfigured(supabaseConfigured)
-      setReady(true)
-    })
+    void initSupabase().then(() => setConfigured(supabaseConfigured))
     return subscribeSupabaseConfig(() => setConfigured(supabaseConfigured))
   }, [])
-
-  if (!ready) return <LoadingScreen />
 
   return (
     <ErrorBoundary>

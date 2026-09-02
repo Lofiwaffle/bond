@@ -2,12 +2,10 @@ import { useMemo } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router, type Href } from 'expo-router'
 
-import { GrowthObservations } from '../../../components/GrowthObservations'
 import { NextStepCard } from '../../../components/NextStepCard'
 import { LoadingScreen, Screen } from '../../../components/ui'
 import { useCheckInGrowth, useCheckInIndex } from '../../../hooks/useCheckIn'
 import { useBondPlus } from '../../../hooks/useBondPlus'
-import { useCoupleGoal } from '../../../hooks/useCoupleGoal'
 import { useWeeklyReview } from '../../../hooks/useWeeklyReview'
 import { useAuth } from '../../../lib/auth'
 import { localDateString } from '../../../lib/dates'
@@ -17,51 +15,35 @@ import {
   observationDaysFromIndex,
 } from '../../../lib/growthObservations'
 import { Icon } from '../../../lib/icons'
-import {
-  growthUnlocks,
-  pickGrowthNext,
-  unlockedGrowthItems,
-} from '../../../lib/nextStep'
+import { daysUntilFirstLook, pickWeeklyInsight } from '../../../lib/nextStep'
 import { colors, hairlineWidth, type } from '../../../lib/theme'
 
 export default function GrowthScreen() {
   const { profile, isLoading } = useAuth()
-  const { activeGoals, isLoading: goalsLoading } = useCoupleGoal()
-  const { myCheckIns, revealedDays, isLoading: checkInLoading } =
-    useCheckInGrowth()
+  const { myCheckIns, isLoading: checkInLoading } = useCheckInGrowth()
   const { days, isLoading: indexLoading } = useCheckInIndex()
   const plus = useBondPlus()
-  const { needsReview, unlocked: weeklyUnlocked } = useWeeklyReview()
+  const { needsReview, isLoading: weeklyLoading } = useWeeklyReview()
   const observationDays = useMemo(() => observationDaysFromIndex(days), [days])
   const observations = useMemo(
     () => buildGrowthObservations(observationDays, localDateString()),
     [observationDays],
   )
   const insight = useMemo(() => firstInsight(observationDays), [observationDays])
-
-  const unlocks = useMemo(
-    () =>
-      growthUnlocks({
-        myCheckIns,
-        revealedDays,
-        weeklyUnlocked,
-      }),
-    [myCheckIns, revealedDays, weeklyUnlocked],
-  )
-
-  const { next, remaining } = pickGrowthNext({
-    unlocks,
+  const weekly = pickWeeklyInsight({
     needsReview,
-    activeGoalCount: activeGoals.length,
-    myCheckIns,
-    revealedDays,
+    insightTitle: plus.active
+      ? observations[0]
+        ? 'What we noticed'
+        : insight?.title ?? null
+      : insight?.title ?? null,
+    insightBody: plus.active
+      ? observations[0]?.body ?? insight?.body ?? null
+      : insight?.body ?? null,
+    remaining: daysUntilFirstLook(myCheckIns),
   })
 
-  const items = unlockedGrowthItems(unlocks, { revealedDays }).filter(
-    (item) => item.id !== next?.id,
-  )
-
-  if (isLoading || goalsLoading || checkInLoading || indexLoading || plus.isLoading) {
+  if (isLoading || checkInLoading || indexLoading || plus.isLoading || weeklyLoading) {
     return <LoadingScreen />
   }
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
@@ -69,92 +51,39 @@ export default function GrowthScreen() {
   return (
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false}>
-      <Text style={styles.title}>Growth</Text>
-      <Text style={styles.subtitle}>What should we look at next?</Text>
+        <Text style={styles.title}>Growth</Text>
+        <Text style={styles.subtitle}>One look this week.</Text>
 
-      {next ? (
         <NextStepCard
-          kicker="Next"
-          title={next.title}
-          body={next.body}
-          actionLabel={`Open ${next.title.toLowerCase()}`}
-          onAction={() => router.push(next.href as Href)}
-        />
-      ) : (
-        <NextStepCard
-          kicker="Not yet"
-          title="Rhythm opens after a few check-ins."
-          body={
-            remaining > 0
-              ? `${remaining} more day${remaining === 1 ? '' : 's'} on Today, then this home fills in.`
-              : 'Keep the daily ritual. This page stays quiet until it can help.'
+          kicker={weekly.kicker}
+          title={weekly.title}
+          body={weekly.body}
+          actionLabel={weekly.actionLabel}
+          onAction={
+            weekly.href
+              ? () => router.push(weekly.href as Href)
+              : undefined
           }
-          actionLabel="Go to Today"
-          onAction={() => router.push('/(app)/(tabs)')}
         />
-      )}
 
-      {plus.active ? (
-        <GrowthObservations observations={observations} />
-      ) : insight ? (
-        <GrowthObservations
-          observations={[{ id: 'similar', body: insight.body }]}
-        />
-      ) : (
-        <GrowthObservations
-          observations={[]}
-          lockedHint="After three days you both open, a first look appears here. Longer trends are Bond Plus."
-        />
-      )}
-
-      {items.length > 0 ? (
-        <View style={styles.list}>
-          {items.map((item, index) => (
-            <Pressable
-              key={item.id}
-              accessibilityRole="button"
-              accessibilityLabel={`${item.title}. ${item.body}`}
-              onPress={() => router.push(item.href as Href)}
-              style={(state) => [
-                styles.row,
-                index === items.length - 1 && !plus.active && styles.rowLast,
-                state.pressed && styles.rowPressed,
-                Boolean((state as { focused?: boolean }).focused) &&
-                  styles.rowFocus,
-              ]}
-            >
-              <View style={styles.copy}>
-                <Text style={styles.rowTitle}>{item.title}</Text>
-                <Text style={styles.rowBody}>{item.body}</Text>
-              </View>
-              <Icon name="chevron-right" size={16} color={colors.muted} />
-            </Pressable>
-          ))}
-          {plus.active ? null : (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Bond Plus. Deeper growth for the two of you."
-              onPress={() => router.push('/(app)/plus' as Href)}
-              style={(state) => [
-                styles.row,
-                styles.rowLast,
-                state.pressed && styles.rowPressed,
-                Boolean((state as { focused?: boolean }).focused) &&
-                  styles.rowFocus,
-              ]}
-            >
-              <View style={styles.copy}>
-                <Text style={styles.rowTitle}>Bond Plus</Text>
-                <Text style={styles.rowBody}>
-                  History, State of Us, and trends — without paying to see an
-                  answer already shared.
-                </Text>
-              </View>
-              <Icon name="chevron-right" size={16} color={colors.muted} />
-            </Pressable>
-          )}
-        </View>
-      ) : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="More in Growth. Goals, rhythm, prompts, and milestones."
+          onPress={() => router.push('/(app)/bond/hub' as Href)}
+          style={(state) => [
+            styles.row,
+            state.pressed && styles.rowPressed,
+            Boolean((state as { focused?: boolean }).focused) && styles.rowFocus,
+          ]}
+        >
+          <View style={styles.copy}>
+            <Text style={styles.rowTitle}>More in Growth</Text>
+            <Text style={styles.rowBody}>
+              Goals, rhythm, prompts, and milestones — when you want them.
+            </Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.muted} />
+        </Pressable>
       </ScrollView>
     </Screen>
   )
@@ -170,20 +99,15 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginBottom: 20,
   },
-  list: {
-    marginTop: 12,
-  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     minHeight: 44,
     paddingVertical: 16,
+    marginTop: 8,
     borderBottomWidth: hairlineWidth,
     borderBottomColor: colors.hairline,
-  },
-  rowLast: {
-    borderBottomWidth: 0,
   },
   rowPressed: {
     opacity: 0.7,

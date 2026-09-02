@@ -7,6 +7,8 @@ import { LoadingScreen } from '../../../components/ui'
 import { useTodayCheckIn } from '../../../hooks/useCheckIn'
 import { useAuth } from '../../../lib/auth'
 import { todayPhase } from '../../../lib/nextStep'
+import { useAccessibleLayout } from '../../../lib/a11y'
+import { tabBarHeight } from '../../../lib/a11yLayout'
 import { colors, elevation, radii } from '../../../lib/theme'
 
 function CheckInFab() {
@@ -55,6 +57,7 @@ function CheckInFab() {
 
 export default function TabsLayout() {
   const { profile, isLoading } = useAuth()
+  const { fontScale, largeText, highContrast } = useAccessibleLayout()
 
   if (isLoading) return <LoadingScreen />
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
@@ -65,8 +68,16 @@ export default function TabsLayout() {
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.tabBarIconMuted,
-          tabBarStyle: styles.tabBar,
+          tabBarInactiveTintColor: highContrast
+            ? colors.ink
+            : colors.tabBarIconMuted,
+          tabBarStyle: [
+            styles.tabBar,
+            {
+              height: tabBarHeight(fontScale),
+              paddingBottom: largeText ? 18 : 14,
+            },
+          ],
           tabBarLabelStyle: styles.tabLabel,
         }}
       >

@@ -6,6 +6,7 @@ import { NextStepCard } from '../../../components/NextStepCard'
 import { PlusOfferCard } from '../../../components/PlusOfferCard'
 import { CheckInDayFeed } from '../../../components/CheckInDayFeed'
 import { SharedActionCard } from '../../../components/CheckInMoment'
+import { CheckInSyncBanner } from '../../../components/CheckInSyncBanner'
 import { LoadingScreen, Screen, StatusPanel, TextLink } from '../../../components/ui'
 import {
   useTodayCheckIn,
@@ -21,6 +22,7 @@ import { useAuth } from '../../../lib/auth'
 import { promptForDate } from '../../../lib/dailyPrompts'
 import { addDays, formatDisplayDate, localDateString } from '../../../lib/dates'
 import { useQueuedCheckIn } from '../../../lib/checkInOutbox'
+import { useOnline } from '../../../lib/network'
 import { firstInsight } from '../../../lib/firstInsight'
 import { observationDaysFromIndex } from '../../../lib/growthObservations'
 import { todayPhase } from '../../../lib/nextStep'
@@ -39,6 +41,7 @@ export default function TodayScreen() {
     isLoading,
     error,
     refresh,
+    syncing,
   } = useTodayCheckIn()
   const { myCheckIns, lastDate } = useCheckInGrowth()
   const { days: indexDays } = useCheckInIndex()
@@ -49,6 +52,7 @@ export default function TodayScreen() {
   const [snoozing, setSnoozing] = useState(false)
   const today = localDateString()
   const queued = useQueuedCheckIn(user?.id, today)
+  const online = useOnline()
   const feedQuery = useCheckInRange(addDays(today, -180), today)
 
   const insight = useMemo(
@@ -148,12 +152,19 @@ export default function TodayScreen() {
           />
         }
       >
-        {error ? (
+        {error && !queued ? (
           <StatusPanel
             message="Couldn't load today."
             onRetry={() => void refresh()}
           />
         ) : null}
+
+        <CheckInSyncBanner
+          queued={queued}
+          syncing={syncing}
+          online={online}
+          allowDraft={phase === 'compose'}
+        />
 
         <View style={styles.padded}>
         {accepted

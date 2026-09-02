@@ -1,33 +1,63 @@
 import { useEffect, useState } from 'react'
+import { Platform } from 'react-native'
 import { Redirect, type Href } from 'expo-router'
 
 import { LoadingScreen, Screen, StatusPanel } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { captureInviteFromUrl, loadPendingInvite } from '../lib/invite'
-import { hasSeenOnboarding } from '../lib/onboarding'
+import {
+  hasSeenOnboarding,
+  rememberedOnboardingSeen,
+} from '../lib/onboarding'
+import {
+  SESSION_RESTORE_ERROR,
+  captureInviteFromWindowLocation,
+} from '../lib/startup'
 import { supabaseConfigured } from '../lib/supabase'
 
 export default function Index() {
   const { session, profile, isLoading, sessionError, retrySession, passwordRecovery, authLinkExpired, authLinkExpiredKind } = useAuth()
-  const [onboardingSeen, setOnboardingSeen] = useState<boolean | null>(null)
-  const [pendingInvite, setPendingInvite] = useState<string | null | undefined>(undefined)
+  const [onboardingSeen, setOnboardingSeen] = useState<boolean | null>(
+    rememberedOnboardingSeen(),
+  )
+  const [pendingInvite, setPendingInvite] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
+
     void (async () => {
-      if (typeof window !== 'undefined') {
-        await captureInviteFromUrl(window.location.href)
+      try {
+        if (captureInviteFromWindowLocation(Platform.OS)) {
+          await captureInviteFromUrl(window.location.href)
+        }
+        const [invite, seen] = await Promise.all([
+          loadPendingInvite(),
+          hasSeenOnboarding(),
+        ])
+        if (cancelled) return
+        setPendingInvite(invite)
+        setOnboardingSeen(seen)
+      } catch {
+        if (cancelled) return
+        setPendingInvite(null)
+        setOnboardingSeen(rememberedOnboardingSeen() ?? false)
       }
-      setPendingInvite(await loadPendingInvite())
     })()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
-    if (session || isLoading) return
-    hasSeenOnboarding().then(setOnboardingSeen)
-  }, [session, isLoading])
+    const id = setTimeout(() => {
+      setOnboardingSeen((current) => (current === null ? false : current))
+    }, 2000)
+    return () => clearTimeout(id)
+  }, [])
 
-  if (isLoading) {
-    return <LoadingScreen />
+  if (isLoading || onboardingSeen === null) {
+    return <LoadingScreen label="Opening Bond" />
   }
 
   if (passwordRecovery) {
@@ -50,7 +80,7 @@ export default function Index() {
     return (
       <Screen>
         <StatusPanel
-          message="Couldn't restore your session. Check your connection and try again."
+          message={SESSION_RESTORE_ERROR}
           onRetry={() => void retrySession()}
         />
       </Screen>
@@ -62,9 +92,6 @@ export default function Index() {
   }
 
   if (!session) {
-    if (pendingInvite === undefined || onboardingSeen === null) {
-      return <LoadingScreen />
-    }
     if (pendingInvite) {
       return (
         <Redirect href={`/join?invite=${pendingInvite}` as Href} />

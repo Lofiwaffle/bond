@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { router } from 'expo-router'
 
 import { Icon } from '../lib/icons'
-import { colors, type } from '../lib/theme'
+import { colors, hit, type } from '../lib/theme'
 
 export function BondSectionHeader({
   title,
@@ -38,7 +38,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    paddingVertical: 8,
+    minHeight: hit,
+    paddingVertical: 12,
     marginBottom: 8,
   },
   backText: {

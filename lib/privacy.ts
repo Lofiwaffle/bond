@@ -72,6 +72,13 @@ export const ADS_DISCLOSURE =
 export const DEVICE_ONLY_THOUGHTS =
   'Private thoughts stay on this device and are never uploaded. They are lost if you clear Bond’s app storage, uninstall, or switch phones.'
 
+export const MUTUAL_REVEAL_TITLE = 'They cannot see this yet'
+
+export const MUTUAL_REVEAL_BODY =
+  'Your check-in stays only yours until they check in too. Then both answers open to the two of you, and neither of you can change them. Nobody else can see this.'
+
+export const MUTUAL_REVEAL_CONFIRM = 'I understand — save'
+
 export const NOT_STORED = [
   'Private thoughts typed during check-in (this device only; lost if app storage is cleared).',
   'Weekly review drafts (this device only; lost if app storage is cleared).',

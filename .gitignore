@@ -45,6 +45,10 @@ store/screenshots/*.png
 /ios
 /android
 
+# store binaries
+*.aab
+*.apk
+
 # Play / EAS secrets (never commit)
 google-services.json
 play-service-account.json
@@ -52,3 +56,9 @@ pc-api-*.json
 *.keystore
 credentials/
 credentials.json
+
+# IDE
+.idea/
+
+# Nested marketing site (own repo)
+website/

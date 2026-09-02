@@ -1,6 +1,8 @@
 # First Play Store release
 
-Bond ships as a **free** Android app. Paid Bond Plus is not sold in this build (`PLUS_PAID_CHECKOUT_READY` is false) so Google Play Billing policy is not triggered.
+Bond ships as a **free** Android app, version **1.0.1**. Paid Bond Plus is not sold in this build (`PLUS_PAID_CHECKOUT_READY` is false) so Google Play Billing policy is not triggered.
+
+Production never requests Google’s sample AdMob units. Until you set real `EXPO_PUBLIC_ADMOB_*` EAS secrets (app id + banner + interstitial), the free plan shows the in-app Bond Plus house unit instead of “Test Ad”. Do not invent a publisher id.
 
 Target API 36 is already set. Google requires that for new apps as of 31 August 2026.
 
@@ -18,6 +20,14 @@ eas secret:create --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value YOUR_ANON_
 ```
 
 `APP_ENV=production` is already on the production profile. Release builds refuse localhost.
+
+Optional, for paid AdMob inventory (otherwise house ads only):
+
+```sh
+eas secret:create --name EXPO_PUBLIC_ADMOB_ANDROID_APP_ID --value ca-app-pub-xxxxxxxxxxxxxxxx~xxxxxxxxxx
+eas secret:create --name EXPO_PUBLIC_ADMOB_BANNER_ID --value ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx
+eas secret:create --name EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID --value ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx
+```
 
 Optional, for partner “reveal is ready” remote alerts: Firebase Cloud Messaging + `google-services.json` (gitignored). Local daily reminders work without it. After `eas init`, push tokens also need `extra.eas.projectId`.
 

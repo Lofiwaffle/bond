@@ -44,6 +44,10 @@ assert(
   'incoming rewrite',
   invitePathFromIncoming('bond://join?invite=ABC234') === '/join?invite=ABC234',
 )
+assert(
+  'auth callback is not rewritten as join',
+  invitePathFromIncoming('bond://auth-callback?code=abcdefghijk') === null,
+)
 
 assert('full', classifyJoinError('Couple is full') === 'full')
 assert('expired', classifyJoinError('Invite expired') === 'expired')

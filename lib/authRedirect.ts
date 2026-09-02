@@ -5,8 +5,14 @@ import { HOSTED_APP_URL } from './appUrls'
 
 export { HOSTED_APP_URL }
 
+/** Production native OAuth / email return. Allow-list `bond://**` in Supabase Auth. */
+export const NATIVE_AUTH_CALLBACK_URL = 'bond://auth-callback'
+
 /** Production native recovery destination. Allow-list this in Supabase Auth. */
 export const NATIVE_UPDATE_PASSWORD_URL = 'bond://update-password'
+
+/** Static page that hands HTTPS auth links back to the Play/App Store install. */
+export const HOSTED_AUTH_CALLBACK_URL = `${HOSTED_APP_URL}/auth-callback.html`
 
 /** Production web recovery destination (GitHub Pages). */
 export const HOSTED_UPDATE_PASSWORD_URL = `${HOSTED_APP_URL}/update-password`
@@ -15,7 +21,7 @@ export const RESET_REQUESTED_MESSAGE =
   'If that email is in Bond, we sent a link. Check your inbox in a few minutes.'
 
 export const CONFIRM_EMAIL_MESSAGE =
-  'Check your email to confirm this account. Open the link on this phone.'
+  'Check your inbox for a Bond message. Open the link on this phone, or type the 6-digit code from that email.'
 
 export const LINK_EXPIRED_MESSAGE =
   'That link expired. Request a new one below.'
@@ -31,6 +37,18 @@ function webOriginPath(path: string): string {
   return `${HOSTED_APP_URL}${suffix === '/' ? '' : suffix}`
 }
 
+export function nativeAuthReturnUrl(): string {
+  if (Platform.OS === 'web') return webOriginPath('/')
+  if (!__DEV__) return NATIVE_AUTH_CALLBACK_URL
+  return Linking.createURL('auth-callback')
+}
+
+/** Google OAuth `redirectTo`. Native production uses a custom scheme so Chrome can return to the app. */
+export function oauthRedirectUrl(): string {
+  if (Platform.OS === 'web') return webOriginPath('/')
+  return nativeAuthReturnUrl()
+}
+
 /** Platform redirect for signup confirmation and password recovery emails. */
 export function authRedirectUrl(kind: 'update-password' | 'app'): string {
   if (kind === 'update-password') {
@@ -39,8 +57,8 @@ export function authRedirectUrl(kind: 'update-password' | 'app'): string {
     return Linking.createURL('update-password')
   }
   if (Platform.OS === 'web') return webOriginPath('/')
-  if (!__DEV__) return 'bond://'
-  return Linking.createURL('/')
+  if (!__DEV__) return HOSTED_AUTH_CALLBACK_URL
+  return Linking.createURL('auth-callback')
 }
 
 export type AuthCallback = {
@@ -102,7 +120,22 @@ export function hasAuthSessionPayload(callback: AuthCallback): boolean {
   )
 }
 
-/** True in Metro/dev clients. Production web, store, and release builds hide server switching. */
+export function isAuthCallbackPath(path: string): boolean {
+  return (
+    /auth-callback/i.test(path) ||
+    hasAuthSessionPayload(parseAuthCallback(path))
+  )
+}
+
+export function authCallbackRoute(path: string): string {
+  const queryIndex = path.indexOf('?')
+  const hashIndex = path.indexOf('#')
+  const cut =
+    queryIndex >= 0 ? queryIndex : hashIndex >= 0 ? hashIndex : path.length
+  return `/auth-callback${path.slice(cut)}`
+}
+
+/** True so a store install can still open Connect and attach to Bond. */
 export function showChangeServer(): boolean {
-  return __DEV__
+  return true
 }

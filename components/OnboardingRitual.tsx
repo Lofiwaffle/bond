@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { FaceIcon, Icon, type IconName } from '../lib/icons'
+import { useAccessibleLayout } from '../lib/a11y'
 import {
   SCORE_LABELS,
   colors,
@@ -41,6 +42,7 @@ export function CompactScorePicker({
   value: number | null
   onChange: (score: number) => void
 }) {
+  const { compactVisual, highContrast } = useAccessibleLayout()
   return (
     <View>
       <View style={styles.scaleRow}>
@@ -56,19 +58,20 @@ export function CompactScorePicker({
               style={(state) => [
                 styles.scaleCell,
                 selected && styles.scaleCellSelected,
+                highContrast && { borderColor: colors.ink },
                 state.pressed && { opacity: 0.75 },
               ]}
             >
-              <FaceIcon score={score} size={36} />
+              <FaceIcon score={score} size={compactVisual} />
             </Pressable>
           )
         })}
       </View>
       <View style={styles.scaleCaptions}>
-        <Text style={[styles.caption, styles.captionStart]} numberOfLines={1}>
+        <Text style={[styles.caption, styles.captionStart]}>
           {SCORE_LABELS[1]}
         </Text>
-        <Text style={[styles.caption, styles.captionEnd]} numberOfLines={1}>
+        <Text style={[styles.caption, styles.captionEnd]}>
           {SCORE_LABELS[5]}
         </Text>
       </View>

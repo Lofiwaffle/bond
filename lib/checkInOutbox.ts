@@ -121,11 +121,43 @@ export function useQueuedCheckIn(
   return queued
 }
 
+export const SAVED_WAITING_TO_SYNC =
+  'Saved on this device, waiting to sync.'
+
+export const SAVED_WAITING_TO_SYNC_DETAIL =
+  'Your partner cannot see this yet. Bond will send it when you reconnect.'
+
+export const SYNCING_BANNER = 'Sending your check-in now.'
+
 export const OFFLINE_DRAFT_BANNER =
-  "You're offline. Your draft is safe on this device. Reconnect to submit."
+  "You're offline. Your draft is saved on this device. Reconnect to submit."
 
-export const OFFLINE_QUEUED_BANNER =
-  "You're offline. Today's check-in is on this device and will send when you're back."
+export const OFFLINE_QUEUED_BANNER = SAVED_WAITING_TO_SYNC
 
-export const QUEUED_TOAST =
-  'Kept on this device. Bond will send it when you reconnect.'
+export const QUEUED_TOAST = SAVED_WAITING_TO_SYNC
+
+export function checkInSyncMessage({
+  queued,
+  syncing,
+  online,
+  allowDraft = true,
+}: {
+  queued: boolean
+  syncing?: boolean
+  online: boolean
+  allowDraft?: boolean
+}): { title: string; detail: string | null } | null {
+  if (queued && syncing && online) {
+    return { title: SYNCING_BANNER, detail: null }
+  }
+  if (queued) {
+    return {
+      title: SAVED_WAITING_TO_SYNC,
+      detail: SAVED_WAITING_TO_SYNC_DETAIL,
+    }
+  }
+  if (!online && allowDraft) {
+    return { title: OFFLINE_DRAFT_BANNER, detail: null }
+  }
+  return null
+}

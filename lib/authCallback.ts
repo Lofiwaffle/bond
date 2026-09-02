@@ -49,10 +49,15 @@ function stripAuthParamsFromAddressBar(): void {
   window.history.replaceState({}, '', `${url.pathname}${url.search}`)
 }
 
+let lastConsumedUrl: string | null = null
+
 export async function consumeAuthUrl(
   url: string | null,
 ): Promise<ConsumeAuthResult> {
   if (!url || !supabaseConfigured) {
+    return { recovery: false, expired: false, expiredKind: null, error: null }
+  }
+  if (url === lastConsumedUrl) {
     return { recovery: false, expired: false, expiredKind: null, error: null }
   }
 
@@ -86,7 +91,7 @@ export async function consumeAuthUrl(
         token_hash: parsed.tokenHash,
       })
       if (error) throw error
-    } else if (parsed.code && parsed.code.length > 8) {
+    } else if (parsed.code) {
       const { error } = await supabase.auth.exchangeCodeForSession(parsed.code)
       if (error) throw error
     } else if (parsed.accessToken && parsed.refreshToken) {
@@ -96,6 +101,7 @@ export async function consumeAuthUrl(
       })
       if (error) throw error
     }
+    lastConsumedUrl = url
     stripAuthParamsFromAddressBar()
     return {
       recovery: parsed.type === 'recovery' || otpType === 'recovery',

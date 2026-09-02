@@ -51,6 +51,7 @@ import {
   writeHistoryView,
 } from '../../../lib/historyView'
 import { Icon } from '../../../lib/icons'
+import { useAccessibleLayout } from '../../../lib/a11y'
 import { colors, hairlineWidth, hit, radii, type } from '../../../lib/theme'
 import type { DailyCheckIn } from '../../../types/database'
 
@@ -85,6 +86,7 @@ function dayMatches(
 export default function HistoryScreen() {
   const { profile, partner, couple, isLoading: authLoading } = useAuth()
   const plus = useBondPlus()
+  const { compactVisual, highContrast, border } = useAccessibleLayout()
   const today = localDateString()
   const now = monthFromDate(today)
   const saved = readHistoryView()
@@ -312,6 +314,13 @@ export default function HistoryScreen() {
                 <View
                   style={[
                     styles.matrixDay,
+                    {
+                      width: compactVisual,
+                      height: compactVisual,
+                      borderRadius: compactVisual / 2,
+                      borderColor: highContrast ? border : undefined,
+                      borderWidth: highContrast && !savedDay ? 2 : undefined,
+                    },
                     savedDay && styles.matrixSaved,
                     opened && styles.matrixOpened,
                     key === today && styles.matrixToday,

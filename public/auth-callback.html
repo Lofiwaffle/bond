@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Opening Bond</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body style="font-family: system-ui, sans-serif; padding: 24px; color: #2b1b24">
+    <p id="status">Returning to Bond…</p>
+    <p><a id="open" href="bond://auth-callback">Open Bond</a></p>
+    <script>
+      (function () {
+        var params = location.search + location.hash
+        var app = 'bond://auth-callback' + params
+        var spa = '/bond/' + (location.search || '') + (location.hash || '')
+        var open = document.getElementById('open')
+        var status = document.getElementById('status')
+        if (open) open.setAttribute('href', app)
+        location.replace(app)
+        setTimeout(function () {
+          if (status) {
+            status.textContent =
+              'If Bond did not open, tap Open Bond. On a computer, continue in the browser.'
+          }
+        }, 800)
+        setTimeout(function () {
+          var mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+          if (!mobile) location.replace(spa)
+        }, 1600)
+      })()
+    </script>
+  </body>
+</html>

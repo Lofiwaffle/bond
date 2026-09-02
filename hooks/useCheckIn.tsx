@@ -63,6 +63,7 @@ type CheckInContextValue = {
   days: HistoryDay[]
   isLoading: boolean
   error: string | null
+  syncing: boolean
   refresh: () => Promise<void>
   submit: (
     score: number,
@@ -368,6 +369,7 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
   const [days, setDays] = useState<HistoryDay[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
 
   const refresh = useCallback(async () => {
     if (!user?.id || !profile?.couple_id) {
@@ -587,22 +589,28 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
   const flushOutbox = useCallback(async () => {
     if (!user?.id || !profile?.couple_id || !isOnlineNow()) return
     const pending = await listQueuedCheckIns(user.id)
-    let sent = 0
-    for (const entry of pending) {
-      if (entry.coupleId !== profile.couple_id) continue
-      const result = await writeCheckIn(payloadFromOutbox(entry))
-      if (result.ok) {
-        await clearQueuedCheckIn(entry.userId, entry.date)
-        await clearCheckInDraft(entry.userId, entry.date)
-        sent += 1
-        continue
+    const mine = pending.filter((entry) => entry.coupleId === profile.couple_id)
+    if (mine.length === 0) return
+    setSyncing(true)
+    try {
+      let sent = 0
+      for (const entry of mine) {
+        const result = await writeCheckIn(payloadFromOutbox(entry))
+        if (result.ok) {
+          await clearQueuedCheckIn(entry.userId, entry.date)
+          await clearCheckInDraft(entry.userId, entry.date)
+          sent += 1
+          continue
+        }
+        if (result.network) return
+        reportError('supabase', result.error, { op: 'check-in-flush' })
       }
-      if (result.network) return
-      reportError('supabase', result.error, { op: 'check-in-flush' })
-    }
-    if (sent > 0) {
-      await refresh()
-      showToast('Saved. Private until they check in too.')
+      if (sent > 0) {
+        await refresh()
+        showToast('Saved. Private until they check in too.')
+      }
+    } finally {
+      setSyncing(false)
     }
   }, [profile?.couple_id, refresh, showToast, user?.id])
 
@@ -643,12 +651,13 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
       days,
       isLoading,
       error,
+      syncing,
       refresh,
       submit,
       revise,
       sendNudge,
     }),
-    [days, error, isLoading, refresh, revise, sendNudge, submit],
+    [days, error, isLoading, refresh, revise, sendNudge, submit, syncing],
   )
 
   return (
@@ -666,7 +675,7 @@ function useCheckInContext(): CheckInContextValue {
 
 export function useTodayCheckIn() {
   const { partner } = useAuth()
-  const { days, isLoading, error, refresh, submit, revise, sendNudge } =
+  const { days, isLoading, error, syncing, refresh, submit, revise, sendNudge } =
     useCheckInContext()
   const today = days.find((day) => day.date === localDateString())
   const mine = today?.mine ?? null
@@ -679,6 +688,7 @@ export function useTodayCheckIn() {
     waitingForPartner: Boolean(mine && partner && !today?.revealed),
     isLoading,
     error,
+    syncing,
     refresh,
     submit,
     revise,

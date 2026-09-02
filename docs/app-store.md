@@ -27,6 +27,8 @@ eas secret:create --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value YOUR_ANON_
 
 Confirm `APP_ENV=production` on the production EAS profile.
 
+Production never requests Google’s sample AdMob units. Until real `EXPO_PUBLIC_ADMOB_IOS_APP_ID`, `EXPO_PUBLIC_ADMOB_BANNER_ID`, and `EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID` are set as EAS secrets, the free plan shows the Bond Plus house unit instead of “Test Ad”.
+
 For partner push on iOS, generate an APNs key in the Apple Developer portal and attach it with `eas credentials --platform ios`.
 
 ## 3. Credentials

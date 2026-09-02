@@ -157,6 +157,58 @@ export function pickGrowthNext({
   }
 }
 
+export function daysUntilFirstLook(myCheckIns: number): number {
+  return Math.max(0, 3 - myCheckIns)
+}
+
+export type WeeklyInsight = {
+  kicker: string
+  title: string
+  body: string
+  actionLabel?: string
+  href?: GrowthDestination['href'] | '/(app)/(tabs)'
+}
+
+/** One weekly reading for Growth home. Tools live in the hub. */
+export function pickWeeklyInsight({
+  needsReview,
+  insightTitle,
+  insightBody,
+  remaining,
+}: {
+  needsReview: boolean
+  insightTitle: string | null
+  insightBody: string | null
+  remaining: number
+}): WeeklyInsight {
+  if (needsReview) {
+    return {
+      kicker: 'This week',
+      title: 'Weekly review',
+      body: 'Look back at last week in your own words, then pick one small intention.',
+      actionLabel: 'Open weekly review',
+      href: '/(app)/weekly-review',
+    }
+  }
+  if (insightBody) {
+    return {
+      kicker: 'This week',
+      title: insightTitle ?? 'A first look',
+      body: insightBody,
+    }
+  }
+  return {
+    kicker: 'Not yet',
+    title: 'A weekly look opens after a few check-ins.',
+    body:
+      remaining > 0
+        ? `${remaining} more day${remaining === 1 ? '' : 's'} on Today, then a first look appears here.`
+        : 'Keep the daily ritual. This page stays quiet until it can help.',
+    actionLabel: 'Go to Today',
+    href: '/(app)/(tabs)',
+  }
+}
+
 export function unlockedGrowthItems(
   unlocks: GrowthUnlocks,
   { revealedDays = 0 }: { revealedDays?: number } = {},

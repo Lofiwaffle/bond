@@ -5,8 +5,8 @@ export const FEED_AD_INTERVAL = 3
 
 /**
  * Google sample / test app and unit IDs.
- * Swap EXPO_PUBLIC_ADMOB_* (and app.json plugin app ids) for your AdMob units
- * before shipping paid inventory. Do not invent a publisher id here.
+ * Production never requests these. Set EXPO_PUBLIC_ADMOB_* (and app ids in
+ * EAS secrets) for paid inventory. Do not invent a publisher id here.
  */
 export const ADMOB_TEST = {
   androidAppId: 'ca-app-pub-3940256099942544~3347511713',
@@ -16,6 +16,23 @@ export const ADMOB_TEST = {
   androidInterstitial: 'ca-app-pub-3940256099942544/1033173712',
   iosInterstitial: 'ca-app-pub-3940256099942544/4411468910',
 } as const
+
+export function isGoogleTestAdId(id: string | undefined | null): boolean {
+  return Boolean(id && id.includes('3940256099942544'))
+}
+
+export function isProductionBuild(): boolean {
+  return process.env.APP_ENV === 'production'
+}
+
+function paidAdUnit(
+  fromEnv: string | undefined,
+  testId: string,
+): string | null {
+  if (fromEnv && !isGoogleTestAdId(fromEnv)) return fromEnv
+  if (isProductionBuild()) return null
+  return fromEnv || testId
+}
 
 export function shouldShowAds(plusActive: boolean): boolean {
   return !plusActive
@@ -37,16 +54,18 @@ export function shouldInsertFeedAd(
   return index % interval === 0
 }
 
-export function bannerUnitId(os: string): string {
-  const fromEnv = process.env.EXPO_PUBLIC_ADMOB_BANNER_ID
-  if (fromEnv) return fromEnv
-  return os === 'ios' ? ADMOB_TEST.iosBanner : ADMOB_TEST.androidBanner
+export function bannerUnitId(os: string): string | null {
+  return paidAdUnit(
+    process.env.EXPO_PUBLIC_ADMOB_BANNER_ID,
+    os === 'ios' ? ADMOB_TEST.iosBanner : ADMOB_TEST.androidBanner,
+  )
 }
 
-export function interstitialUnitId(os: string): string {
-  const fromEnv = process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID
-  if (fromEnv) return fromEnv
-  return os === 'ios' ? ADMOB_TEST.iosInterstitial : ADMOB_TEST.androidInterstitial
+export function interstitialUnitId(os: string): string | null {
+  return paidAdUnit(
+    process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID,
+    os === 'ios' ? ADMOB_TEST.iosInterstitial : ADMOB_TEST.androidInterstitial,
+  )
 }
 
 export const HOUSE_AD_KICKER = 'Advertisement'

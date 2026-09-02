@@ -75,7 +75,7 @@ export default function DayDetailScreen() {
                   {SCORE_LABELS[detail.mine.score]}
                 </Text>
               </View>
-              <Text style={styles.noteHeading}>Today's prompt</Text>
+              <Text style={styles.noteHeading}>Daily question</Text>
               <Text style={styles.note}>
                 {detail.mine.prompt_text?.trim() || 'How connected did you feel?'}
               </Text>

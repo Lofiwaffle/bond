@@ -8,24 +8,28 @@ export type WeeklyPrompt = {
 /** One fixed set. Independent answers, revealed after both finish. */
 export const WEEKLY_PROMPTS: WeeklyPrompt[] = [
   {
-    id: 'felt_good',
-    text: 'What felt good this week?',
+    id: 'connection',
+    text: 'How connected did we feel this week?',
   },
   {
-    id: 'disconnected',
-    text: 'Where did you feel disconnected?',
+    id: 'stress',
+    text: 'Where did stress show up for us?',
   },
   {
-    id: 'appreciate',
-    text: 'What did your partner do that you appreciated?',
+    id: 'affection',
+    text: 'How was affection this week?',
   },
   {
-    id: 'support',
-    text: 'What support would help next week?',
+    id: 'teamwork',
+    text: 'How did we work as a team?',
+  },
+  {
+    id: 'plans',
+    text: 'What do we want next week to hold?',
   },
   {
     id: 'intention',
-    text: 'What is one small shared intention for next week?',
+    text: 'What is one small action for the coming week?',
   },
 ]
 

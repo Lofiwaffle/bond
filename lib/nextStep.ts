@@ -83,8 +83,8 @@ export function bondHubItems(): GrowthDestination[] {
     },
     {
       id: 'weekly',
-      title: 'Weekly review',
-      body: 'Look back on the week together',
+      title: 'Weekly check-in',
+      body: 'Connection, stress, affection, teamwork, and one small action',
       href: '/(app)/weekly-review',
     },
     {
@@ -202,9 +202,9 @@ export function pickWeeklyInsight({
     title: 'A weekly look opens after a few check-ins.',
     body:
       remaining > 0
-        ? `${remaining} more day${remaining === 1 ? '' : 's'} on Today, then a first look appears here.`
+        ? `${remaining} more day${remaining === 1 ? '' : 's'} on Feed, then a first look appears here.`
         : 'Keep the daily ritual. This page stays quiet until it can help.',
-    actionLabel: 'Go to Today',
+    actionLabel: 'Go to Feed',
     href: '/(app)/(tabs)',
   }
 }

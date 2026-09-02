@@ -2,12 +2,14 @@ import { useCallback, useMemo, useState } from 'react'
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router, useFocusEffect } from 'expo-router'
 
+import { FeedThread } from '../../../components/FeedThread'
+import { TogetherLauncher } from '../../../components/TogetherLauncher'
 import { NextStepCard } from '../../../components/NextStepCard'
 import { PlusOfferCard } from '../../../components/PlusOfferCard'
-import { CheckInDayFeed } from '../../../components/CheckInDayFeed'
 import { SharedActionCard } from '../../../components/CheckInMoment'
 import { CheckInSyncBanner } from '../../../components/CheckInSyncBanner'
 import { LoadingScreen, Screen, StatusPanel, TextLink } from '../../../components/ui'
+import { Icon } from '../../../lib/icons'
 import {
   useTodayCheckIn,
   useCheckInGrowth,
@@ -15,6 +17,7 @@ import {
   useCheckInRange,
   type HistoryDay,
 } from '../../../hooks/useCheckIn'
+import { useCouplePlays } from '../../../hooks/useCouplePlay'
 import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useDailyAction } from '../../../hooks/useDailyAction'
 import { useNotificationPreferences } from '../../../hooks/useNotificationPreferences'
@@ -31,7 +34,7 @@ import { useToast } from '../../../lib/toast'
 import { colors, type } from '../../../lib/theme'
 import { formatClockLabel } from '../../../lib/notificationSchedule'
 
-export default function TodayScreen() {
+export default function FeedScreen() {
   const { user, profile, partner, isLoading: authLoading } = useAuth()
   const {
     mine,
@@ -48,6 +51,7 @@ export default function TodayScreen() {
   const plus = useBondPlus()
   const { accepted } = useDailyAction()
   const { remindInOneHour } = useNotificationPreferences()
+  const plays = useCouplePlays()
   const { showToast } = useToast()
   const [snoozing, setSnoozing] = useState(false)
   const today = localDateString()
@@ -81,7 +85,8 @@ export default function TodayScreen() {
     useCallback(() => {
       void refresh()
       void feedQuery.refresh()
-    }, [feedQuery.refresh, refresh]),
+      void plays.refresh()
+    }, [feedQuery.refresh, plays.refresh, refresh]),
   )
 
   if (authLoading || isLoading) return <LoadingScreen />
@@ -133,7 +138,7 @@ export default function TodayScreen() {
     <Screen style={styles.screen} keyboard>
       <View style={styles.topBar}>
         <View>
-          <Text style={styles.topTitle}>Today</Text>
+          <Text style={styles.topTitle}>Feed</Text>
           <Text style={styles.date}>{formatDisplayDate(today)}</Text>
         </View>
       </View>
@@ -148,13 +153,14 @@ export default function TodayScreen() {
             onRefresh={() => {
               void refresh()
               void feedQuery.refresh()
+              void plays.refresh()
             }}
           />
         }
       >
         {error && !queued ? (
           <StatusPanel
-            message="Couldn't load today."
+            message="Couldn't load the feed."
             onRetry={() => void refresh()}
           />
         ) : null}
@@ -167,58 +173,67 @@ export default function TodayScreen() {
         />
 
         <View style={styles.padded}>
-        {accepted
-          .filter(
-            (action) => phase !== 'reveal' || action.check_in_date !== today,
-          )
-          .map((action) => (
-            <SharedActionCard
-              key={action.id}
-              action={action}
-              partnerName={partnerName}
-              userId={user?.id ?? ''}
-            />
-          ))}
+          {accepted
+            .filter(
+              (action) => phase !== 'reveal' || action.check_in_date !== today,
+            )
+            .map((action) => (
+              <SharedActionCard
+                key={action.id}
+                action={action}
+                partnerName={partnerName}
+                userId={user?.id ?? ''}
+              />
+            ))}
 
-        {phase === 'compose' ? (
-          <>
+          {phase === 'compose' ? (
+            <>
+              <View style={styles.composer}>
+                <View style={styles.composerIcon}>
+                  <Icon name="message-circle" size={18} color={colors.accentFill} />
+                </View>
+                <View style={styles.composerCopy}>
+                  <NextStepCard
+                    kicker="Daily question"
+                    title={prompt.text}
+                    body={
+                      queued
+                        ? 'Today is queued on this device. It is not in the relationship until Bond confirms it.'
+                        : returning ??
+                          'Both of you answer privately, then answers reveal together.'
+                    }
+                    actionLabel={queued ? 'Review check-in' : 'Answer'}
+                    onAction={() => router.push('/(app)/check-in')}
+                  />
+                </View>
+              </View>
+              <TextLink
+                label={
+                  snoozing ? 'Setting reminder...' : 'Remind me in one hour'
+                }
+                onPress={() => void onSnooze()}
+                disabled={snoozing}
+              />
+            </>
+          ) : null}
+
+          {phase === 'waiting' && mine && !partner ? (
             <NextStepCard
-              kicker="Today's prompt"
-              title={prompt.text}
-              body={
-                queued
-                  ? 'Today is queued on this device. It is not in the relationship until Bond confirms it.'
-                  : returning ??
-                    'Two minutes. Private until you both check in.'
-              }
-              actionLabel={queued ? 'Review check-in' : 'Check in'}
-              onAction={() => router.push('/(app)/check-in')}
+              kicker="Saved"
+              title="Your check-in is safe."
+              body="Invite your person from Us when you are ready. There is no rush."
             />
-            <TextLink
-              label={
-                snoozing ? 'Setting reminder...' : 'Remind me in one hour'
-              }
-              onPress={() => void onSnooze()}
-              disabled={snoozing}
+          ) : null}
+
+          {plus.offerEligible && insight ? (
+            <PlusOfferCard
+              insight={insight}
+              onNotNow={() => void plus.snoozeOffer()}
             />
-          </>
-        ) : null}
-
-        {phase === 'waiting' && mine && !partner ? (
-          <NextStepCard
-            kicker="Saved"
-            title="Your check-in is safe."
-            body="Invite your person from Us when you are ready. There is no rush."
-          />
-        ) : null}
-
-        {plus.offerEligible && insight ? (
-          <PlusOfferCard
-            insight={insight}
-            onNotNow={() => void plus.snoozeOffer()}
-          />
-        ) : null}
+          ) : null}
         </View>
+
+        <TogetherLauncher />
 
         <View style={styles.feed}>
           {feedQuery.error ? (
@@ -228,15 +243,15 @@ export default function TodayScreen() {
                 onRetry={() => void feedQuery.refresh()}
               />
             </View>
-          ) : feedQuery.isLoading && feed.length === 0 ? (
+          ) : (feedQuery.isLoading || plays.isLoading) &&
+            feed.length === 0 &&
+            plays.plays.length === 0 ? (
             <Text style={styles.feedEmpty}>Loading the thread…</Text>
-          ) : feed.length === 0 ? (
-            <Text style={styles.feedEmpty}>
-              Check-ins show up here in a thread, newest first.
-            </Text>
           ) : (
-            <CheckInDayFeed
+            <FeedThread
               days={feed}
+              plays={plays.plays}
+              rituals={plays.rituals}
               today={today}
               myName={profile.display_name?.trim() || 'You'}
               partnerName={partner ? partnerName : null}
@@ -270,6 +285,23 @@ const styles = StyleSheet.create({
   },
   padded: {
     paddingHorizontal: 20,
+  },
+  composer: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  composerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  composerCopy: {
+    flex: 1,
   },
   feed: {
     marginTop: 8,

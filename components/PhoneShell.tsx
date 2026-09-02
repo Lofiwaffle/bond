@@ -59,9 +59,14 @@ const styles = StyleSheet.create({
   outer: {
     flex: 1,
     width: '100%',
-    backgroundColor: colors.frame,
+    backgroundColor: colors.bg,
     alignItems: 'center',
-    ...(Platform.OS === 'web' ? { minHeight: '100%' as unknown as number } : {}),
+    ...(Platform.OS === 'web'
+      ? {
+          minHeight: '100dvh' as unknown as number,
+          height: '100%' as unknown as number,
+        }
+      : {}),
   },
   frame: {
     flex: 1,

@@ -126,6 +126,7 @@ export type Ritual = {
   last_completed: string | null
   co_owners: [string, string]
   description?: string
+  created_at?: string
 }
 
 export type RepairCard = {
@@ -133,6 +134,33 @@ export type RepairCard = {
   title: string
   prompt: string
   category: 'humor' | 'apology' | 'validation' | 'deescalation' | 'affection'
+}
+
+export type CouplePlayKind =
+  | 'know_me'
+  | 'choose_date'
+  | 'appreciation'
+  | 'memory'
+  | 'dreams'
+  | 'challenge'
+  | 'ritual'
+  | 'repair'
+
+export type CouplePlay = {
+  id: string
+  couple_id: string
+  kind: CouplePlayKind
+  prompt: Json
+  created_by: string
+  created_at: string
+  revealed_at: string | null
+}
+
+export type CouplePlayAnswer = {
+  play_id: string
+  user_id: string
+  payload: Json
+  created_at: string
 }
 
 export type WeeklyReview = {
@@ -571,6 +599,35 @@ export type Database = {
         }
         Relationships: []
       }
+      couple_plays: {
+        Row: CouplePlay
+        Insert: {
+          id?: string
+          couple_id: string
+          kind: CouplePlayKind
+          prompt?: Json
+          created_by: string
+          created_at?: string
+          revealed_at?: string | null
+        }
+        Update: {
+          revealed_at?: string | null
+        }
+        Relationships: []
+      }
+      couple_play_answers: {
+        Row: CouplePlayAnswer
+        Insert: {
+          play_id: string
+          user_id: string
+          payload?: Json
+          created_at?: string
+        }
+        Update: {
+          payload?: Json
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -604,6 +661,10 @@ export type Database = {
       }
       has_own_weekly_review: {
         Args: { p_couple_id: string; p_week_start: string }
+        Returns: boolean
+      }
+      has_own_play_answer: {
+        Args: { p_play_id: string }
         Returns: boolean
       }
       // P0 trio functions

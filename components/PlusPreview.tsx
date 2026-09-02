@@ -55,7 +55,7 @@ export function PlusPreview({
         />
       ) : (
         <PrimaryButton
-          label="Back to Today"
+          label="Back to Feed"
           onPress={() => router.replace('/(app)/(tabs)')}
         />
       )}

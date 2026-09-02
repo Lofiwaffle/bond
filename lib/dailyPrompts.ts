@@ -4,6 +4,8 @@ export type DailyPrompt = {
 }
 
 export const DAILY_PROMPTS: DailyPrompt[] = [
+  { id: 'p67', text: 'What made you feel supported today?' },
+  { id: 'p68', text: 'What do you need more of this week?' },
   { id: 'p01', text: 'What was the key highlight of our day together?' },
   { id: 'p02', text: 'Discuss a dream that you would like to achieve together.' },
   { id: 'p03', text: 'What are the qualities that you appreciate most in me?' },

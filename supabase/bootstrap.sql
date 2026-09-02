@@ -11,7 +11,7 @@ grant usage on schema private to postgres, service_role;
 -- Tables
 -- ---------------------------------------------------------------------------
 
-create table public.couples (
+create table if not exists public.couples (
   id uuid primary key default gen_random_uuid(),
   invite_code text not null,
   created_by uuid not null references auth.users (id) on delete cascade,
@@ -20,16 +20,16 @@ create table public.couples (
   constraint couples_invite_code_format check (invite_code ~ '^[A-Z0-9]{6}$')
 );
 
-create unique index couples_invite_code_uidx on public.couples (invite_code);
+create unique index if not exists couples_invite_code_uidx on public.couples (invite_code);
 
-create table public.profiles (
+create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   display_name text not null default '',
   couple_id uuid references public.couples (id) on delete set null,
   created_at timestamptz not null default now()
 );
 
-create index profiles_couple_id_idx on public.profiles (couple_id);
+create index if not exists profiles_couple_id_idx on public.profiles (couple_id);
 
 -- ---------------------------------------------------------------------------
 -- Profile bootstrap on signup
@@ -58,6 +58,7 @@ begin
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row

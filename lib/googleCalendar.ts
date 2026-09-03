@@ -1,7 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { Linking } from 'react-native'
+import { Linking, Platform } from 'react-native'
 
 import { addDays } from './dates'
+import {
+  googleCalendarEventUrl,
+  type CalendarEvent,
+} from './googleCalendarUrl'
+
+export {
+  compactLocalDateTime,
+  defaultTogetherStart,
+  googleCalendarEventUrl,
+  type CalendarEvent,
+} from './googleCalendarUrl'
 
 const MARKS_KEY = 'bond.goalCalendar.v1'
 
@@ -76,6 +87,26 @@ export async function openGoogleCalendarDeadline(
   try {
     await Linking.openURL(url)
     if (goal.id) await markGoalOnCalendar(goal.id)
+    return { error: null }
+  } catch {
+    return { error: 'Could not open Google Calendar.' }
+  }
+}
+
+export async function openGoogleCalendarEvent(
+  event: CalendarEvent,
+): Promise<{ error: string | null }> {
+  if (!event.title.trim()) {
+    return { error: 'This needs a title before it can go on the calendar.' }
+  }
+  const url = googleCalendarEventUrl(event)
+  try {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.open === 'function') {
+      const opened = window.open(url, '_blank', 'noopener,noreferrer')
+      if (!opened) await Linking.openURL(url)
+      return { error: null }
+    }
+    await Linking.openURL(url)
     return { error: null }
   } catch {
     return { error: 'Could not open Google Calendar.' }

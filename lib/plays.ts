@@ -31,6 +31,7 @@ export type PlayLauncherItem = {
   icon: IconName
 }
 
+/** Together tiles on Growth. One person picks; no approval. */
 export const FEED_LAUNCHER: PlayLauncherItem[] = [
   {
     kind: 'know_me',

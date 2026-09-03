@@ -4,6 +4,7 @@ import { Redirect, router, type Href } from 'expo-router'
 
 import { GrowthObservations } from '../../../components/GrowthObservations'
 import { NextStepCard } from '../../../components/NextStepCard'
+import { TogetherLauncher } from '../../../components/TogetherLauncher'
 import { LoadingScreen, Screen } from '../../../components/ui'
 import { useCheckInGrowth, useCheckInIndex } from '../../../hooks/useCheckIn'
 import { useBondPlus } from '../../../hooks/useBondPlus'
@@ -69,6 +70,8 @@ export default function GrowthScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
       <Text style={styles.title}>Growth</Text>
       <Text style={styles.subtitle}>What should we look at next?</Text>
+
+      <TogetherLauncher inset={false} />
 
       {next ? (
         <NextStepCard

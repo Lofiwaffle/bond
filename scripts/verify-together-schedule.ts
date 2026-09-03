@@ -19,7 +19,20 @@ import {
   defaultTogetherStart,
   googleCalendarEventUrl,
 } from '../lib/googleCalendarUrl'
+import {
+  activityRows,
+  activityStatus,
+  activityStatusLabel,
+  activityTint,
+  boardSummary,
+  growthHubTint,
+  startableItems,
+} from '../lib/activityBoard'
 import { inAppSignalCopy } from '../lib/notificationCopy'
+import {
+  TOGETHER_SIGNAL_SETUP_NOTICE,
+  isMissingSignalPolicy,
+} from '../lib/togetherSignal'
 import { VISIBILITY_ROWS } from '../lib/privacy'
 import { colors } from '../lib/theme'
 import { timeOfDayHello } from '../lib/dates'
@@ -42,7 +55,7 @@ const dateScreen = readFileSync(join(root, 'components/ChooseDateScreen.tsx'), '
 const deviceCalendar = readFileSync(join(root, 'lib/deviceCalendar.ts'), 'utf8')
 const appConfig = readFileSync(join(root, 'app.json'), 'utf8')
 const togetherLauncher = readFileSync(
-  join(root, 'components/TogetherLauncher.tsx'),
+  join(root, 'components/TogetherBoard.tsx'),
   'utf8',
 )
 const catchup = readFileSync(
@@ -50,13 +63,16 @@ const catchup = readFileSync(
   'utf8',
 )
 
-assert('Feed does not mount Together', !feed.includes('TogetherLauncher'))
+assert(
+  'Feed does not mount Together',
+  !feed.includes('TogetherLauncher') && !feed.includes('TogetherBoard'),
+)
 assert(
   'Feed points the daily question at Check-in',
   feed.includes('The daily question lives in check-in') &&
     feed.includes("router.push('/(app)/check-in')"),
 )
-assert('Growth mounts Together', growth.includes('<TogetherLauncher inset={false} />'))
+assert('Growth mounts Together', growth.includes('<TogetherBoard inset={false} />'))
 assert(
   'Check-in starts on the daily question',
   checkIn.includes("useState<CheckInDraft['step']>('words')") &&
@@ -159,6 +175,108 @@ assert(
   togetherLauncher.includes("item.kind === 'choose_date'") &&
     !opensCalendarOnTogetherTap('choose_date') &&
     opensCalendarOnTogetherTap('know_me'),
+)
+
+assert(
+  'A missing signal policy is a setup notice, not a console error',
+  isMissingSignalPolicy(
+    'new row violates row-level security policy for table "partner_signals"',
+  ) &&
+    !isMissingSignalPolicy('network request failed') &&
+    schedule.includes('isMissingSignalPolicy(insertError.message)') &&
+    schedule.includes('notice: TOGETHER_SIGNAL_SETUP_NOTICE') &&
+    TOGETHER_SIGNAL_SETUP_NOTICE.includes('catch-up'),
+)
+assert(
+  'The board surfaces that notice instead of failing the pick',
+  togetherLauncher.includes('result.notice'),
+)
+
+const boardPlays = [
+  {
+    id: 'p-ready',
+    kind: 'know_me' as const,
+    mine: true,
+    partner: true,
+    revealed: true,
+    createdAt: '2026-09-01T10:00:00.000Z',
+  },
+  {
+    id: 'p-mine',
+    kind: 'dreams' as const,
+    mine: true,
+    partner: false,
+    revealed: false,
+    createdAt: '2026-09-02T10:00:00.000Z',
+  },
+  {
+    id: 'p-turn',
+    kind: 'memory' as const,
+    mine: false,
+    partner: true,
+    revealed: false,
+    createdAt: '2026-09-03T10:00:00.000Z',
+  },
+  {
+    id: 'p-repair',
+    kind: 'repair' as const,
+    mine: false,
+    partner: true,
+    revealed: false,
+    createdAt: '2026-09-03T11:00:00.000Z',
+  },
+]
+
+assert(
+  'Board states cover ready, your turn, and waiting',
+  activityStatus({ mine: true, partner: true, revealed: true }) === 'ready' &&
+    activityStatus({ mine: false, partner: true, revealed: false }) === 'your_turn' &&
+    activityStatus({ mine: true, partner: false, revealed: false }) === 'waiting',
+)
+
+const rows = activityRows(boardPlays)
+assert('Ready rounds come first', rows[0]?.status === 'ready')
+assert('Your turn comes before waiting', rows[1]?.status === 'your_turn')
+assert('Waiting is last', rows[2]?.status === 'waiting')
+assert('Repair never shows on the board', !rows.some((row) => row.kind === 'repair'))
+assert(
+  'In-progress activities leave the start row',
+  !startableItems(rows).some((item) => item.kind === 'know_me') &&
+    startableItems(rows).some((item) => item.kind === 'choose_date'),
+)
+assert(
+  'Board summary counts what needs them',
+  boardSummary(rows) === '1 ready to open · 1 waiting on you',
+)
+assert(
+  'Empty board explains the rule',
+  boardSummary([]) === 'One of you picks. No approval needed.',
+)
+assert(
+  'Waiting names the partner',
+  activityStatusLabel('waiting', 'Sam') === 'Waiting for Sam' &&
+    activityStatusLabel('ready', 'Sam') === 'Ready to open',
+)
+assert(
+  'Every activity has its own tint',
+  new Set(
+    ['know_me', 'choose_date', 'appreciation', 'weekly', 'memory', 'dreams'].map(
+      (kind) => activityTint(kind).bg,
+    ),
+  ).size === 6,
+)
+assert(
+  'Growth hub rows are tinted too',
+  growthHubTint('goals').bg !== growthHubTint('reviews').bg &&
+    growth.includes('growthHubTint(item.id)'),
+)
+assert(
+  'Growth animates its cards',
+  growth.includes('<Appear') && togetherLauncher.includes('<Appear'),
+)
+assert(
+  'Ready rounds breathe',
+  togetherLauncher.includes('<Breathe active={ready}'),
 )
 
 const from = new Date(2026, 8, 3, 10, 0, 0)

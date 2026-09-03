@@ -8,6 +8,10 @@
 --   new row violates row-level security policy for table "partner_signals"
 --
 -- Do not run bootstrap.sql on a project that already has couples.
+--
+-- Bond Plus bookkeeping (plus_status and the other plus_* routines) lives in
+-- supabase/migrations/20260827120000_bond_plus.sql. Bond runs without it: every
+-- shipped feature stays available and the client stops reporting the gap.
 
 -- 1. One small shared action per couple per day -------------------------------
 

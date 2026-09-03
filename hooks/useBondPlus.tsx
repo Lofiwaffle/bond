@@ -18,6 +18,7 @@ import {
 import { reportError } from '../lib/monitor'
 import { isPlusActive, type PlusLifecycle } from '../lib/plusAccess'
 import { purchaseBondPlus } from '../lib/purchases'
+import { SCHEMA_CATCHUP_NOTE, isSchemaMissing } from '../lib/schemaGap'
 import { supabase } from '../lib/supabase'
 
 export type PlusStatus = {
@@ -148,8 +149,18 @@ async function rpcError(
   error: { message: string } | null,
 ): Promise<string | null> {
   if (!error) return null
+  if (isSchemaMissing(error.message)) return SCHEMA_CATCHUP_NOTE
   reportError('supabase', error.message, { op })
   return error.message
+}
+
+/** Plus bookkeeping is best-effort. A project without those routines stays quiet. */
+function reportUnlessMissing(
+  op: string,
+  error: { message: string } | null,
+): void {
+  if (!error || isSchemaMissing(error.message)) return
+  reportError('supabase', error.message, { op })
 }
 
 export function BondPlusProvider({ children }: { children: ReactNode }) {
@@ -167,8 +178,11 @@ export function BondPlusProvider({ children }: { children: ReactNode }) {
     setError(null)
     const { data, error: fetchError } = await supabase.rpc('plus_status')
     if (fetchError) {
-      reportError('supabase', fetchError.message, { op: 'plus-status' })
-      setError(fetchError.message)
+      const missing = isSchemaMissing(fetchError.message)
+      if (!missing) {
+        reportError('supabase', fetchError.message, { op: 'plus-status' })
+      }
+      setError(missing ? null : fetchError.message)
       // Keep shipped features available until the entitlement row can be read.
       setStatus({ ...EMPTY, active: true })
       setIsLoading(false)
@@ -200,7 +214,7 @@ export function BondPlusProvider({ children }: { children: ReactNode }) {
   const snoozeOffer = useCallback(async () => {
     const { error: snoozeError } = await supabase.rpc('snooze_plus_offer')
     if (snoozeError) {
-      reportError('supabase', snoozeError.message, { op: 'plus-snooze' })
+      reportUnlessMissing('plus-snooze', snoozeError)
       return
     }
     await refresh()
@@ -208,9 +222,7 @@ export function BondPlusProvider({ children }: { children: ReactNode }) {
 
   const markPreviewViewed = useCallback(async () => {
     const { error: viewError } = await supabase.rpc('mark_plus_preview_viewed')
-    if (viewError) {
-      reportError('supabase', viewError.message, { op: 'plus-preview' })
-    }
+    reportUnlessMissing('plus-preview', viewError)
   }, [])
 
   const trackFunnel = useCallback(
@@ -219,9 +231,7 @@ export function BondPlusProvider({ children }: { children: ReactNode }) {
         ev: event,
         meta: {},
       })
-      if (trackError) {
-        reportError('supabase', trackError.message, { op: 'plus-funnel' })
-      }
+      reportUnlessMissing('plus-funnel', trackError)
     },
     [],
   )

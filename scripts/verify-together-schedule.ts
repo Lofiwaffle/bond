@@ -210,6 +210,13 @@ assert(
   'The catch-up note names the file to paste',
   SCHEMA_CATCHUP_NOTE.includes('catchup_hosted_current.sql'),
 )
+const bondPlusHook = readFileSync(join(root, 'hooks/useBondPlus.tsx'), 'utf8')
+assert(
+  'A project without the Plus routines keeps every shipped feature and stays quiet',
+  bondPlusHook.includes('isSchemaMissing(fetchError.message)') &&
+    bondPlusHook.includes('setStatus({ ...EMPTY, active: true })') &&
+    bondPlusHook.includes('reportUnlessMissing'),
+)
 assert(
   'One catch-up file covers every table a stale hosted project is missing',
   ['daily_actions', 'weekly_ai_summary_prefs', 'couple_prompt_items'].every(

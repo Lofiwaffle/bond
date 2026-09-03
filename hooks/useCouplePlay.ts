@@ -9,6 +9,7 @@ import {
   pickMemoryPrompt,
   type PlayKind,
 } from '../lib/plays'
+import { SCHEMA_CATCHUP_NOTE, isSchemaMissing } from '../lib/schemaGap'
 import { supabase } from '../lib/supabase'
 import type {
   CouplePlay,
@@ -19,19 +20,11 @@ import type {
 
 const OFFLINE =
   'Reconnect to share this. It is not in the relationship until Bond confirms it.'
-const SCHEMA_NOTE =
-  'Together activities need a quick database update. Run supabase/bootstrap.sql, then try again.'
+const SCHEMA_NOTE = SCHEMA_CATCHUP_NOTE
 
 export type PlayWithAnswers = CouplePlay & {
   mine: CouplePlayAnswer | null
   partner: CouplePlayAnswer | null
-}
-
-function isSchemaMissing(message: string): boolean {
-  return (
-    message.includes('schema cache') ||
-    message.toLowerCase().includes('does not exist')
-  )
 }
 
 function friendlyError(message: string): string {

@@ -14,6 +14,7 @@ import {
 import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useAuth } from '../../../lib/auth'
 import { reportError } from '../../../lib/monitor'
+import { SCHEMA_CATCHUP_NOTE, isSchemaMissing } from '../../../lib/schemaGap'
 import { supabase } from '../../../lib/supabase'
 import { colors, hairlineWidth, type } from '../../../lib/theme'
 
@@ -42,6 +43,12 @@ export default function BondPromptsScreen() {
       .select('id, prompt_text')
       .order('created_at', { ascending: true })
     if (fetchError) {
+      if (isSchemaMissing(fetchError.message)) {
+        setItems([])
+        setError(SCHEMA_CATCHUP_NOTE)
+        setLoading(false)
+        return
+      }
       reportError('supabase', fetchError.message, { op: 'plus-prompts' })
       setError(fetchError.message)
       setLoading(false)

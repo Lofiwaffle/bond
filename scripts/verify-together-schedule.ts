@@ -29,6 +29,7 @@ import {
   startableItems,
 } from '../lib/activityBoard'
 import { inAppSignalCopy } from '../lib/notificationCopy'
+import { SCHEMA_CATCHUP_NOTE, isSchemaMissing } from '../lib/schemaGap'
 import {
   TOGETHER_SIGNAL_SETUP_NOTICE,
   isMissingSignalPolicy,
@@ -194,6 +195,20 @@ assert(
 assert(
   'The board surfaces that notice instead of failing the pick',
   togetherLauncher.includes('result.notice'),
+)
+const dailyAction = readFileSync(join(root, 'hooks/useDailyAction.tsx'), 'utf8')
+assert(
+  'A missing optional table stays quiet instead of reporting a client error',
+  isSchemaMissing("Could not find the table 'public.daily_actions' in the schema cache") &&
+    isSchemaMissing('relation "public.daily_actions" does not exist') &&
+    !isSchemaMissing('network request failed') &&
+    dailyAction.includes('isSchemaMissing(fetchError.message)') &&
+    dailyAction.indexOf('isSchemaMissing(fetchError.message)') <
+      dailyAction.indexOf("reportError('supabase', fetchError.message"),
+)
+assert(
+  'The catch-up note names the file to paste',
+  SCHEMA_CATCHUP_NOTE.includes('catchup_hosted_current.sql'),
 )
 assert(
   'One catch-up file covers every table a stale hosted project is missing',

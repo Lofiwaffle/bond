@@ -12,6 +12,7 @@ import { useAuth } from '../lib/auth'
 import { localDateString } from '../lib/dates'
 import { reportError } from '../lib/monitor'
 import { isOnlineNow } from '../lib/network'
+import { SCHEMA_CATCHUP_NOTE, isSchemaMissing } from '../lib/schemaGap'
 import { supabase } from '../lib/supabase'
 import type {
   DailyAction,
@@ -67,6 +68,12 @@ export function DailyActionProvider({ children }: { children: ReactNode }) {
       .order('check_in_date', { ascending: false })
 
     if (fetchError) {
+      if (isSchemaMissing(fetchError.message)) {
+        setActions([])
+        setError(null)
+        setIsLoading(false)
+        return
+      }
       reportError('supabase', fetchError.message, { op: 'daily-action-load' })
       setError(fetchError.message)
       setIsLoading(false)
@@ -131,6 +138,9 @@ export function DailyActionProvider({ children }: { children: ReactNode }) {
         if (insertError.code === '23505') {
           await refresh()
           return { error: 'Today already has one small action.' }
+        }
+        if (isSchemaMissing(insertError.message)) {
+          return { error: SCHEMA_CATCHUP_NOTE }
         }
         reportError('supabase', insertError.message, { op: 'daily-action-propose' })
         if (

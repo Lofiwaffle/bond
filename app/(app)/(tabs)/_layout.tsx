@@ -9,6 +9,7 @@ import { useAuth } from '../../../lib/auth'
 import { todayPhase } from '../../../lib/nextStep'
 import { useAccessibleLayout } from '../../../lib/a11y'
 import { tabBarHeight } from '../../../lib/a11yLayout'
+import { hapticLight } from '../../../lib/haptics'
 import { colors, elevation, fonts, radii } from '../../../lib/theme'
 
 function CheckInFab() {
@@ -29,6 +30,7 @@ function CheckInFab() {
         : "Open today's reveal"
 
   const onPress = () => {
+    hapticLight()
     if (phase === 'compose') {
       router.push('/(app)/check-in')
       return
@@ -47,8 +49,10 @@ function CheckInFab() {
         Boolean((state as { focused?: boolean }).focused) && styles.fabFocus,
       ]}
     >
-      <View style={styles.fab}>
-        <Feather name={icon} size={26} color={colors.onAccent} />
+      <View style={styles.fabHalo}>
+        <View style={styles.fab}>
+          <Feather name={icon} size={26} color={colors.onAccent} />
+        </View>
       </View>
       <Text style={styles.fabLabel}>{label}</Text>
     </Pressable>
@@ -157,6 +161,14 @@ const styles = StyleSheet.create({
   },
   fabWrap: {
     alignItems: 'center',
+  },
+  fabHalo: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fab: {
     width: 56,

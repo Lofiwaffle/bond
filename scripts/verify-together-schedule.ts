@@ -13,6 +13,8 @@ import {
 } from '../lib/googleCalendarUrl'
 import { inAppSignalCopy } from '../lib/notificationCopy'
 import { VISIBILITY_ROWS } from '../lib/privacy'
+import { colors } from '../lib/theme'
+import { timeOfDayHello } from '../lib/dates'
 
 function assert(label: string, condition: boolean) {
   if (!condition) throw new Error(label)
@@ -106,6 +108,15 @@ assert(
       row.entry === 'Together activities' &&
       row.who.includes('They do not have to approve'),
   ),
+)
+assert('cream canvas is warm', colors.bg === '#FBF5EE')
+assert(
+  'morning greeting',
+  timeOfDayHello(new Date(2026, 8, 3, 9, 0, 0)) === 'Good morning',
+)
+assert(
+  'evening greeting',
+  timeOfDayHello(new Date(2026, 8, 3, 20, 0, 0)) === 'Good evening',
 )
 
 console.log('together schedule, Growth placement, and check-in prompt ok')

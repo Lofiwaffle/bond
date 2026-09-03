@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { colors, phoneMaxWidth, radii, type } from '../lib/theme'
+import { colors, elevation, phoneMaxWidth, radii, type } from '../lib/theme'
 import { useOnline } from '../lib/network'
 import { useToast } from '../lib/toast'
 import {
@@ -91,13 +91,14 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     bottom: 28,
-    minHeight: 44,
+    minHeight: 48,
     backgroundColor: colors.ink,
-    borderRadius: radii.md,
-    paddingHorizontal: 16,
+    borderRadius: radii.xl,
+    paddingHorizontal: 18,
     paddingVertical: 14,
     justifyContent: 'center',
     zIndex: 20,
+    ...elevation.fab,
   },
   toastText: {
     ...type.body,

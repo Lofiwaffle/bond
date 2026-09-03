@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 
-import { colors, radii, type } from '../lib/theme'
+import { colors, elevation, radii, type } from '../lib/theme'
 import { PrimaryButton } from './ui'
+import { PressScale } from './PressScale'
 
 export function NextStepCard({
   kicker,
@@ -31,14 +32,13 @@ export function NextStepCard({
 
   if (onAction && !actionLabel) {
     return (
-      <Pressable
-        accessibilityRole="button"
+      <PressScale
         accessibilityLabel={`${kicker}. ${title}`}
         onPress={onAction}
-        style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+        style={styles.card}
       >
         {inner}
-      </Pressable>
+      </PressScale>
     )
   }
 
@@ -48,26 +48,26 @@ export function NextStepCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.accentSoft,
-    borderRadius: radii.md,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    marginBottom: 8,
-  },
-  pressed: {
-    opacity: 0.7,
+    borderRadius: radii.lg,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    marginBottom: 12,
+    ...elevation.card,
   },
   kicker: {
     ...type.label,
     color: colors.accentFill,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   title: {
-    ...type.body,
-    fontWeight: '500',
+    ...type.heading,
+    fontSize: 20,
+    lineHeight: 26,
   },
   body: {
-    ...type.label,
-    marginTop: 4,
+    ...type.body,
+    color: colors.muted,
+    marginTop: 6,
     marginBottom: 0,
   },
   action: {

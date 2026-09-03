@@ -1,6 +1,6 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
-import { colors, fonts, hit, radii, type } from '../lib/theme'
+import { colors, elevation, fonts, hit, radii, type } from '../lib/theme'
 
 export function ConfirmDialog({
   visible,
@@ -102,9 +102,10 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: colors.card,
-    borderRadius: radii.lg,
+    borderRadius: radii.xl,
     padding: 22,
     zIndex: 1,
+    ...elevation.card,
   },
   title: {
     ...type.heading,

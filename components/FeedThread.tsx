@@ -363,12 +363,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderBottomWidth: hairlineWidth,
     borderBottomColor: colors.hairline,
   },
   pressed: {
-    backgroundColor: colors.bgSoft,
+    backgroundColor: colors.accentSoft,
   },
   avatar: {
     width: AVATAR,
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     borderRadius: AVATAR / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.bgSoft,
+    backgroundColor: colors.accentSoft,
   },
   avatarSelf: {
     backgroundColor: colors.accent,

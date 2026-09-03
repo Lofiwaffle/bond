@@ -23,7 +23,7 @@ import {
   growthUnlocks,
   pickGrowthNext,
 } from '../../../lib/nextStep'
-import { colors, hairlineWidth, type } from '../../../lib/theme'
+import { colors, hairlineWidth, radii, type } from '../../../lib/theme'
 
 export default function GrowthScreen() {
   const { profile, isLoading } = useAuth()
@@ -69,7 +69,7 @@ export default function GrowthScreen() {
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false}>
       <Text style={styles.title}>Growth</Text>
-      <Text style={styles.subtitle}>What should we look at next?</Text>
+      <Text style={styles.subtitle}>Small ways to grow, together.</Text>
 
       <TogetherLauncher inset={false} />
 
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   subtitle: {
     ...type.body,
     color: colors.muted,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   list: {
     marginTop: 12,
@@ -175,7 +175,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   rowPressed: {
-    opacity: 0.7,
+    backgroundColor: colors.accentSoft,
+    borderRadius: radii.md,
   },
   rowFocus: {
     borderRadius: 8,

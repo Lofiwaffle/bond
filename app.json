@@ -137,15 +137,15 @@
     "name": "Bond",
     "shortName": "Bond",
     "lang": "en",
-    "themeColor": "#F7F2EF",
-    "backgroundColor": "#F7F2EF"
+    "themeColor": "#FBF5EE",
+    "backgroundColor": "#FBF5EE"
   },
   "plugins": [
     "expo-router",
     [
       "expo-splash-screen",
       {
-        "backgroundColor": "#F7F2EF",
+        "backgroundColor": "#FBF5EE",
         "image": "./assets/splash-icon.png",
         "imageWidth": 180
       }

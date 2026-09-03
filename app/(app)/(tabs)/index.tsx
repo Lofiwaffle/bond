@@ -20,7 +20,7 @@ import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useDailyAction } from '../../../hooks/useDailyAction'
 import { useNotificationPreferences } from '../../../hooks/useNotificationPreferences'
 import { useAuth } from '../../../lib/auth'
-import { addDays, formatDisplayDate, localDateString } from '../../../lib/dates'
+import { addDays, formatDisplayDate, localDateString, timeOfDayHello } from '../../../lib/dates'
 import { useQueuedCheckIn } from '../../../lib/checkInOutbox'
 import { useOnline } from '../../../lib/network'
 import { firstInsight } from '../../../lib/firstInsight'
@@ -134,7 +134,7 @@ export default function FeedScreen() {
     <Screen style={styles.screen} keyboard>
       <View style={styles.topBar}>
         <View>
-          <Text style={styles.topTitle}>Feed</Text>
+          <Text style={styles.topTitle}>{timeOfDayHello()}</Text>
           <Text style={styles.date}>{formatDisplayDate(today)}</Text>
         </View>
       </View>

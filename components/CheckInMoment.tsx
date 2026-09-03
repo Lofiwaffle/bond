@@ -23,7 +23,7 @@ import { useDailyAction } from '../hooks/useDailyAction'
 import { useAuth } from '../lib/auth'
 import { DEVICE_ONLY_THOUGHTS } from '../lib/privacy'
 import { useToast } from '../lib/toast'
-import { SCORE_LABELS, colors, hairlineWidth, hit, radii, type } from '../lib/theme'
+import { SCORE_LABELS, colors, elevation, hairlineWidth, hit, radii, type } from '../lib/theme'
 import type { DailyAction, DailyCheckIn } from '../types/database'
 
 export function PrivacyLine() {
@@ -43,9 +43,26 @@ export function CheckInProgress({
   total?: number
 }) {
   return (
-    <Text style={styles.progressLabel} accessibilityLabel={`Question ${step} of ${total}`}>
-      {step} of {total}
-    </Text>
+    <View
+      style={styles.progressRow}
+      accessibilityLabel={`Question ${step} of ${total}`}
+    >
+      {Array.from({ length: total }, (_, index) => {
+        const n = index + 1
+        const active = n === step
+        const done = n < step
+        return (
+          <View
+            key={n}
+            style={[
+              styles.progressDot,
+              done && styles.progressDotDone,
+              active && styles.progressDotActive,
+            ]}
+          />
+        )
+      })}
+    </View>
   )
 }
 
@@ -578,9 +595,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   title: {
-    ...type.heading,
-    fontSize: 22,
-    lineHeight: 28,
+    ...type.display,
     marginBottom: 12,
   },
   body: {
@@ -593,9 +608,25 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 0,
   },
-  progressLabel: {
-    ...type.label,
-    marginBottom: 8,
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  progressDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.border,
+  },
+  progressDotDone: {
+    backgroundColor: colors.accent,
+    opacity: 0.45,
+  },
+  progressDotActive: {
+    width: 22,
+    backgroundColor: colors.accent,
   },
   pair: {
     flexDirection: 'row',
@@ -609,7 +640,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     padding: 12,
     gap: 8,
-    backgroundColor: colors.white,
+    backgroundColor: colors.card,
+    ...elevation.card,
   },
   sealed: {
     flex: 1,

@@ -36,6 +36,7 @@ import {
 } from '../../lib/checkInDraft'
 import { promptForDate } from '../../lib/dailyPrompts'
 import { formatDisplayDate, localDateString } from '../../lib/dates'
+import { hapticSuccess } from '../../lib/haptics'
 import {
   clearQueuedCheckIn,
   loadQueuedCheckIn,
@@ -245,6 +246,7 @@ export default function CheckInScreen() {
     }
     if (user?.id) await clearCheckInDraft(user.id, today)
     setEditing(false)
+    hapticSuccess()
     showToast('Saved. Private until they check in too.')
   }
 

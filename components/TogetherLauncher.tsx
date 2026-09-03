@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { router } from 'expo-router'
 
+import { PressScale } from './PressScale'
 import { useAuth } from '../lib/auth'
 import { Icon } from '../lib/icons'
 import { FEED_LAUNCHER } from '../lib/plays'
 import { scheduleTogetherActivity } from '../lib/togetherSchedule'
 import { useToast } from '../lib/toast'
-import { colors, fonts, radii, type } from '../lib/theme'
+import { colors, elevation, fonts, radii, type } from '../lib/theme'
 
 export function TogetherLauncher({ inset = true }: { inset?: boolean }) {
   const { user, profile, partner } = useAuth()
@@ -49,21 +50,24 @@ export function TogetherLauncher({ inset = true }: { inset?: boolean }) {
         contentContainerStyle={[styles.row, !inset && styles.rowFlush]}
       >
         {FEED_LAUNCHER.map((item) => (
-          <Pressable
+          <PressScale
             key={item.title}
-            accessibilityRole="button"
             accessibilityLabel={`${item.title}. ${item.body}. Schedules a calendar invite and notifies your person.`}
             disabled={busyKey !== null}
+            scaleTo={0.94}
             onPress={() => void onPick(item)}
-            style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
+            style={styles.tile}
           >
             <View style={styles.glyph}>
-              <Icon name={item.icon} size={18} color={colors.accentFill} />
+              <Icon name={item.icon} size={20} color={colors.accentFill} />
             </View>
             <Text style={styles.title} numberOfLines={2}>
               {busyKey === item.title ? 'Scheduling…' : item.title}
             </Text>
-          </Pressable>
+            <Text style={styles.body} numberOfLines={2}>
+              {item.body}
+            </Text>
+          </PressScale>
         ))}
       </ScrollView>
     </View>
@@ -72,10 +76,12 @@ export function TogetherLauncher({ inset = true }: { inset?: boolean }) {
 
 const styles = StyleSheet.create({
   wrap: {
-    marginBottom: 16,
+    marginBottom: 20,
+    paddingVertical: 4,
   },
   label: {
     ...type.label,
+    color: colors.accentFill,
     paddingHorizontal: 20,
     marginBottom: 4,
   },
@@ -83,11 +89,12 @@ const styles = StyleSheet.create({
     ...type.body,
     color: colors.muted,
     paddingHorizontal: 20,
-    marginBottom: 10,
+    marginBottom: 14,
   },
   row: {
     paddingHorizontal: 16,
-    gap: 10,
+    paddingVertical: 4,
+    gap: 12,
   },
   rowFlush: {
     paddingHorizontal: 0,
@@ -96,29 +103,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
   tile: {
-    width: 108,
-    minHeight: 108,
+    width: 148,
+    minHeight: 148,
     backgroundColor: colors.card,
-    borderRadius: radii.md,
-    padding: 12,
-    gap: 10,
-  },
-  pressed: {
-    opacity: 0.75,
+    borderRadius: radii.lg,
+    padding: 14,
+    gap: 8,
+    ...elevation.card,
   },
   glyph: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
     fontFamily: fonts.medium,
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: '500',
     color: colors.ink,
+  },
+  body: {
+    ...type.label,
+    marginBottom: 0,
   },
 })

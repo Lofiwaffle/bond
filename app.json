@@ -1,7 +1,7 @@
 {
   "name": "Bond",
   "slug": "bond",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "orientation": "portrait",
   "icon": "./assets/icon.png",
   "scheme": "bond",
@@ -101,9 +101,7 @@
     "permissions": [
       "POST_NOTIFICATIONS",
       "RECEIVE_BOOT_COMPLETED",
-      "VIBRATE",
-      "READ_CALENDAR",
-      "WRITE_CALENDAR"
+      "VIBRATE"
     ],
     "intentFilters": [
       {

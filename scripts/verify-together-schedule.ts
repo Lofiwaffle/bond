@@ -173,7 +173,8 @@ assert(
   deviceCalendar.includes("Platform.OS !== 'ios' && Platform.OS !== 'android'") &&
     deviceCalendar.includes('createEvent') &&
     appConfig.includes('"expo-calendar"') &&
-    appConfig.includes('WRITE_CALENDAR'),
+    appConfig.includes('"writeOnlyAccess": true') &&
+    appConfig.includes('NSCalendarsWriteOnlyAccessUsageDescription'),
 )
 assert(
   'Together tap does not open a calendar for choose our date',

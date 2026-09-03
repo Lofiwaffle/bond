@@ -16,7 +16,7 @@ function assert(label: string, condition: boolean) {
   if (!condition) throw new Error(label)
 }
 
-assert('app version is 1.0.1', app.version === '1.0.1')
+assert('app version is 1.0.3', app.version === '1.0.3')
 assert('android package is com.bondcouple.app', app.android.package === 'com.bondcouple.app')
 assert('ios bundle is com.bond.app', app.ios.bundleIdentifier === 'com.bond.app')
 assert('EAS project id is set', app.extra.eas.projectId.length > 8)

@@ -52,6 +52,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 18,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
     ...elevation.card,
   },
   kicker: {

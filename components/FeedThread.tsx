@@ -14,7 +14,7 @@ import {
   playMeta,
   type PlayKind,
 } from '../lib/plays'
-import { colors, fonts, hairlineWidth, radii, type } from '../lib/theme'
+import { colors, elevation, fonts, hairlineWidth, radii, type } from '../lib/theme'
 import type { HistoryDay } from '../hooks/useCheckIn'
 import type { PlayWithAnswers } from '../hooks/useCouplePlay'
 import type { DailyCheckIn, Json, Ritual } from '../types/database'
@@ -356,16 +356,26 @@ const styles = StyleSheet.create({
   empty: {
     ...type.body,
     color: colors.muted,
-    paddingHorizontal: 20,
+    marginHorizontal: 16,
     marginTop: 8,
+    padding: 18,
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    borderWidth: hairlineWidth,
+    borderColor: colors.border,
   },
   post: {
     flexDirection: 'row',
     gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: hairlineWidth,
-    borderBottomColor: colors.hairline,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    borderWidth: hairlineWidth,
+    borderColor: colors.border,
+    ...elevation.card,
   },
   pressed: {
     backgroundColor: colors.accentSoft,
@@ -456,7 +466,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: colors.card,
+    backgroundColor: colors.bgSoft,
   },
   chipLabel: {
     ...type.label,

@@ -8,7 +8,7 @@ import { Icon } from '../lib/icons'
 import { FEED_LAUNCHER } from '../lib/plays'
 import { scheduleTogetherActivity } from '../lib/togetherSchedule'
 import { useToast } from '../lib/toast'
-import { colors, elevation, fonts, radii, type } from '../lib/theme'
+import { colors, elevation, fonts, hairlineWidth, radii, type } from '../lib/theme'
 
 export function TogetherLauncher({ inset = true }: { inset?: boolean }) {
   const { user, profile, partner } = useAuth()
@@ -109,6 +109,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     padding: 14,
     gap: 8,
+    borderWidth: hairlineWidth,
+    borderColor: colors.border,
     ...elevation.card,
   },
   glyph: {

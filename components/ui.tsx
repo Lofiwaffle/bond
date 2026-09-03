@@ -804,7 +804,7 @@ const styles = StyleSheet.create({
     ...type.body,
   },
   input: {
-    backgroundColor: colors.bgSoft,
+    backgroundColor: colors.card,
     borderRadius: radii.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -821,7 +821,7 @@ const styles = StyleSheet.create({
   inputFocus: Platform.select<TextStyle>({
     web: {
       outlineWidth: 2,
-      outlineColor: colors.ink,
+      outlineColor: colors.accentFill,
       outlineStyle: 'solid',
       outlineOffset: 2,
     },
@@ -837,8 +837,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
-    ...elevation.fab,
+    ...elevation.button,
   },
   buttonPressed: {
     backgroundColor: colors.accentPressed,
@@ -990,8 +989,6 @@ const styles = StyleSheet.create({
   scaleCellSelected: {
     borderColor: colors.accent,
     backgroundColor: colors.accentSoft,
-    transform: [{ scale: 1.08 }],
-    ...elevation.card,
   },
   scaleCellContrast: {
     borderColor: colors.ink,

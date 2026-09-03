@@ -17,13 +17,22 @@ import {
   buildGrowthObservations,
   observationDaysFromIndex,
 } from '../../../lib/growthObservations'
-import { Icon } from '../../../lib/icons'
+import { Icon, type IconName } from '../../../lib/icons'
 import {
   bondHubItems,
   growthUnlocks,
   pickGrowthNext,
 } from '../../../lib/nextStep'
-import { colors, hairlineWidth, radii, type } from '../../../lib/theme'
+import { colors, elevation, hairlineWidth, radii, type } from '../../../lib/theme'
+
+const HUB_ICONS: Record<string, IconName> = {
+  achievements: 'award',
+  prompts: 'message-circle',
+  goals: 'target',
+  patterns: 'activity',
+  weekly: 'calendar',
+  reviews: 'book-open',
+}
 
 export default function GrowthScreen() {
   const { profile, isLoading } = useAuth()
@@ -112,6 +121,13 @@ export default function GrowthScreen() {
                   styles.rowFocus,
               ]}
             >
+              <View style={styles.glyph}>
+                <Icon
+                  name={HUB_ICONS[item.id] ?? 'chevron-right'}
+                  size={18}
+                  color={colors.accentFill}
+                />
+              </View>
               <View style={styles.copy}>
                 <Text style={styles.rowTitle}>{item.title}</Text>
                 <Text style={styles.rowBody}>{item.body}</Text>
@@ -132,6 +148,9 @@ export default function GrowthScreen() {
                   styles.rowFocus,
               ]}
             >
+              <View style={styles.glyph}>
+                <Icon name="star" size={18} color={colors.accentFill} />
+              </View>
               <View style={styles.copy}>
                 <Text style={styles.rowTitle}>Bond Plus</Text>
                 <Text style={styles.rowBody}>
@@ -160,26 +179,37 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   list: {
-    marginTop: 12,
+    marginTop: 8,
+    marginBottom: 28,
+    gap: 10,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     minHeight: 44,
-    paddingVertical: 16,
-    borderBottomWidth: hairlineWidth,
-    borderBottomColor: colors.hairline,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    borderWidth: hairlineWidth,
+    borderColor: colors.border,
+    ...elevation.card,
   },
-  rowLast: {
-    borderBottomWidth: 0,
-  },
+  rowLast: {},
   rowPressed: {
     backgroundColor: colors.accentSoft,
-    borderRadius: radii.md,
+  },
+  glyph: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rowFocus: {
-    borderRadius: 8,
+    borderRadius: radii.lg,
     borderWidth: 2,
     borderColor: colors.ink,
   },

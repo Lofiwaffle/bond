@@ -161,14 +161,13 @@ export default function FeedScreen() {
           />
         ) : null}
 
-        <CheckInSyncBanner
-          queued={queued}
-          syncing={syncing}
-          online={online}
-          allowDraft={phase === 'compose'}
-        />
-
         <View style={styles.padded}>
+          <CheckInSyncBanner
+            queued={queued}
+            syncing={syncing}
+            online={online}
+            allowDraft={phase === 'compose'}
+          />
           {accepted
             .filter(
               (action) => phase !== 'reveal' || action.check_in_date !== today,

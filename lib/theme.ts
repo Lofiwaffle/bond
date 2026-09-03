@@ -105,10 +105,20 @@ export const type = {
 
 const cardShadow = {
   shadowColor: '#C9957A',
-  shadowOffset: { width: 0, height: 10 },
-  shadowOpacity: 0.16,
-  shadowRadius: 20,
-  elevation: 4,
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.14,
+  shadowRadius: 18,
+  elevation: 3,
+  boxShadow: '0 8px 24px rgba(201, 149, 122, 0.14)',
+}
+
+const buttonShadow = {
+  shadowColor: '#C44A6C',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.2,
+  shadowRadius: 8,
+  elevation: 3,
+  boxShadow: '0 4px 12px rgba(196, 74, 108, 0.22)',
 }
 
 const fabShadow = {
@@ -117,6 +127,7 @@ const fabShadow = {
   shadowOpacity: 0.28,
   shadowRadius: 14,
   elevation: 8,
+  boxShadow: '0 8px 18px rgba(196, 74, 108, 0.28)',
 }
 
 export const elevation = {
@@ -125,7 +136,7 @@ export const elevation = {
     fab: fabShadow,
   },
   android: {
-    card: { elevation: 4 },
+    card: { elevation: 3 },
     fab: { elevation: 8 },
   },
   default: {
@@ -133,5 +144,6 @@ export const elevation = {
     fab: fabShadow,
   },
   card: cardShadow,
+  button: buttonShadow,
   fab: fabShadow,
 }

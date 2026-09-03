@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text } from 'react-native'
 
-import { colors, fonts, hit, radii, type } from '../lib/theme'
+import { hapticLight } from '../lib/haptics'
+import { colors, elevation, fonts, hit, radii, type } from '../lib/theme'
 
 export function GoogleSignInButton({
   onPress,
@@ -20,6 +21,7 @@ export function GoogleSignInButton({
       accessibilityState={{ disabled: busy, busy: Boolean(loading) }}
       onPress={() => {
         if (busy) return
+        hapticLight()
         onPress()
       }}
       disabled={busy}
@@ -39,7 +41,7 @@ const styles = StyleSheet.create({
     minHeight: hit,
     borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: colors.ink,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
@@ -47,6 +49,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 16,
     backgroundColor: colors.card,
+    ...elevation.card,
   },
   label: {
     ...type.body,
@@ -55,7 +58,8 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   pressed: {
-    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
+    backgroundColor: colors.accentSoft,
   },
   disabled: {
     opacity: 0.4,

@@ -49,10 +49,8 @@ function CheckInFab() {
         Boolean((state as { focused?: boolean }).focused) && styles.fabFocus,
       ]}
     >
-      <View style={styles.fabHalo}>
-        <View style={styles.fab}>
+      <View style={styles.fab}>
           <Feather name={icon} size={26} color={colors.onAccent} />
-        </View>
       </View>
       <Text style={styles.fabLabel}>{label}</Text>
     </Pressable>
@@ -142,12 +140,12 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: colors.tabBar,
-    borderTopWidth: 0.5,
-    borderTopColor: colors.hairline,
+    borderTopWidth: 0,
     height: 78,
     paddingBottom: 14,
     paddingTop: 10,
     overflow: 'visible' as const,
+    ...elevation.card,
   },
   tabLabel: {
     fontFamily: fonts.regular,
@@ -161,14 +159,6 @@ const styles = StyleSheet.create({
   },
   fabWrap: {
     alignItems: 'center',
-  },
-  fabHalo: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: colors.accentSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   fab: {
     width: 56,

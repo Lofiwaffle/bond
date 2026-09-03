@@ -62,6 +62,10 @@ const catchup = readFileSync(
   join(root, 'supabase/catchup_together_schedule.sql'),
   'utf8',
 )
+const catchupCurrent = readFileSync(
+  join(root, 'supabase/catchup_hosted_current.sql'),
+  'utf8',
+)
 
 assert(
   'Feed does not mount Together',
@@ -190,6 +194,16 @@ assert(
 assert(
   'The board surfaces that notice instead of failing the pick',
   togetherLauncher.includes('result.notice'),
+)
+assert(
+  'One catch-up file covers every table a stale hosted project is missing',
+  ['daily_actions', 'weekly_ai_summary_prefs', 'couple_prompt_items'].every(
+    (table) => catchupCurrent.includes(`create table if not exists public.${table}`),
+  ) &&
+    catchupCurrent.includes(
+      "event_type in ('check_in_nudge', 'together_scheduled')",
+    ) &&
+    catchupCurrent.includes('Safe to re-run'),
 )
 
 const boardPlays = [

@@ -39,6 +39,8 @@ const playScreen = readFileSync(join(root, 'app/(app)/play/[kind].tsx'), 'utf8')
 const dateRoute = readFileSync(join(root, 'app/(app)/play/choose-date.tsx'), 'utf8')
 const dateForm = readFileSync(join(root, 'components/DatePlanForm.tsx'), 'utf8')
 const dateScreen = readFileSync(join(root, 'components/ChooseDateScreen.tsx'), 'utf8')
+const deviceCalendar = readFileSync(join(root, 'lib/deviceCalendar.ts'), 'utf8')
+const appConfig = readFileSync(join(root, 'app.json'), 'utf8')
 const togetherLauncher = readFileSync(
   join(root, 'components/TogetherLauncher.tsx'),
   'utf8',
@@ -143,7 +145,14 @@ assert(
 )
 assert(
   'Choose our date submits to the calendar',
-  dateScreen.includes('openGoogleCalendarEvent(datePlanCalendarEvent(plan))'),
+  dateScreen.includes('scheduleCalendarEvent(datePlanCalendarEvent(plan))'),
+)
+assert(
+  'iOS and Android write to the device calendar',
+  deviceCalendar.includes("Platform.OS !== 'ios' && Platform.OS !== 'android'") &&
+    deviceCalendar.includes('createEvent') &&
+    appConfig.includes('"expo-calendar"') &&
+    appConfig.includes('WRITE_CALENDAR'),
 )
 assert(
   'Together tap does not open a calendar for choose our date',
@@ -198,6 +207,11 @@ if (plan) {
     decodeURIComponent(dateUrl).includes('A cozy cafe') &&
       decodeURIComponent(dateUrl).includes('A slow hour together'),
   )
+  assert(
+    'Date calendar includes the place',
+    dateUrl.includes(encodeURIComponent('A cozy cafe')),
+  )
+  assert('Date calendar event has a location', event.location === 'A cozy cafe')
 }
 
 assert('cream canvas is warm', colors.bg === '#FBF5EE')

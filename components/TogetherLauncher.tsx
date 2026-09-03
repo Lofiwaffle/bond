@@ -41,6 +41,8 @@ export function TogetherLauncher({ inset = true }: { inset?: boolean }) {
     setBusyKey(null)
     if (result.error) {
       showToast(result.error)
+    } else if (result.placed === 'device') {
+      showToast('Added to your calendar. They’ll get a nudge — no approval needed.')
     } else {
       showToast('Calendar opened. They’ll get a nudge — no approval needed.')
     }

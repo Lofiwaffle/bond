@@ -109,6 +109,7 @@ export function datePlanCalendarEvent(plan: DatePlanAnswer): CalendarEvent {
   return {
     title: `Bond: ${plan.what}`,
     details,
+    location: plan.where,
     start: datePlanStart(plan.when, plan.whenTime),
     durationMinutes: 120,
   }

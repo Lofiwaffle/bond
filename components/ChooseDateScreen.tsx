@@ -11,7 +11,7 @@ import {
   datePlanLabel,
   normalizeDatePlan,
 } from '../lib/datePlan'
-import { openGoogleCalendarEvent } from '../lib/googleCalendar'
+import { scheduleCalendarEvent } from '../lib/deviceCalendar'
 import { Icon } from '../lib/icons'
 import { useToast } from '../lib/toast'
 import { colors, type } from '../lib/theme'
@@ -70,13 +70,17 @@ export function ChooseDateScreen() {
       setError(result.error)
       return
     }
-    const calendar = await openGoogleCalendarEvent(datePlanCalendarEvent(plan))
+    const calendar = await scheduleCalendarEvent(datePlanCalendarEvent(plan))
     setBusy(false)
     if (calendar.error) {
       showToast(calendar.error)
       return
     }
-    showToast('Saved. Calendar opened for that day.')
+    showToast(
+      calendar.placed === 'device'
+        ? 'Saved. Added to your calendar.'
+        : 'Saved. Calendar opened for that day.',
+    )
   }
 
   return (

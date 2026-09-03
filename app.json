@@ -17,7 +17,10 @@
     "infoPlist": {
       "CFBundleDisplayName": "Bond",
       "LSApplicationCategoryType": "public.app-category.lifestyle",
-      "NSUserNotificationsUsageDescription": "Bond can remind you to check in, and let you know when a shared day is ready to open."
+      "NSUserNotificationsUsageDescription": "Bond can remind you to check in, and let you know when a shared day is ready to open.",
+      "NSCalendarsUsageDescription": "Bond adds the date you just planned to your calendar.",
+      "NSCalendarsFullAccessUsageDescription": "Bond adds the date you just planned to your calendar.",
+      "NSCalendarsWriteOnlyAccessUsageDescription": "Bond adds the date you just planned to your calendar."
     },
     "privacyManifests": {
       "NSPrivacyTracking": false,
@@ -98,7 +101,9 @@
     "permissions": [
       "POST_NOTIFICATIONS",
       "RECEIVE_BOOT_COMPLETED",
-      "VIBRATE"
+      "VIBRATE",
+      "READ_CALENDAR",
+      "WRITE_CALENDAR"
     ],
     "intentFilters": [
       {
@@ -157,6 +162,14 @@
         "color": "#FF6B9D",
         "defaultChannel": "bond-reminders",
         "enableBackgroundRemoteNotifications": false
+      }
+    ],
+    [
+      "expo-calendar",
+      {
+        "calendarPermission": "Bond adds the date you just planned to your calendar.",
+        "writeOnlyCalendarPermission": "Bond adds the date you just planned to your calendar.",
+        "writeOnlyAccess": true
       }
     ],
     [

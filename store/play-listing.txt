@@ -1,0 +1,49 @@
+Bond — Google Play listing copy (paste into Play Console)
+
+App name
+Bond
+
+Short description (80)
+A two-minute daily ritual for two people, before distance builds.
+
+Full description
+Bond is a private space for two people to check in every day.
+
+• Save how connected you felt. Your partner cannot see that day until they check in too
+• Optional shared words and one small next step stay between you
+• Feed holds your check-ins and together activities as a private thread
+• After enough opened days, Growth can notice patterns in the labels you both saved — not a verdict
+
+Bond is for two people who already know each other. There is no public feed. The free plan shows ads; Bond Plus removes them. It is not therapy or emergency support. For adults 18+.
+
+You can export your data or delete your account in Us. Help and a report path are on the support page.
+
+What's new (1.0.2)
+Private Feed, together activities, and a production build that never ships Google test ads.
+
+Category
+Lifestyle
+
+Tags (optional)
+relationship, couples, check-in
+
+Privacy policy
+https://lofiwaffle.github.io/bond/privacy-policy.html
+
+Support / account deletion
+https://lofiwaffle.github.io/bond/support.html
+
+Contact email
+Use the Play Console store listing support email.
+
+Phone screenshots
+store/play-phone-assets/01-two-minutes.png
+store/play-phone-assets/02-check-in-privately.png
+store/play-phone-assets/03-reveal-together.png
+store/play-phone-assets/04-private-bond.png
+
+High-res icon
+store/play-icon-512.png (512×512, no alpha)
+
+Feature graphic
+store/feature-graphic.png (1024×500)

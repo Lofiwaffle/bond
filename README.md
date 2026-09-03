@@ -74,7 +74,7 @@ Then press `a` for Android, `i` for iOS, or `w` for web. Expo Go can load the de
 
 ## Android Play Store
 
-First release is a free AAB to internal testing, then closed testing. Personal Play accounts need 12 testers opted in for 14 days before production. See [docs/play-store.md](docs/play-store.md).
+First release is a free AAB (version 1.0.2) to internal testing, then closed testing. Personal Play accounts need 12 testers opted in for 14 days before production. See [docs/play-store.md](docs/play-store.md). Paste-ready listing copy lives in [store/play-listing.txt](store/play-listing.txt).
 
 ## Apple App Store
 

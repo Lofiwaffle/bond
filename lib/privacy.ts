@@ -1,4 +1,4 @@
-export const PRIVACY_UPDATED = '27 August 2026'
+export const PRIVACY_UPDATED = '3 September 2026'
 
 export const NOT_THERAPY =
   'Bond is a daily check-in habit for two people. It is not therapy, counseling, medical care, or emergency support. If you are in danger, contact local emergency services.'
@@ -59,7 +59,7 @@ export const VISIBILITY_ROWS: VisibilityRow[] = [
 export const STORED_ON_SERVER = [
   'Account: email, optional password (held by our auth provider, not in plain text), display name. If you continue with Google, Google shares your email and name so we can create the account.',
   'Pairing: invite code, invite link, and the link between two accounts.',
-  'Shared ritual: check-in scores, shared words, activity tags, one small action, weekly answers, goals, achievements, and optional weekly suggestions.',
+  'Shared ritual: check-in scores, shared words, activity tags, one small action, weekly answers, together-activity answers, goals, achievements, and optional weekly suggestions.',
   'Your hide or edit choice for a weekly suggestion. Your partner cannot see that preference.',
   'A push token if you turn on “Our reveal is ready.”',
   'Notification preferences: whether reminders are on, the time, timezone, and quiet hours.',
@@ -67,7 +67,7 @@ export const STORED_ON_SERVER = [
 ]
 
 export const ADS_DISCLOSURE =
-  'On the free plan, Bond shows an ad when you open the app the first time that day, and ads in History. Ads are served by Google AdMob and may use a device advertising ID. Bond Plus and the trial remove ads. We do not use your check-in answers to target ads.'
+  'On the free plan, Bond shows an ad when you open the app the first time that day, and ads in History. Those units are labeled in-app Bond Plus house ads until real AdMob units are configured for a store build. When AdMob is configured, ads are served by Google AdMob and may use a device advertising ID. Bond Plus and the trial remove ads. We do not use your check-in answers to target ads.'
 
 export const DEVICE_ONLY_THOUGHTS =
   'Private thoughts stay on this device and are never uploaded. They are lost if you clear Bond’s app storage, uninstall, or switch phones.'

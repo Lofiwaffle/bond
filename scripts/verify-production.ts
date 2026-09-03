@@ -16,7 +16,7 @@ function assert(label: string, condition: boolean) {
   if (!condition) throw new Error(label)
 }
 
-assert('app version is 1.0.1', app.version === '1.0.1')
+assert('app version is 1.0.2', app.version === '1.0.2')
 assert('android package is com.bondcouple.app', app.android.package === 'com.bondcouple.app')
 assert('ios bundle is com.bond.app', app.ios.bundleIdentifier === 'com.bond.app')
 assert('EAS project id is set', app.extra.eas.projectId.length > 8)
@@ -46,10 +46,63 @@ assert(
   isGoogleTestAdId('ca-app-pub-3940256099942544~3347511713'),
 )
 assert(
-  'android_app_id is in app.json',
+  'android_app_id is in app.json for local/preview',
   typeof app['react-native-google-mobile-ads']?.android_app_id === 'string' &&
     app['react-native-google-mobile-ads'].android_app_id.startsWith('ca-app-pub-'),
 )
+assert(
+  '16 KB packaging is not legacy',
+  app.plugins.some((plugin) => {
+    if (!Array.isArray(plugin) || plugin[0] !== 'expo-build-properties') return false
+    return plugin[1]?.android?.useLegacyPackaging === false
+  }),
+)
+
+const loadConfig = require('../app.config.js')
+const previousAppEnv = process.env.APP_ENV
+const previousAdmobApp = process.env.EXPO_PUBLIC_ADMOB_ANDROID_APP_ID
+const previousAdmobIos = process.env.EXPO_PUBLIC_ADMOB_IOS_APP_ID
+process.env.APP_ENV = 'production'
+delete process.env.EXPO_PUBLIC_ADMOB_ANDROID_APP_ID
+delete process.env.EXPO_PUBLIC_ADMOB_IOS_APP_ID
+const productionConfig = loadConfig()
+assert(
+  'production omits test AdMob app ids',
+  productionConfig['react-native-google-mobile-ads'] === undefined,
+)
+assert(
+  'production does not register the AdMob config plugin without real units',
+  !productionConfig.plugins.some((plugin: unknown) =>
+    Array.isArray(plugin)
+      ? plugin[0] === 'react-native-google-mobile-ads'
+      : plugin === 'react-native-google-mobile-ads',
+  ),
+)
+assert(
+  'production without AdMob blocks advertising ID',
+  productionConfig.android.blockedPermissions.includes(
+    'com.google.android.gms.permission.AD_ID',
+  ),
+)
+process.env.EXPO_PUBLIC_ADMOB_ANDROID_APP_ID = 'ca-app-pub-1234567890123456~1234567890'
+const productionWithAds = loadConfig()
+assert(
+  'production keeps a real AdMob app id',
+  productionWithAds['react-native-google-mobile-ads']?.android_app_id ===
+    'ca-app-pub-1234567890123456~1234567890',
+)
+assert(
+  'production with AdMob does not block advertising ID',
+  !productionWithAds.android.blockedPermissions.includes(
+    'com.google.android.gms.permission.AD_ID',
+  ),
+)
+if (previousAdmobApp === undefined) delete process.env.EXPO_PUBLIC_ADMOB_ANDROID_APP_ID
+else process.env.EXPO_PUBLIC_ADMOB_ANDROID_APP_ID = previousAdmobApp
+if (previousAdmobIos === undefined) delete process.env.EXPO_PUBLIC_ADMOB_IOS_APP_ID
+else process.env.EXPO_PUBLIC_ADMOB_IOS_APP_ID = previousAdmobIos
+if (previousAppEnv === undefined) delete process.env.APP_ENV
+else process.env.APP_ENV = previousAppEnv
 assert(
   'minify keeps async storage',
   app.plugins.some((plugin) => {

@@ -21,6 +21,16 @@ export function TogetherLauncher({ inset = true }: { inset?: boolean }) {
       return
     }
     if (busyKey) return
+    if (item.kind === 'choose_date') {
+      router.push(item.href)
+      void scheduleTogetherActivity({
+        item,
+        coupleId: profile.couple_id,
+        actorId: user.id,
+        partnerPushToken: partner?.expo_push_token,
+      })
+      return
+    }
     setBusyKey(item.title)
     const result = await scheduleTogetherActivity({
       item,
@@ -31,8 +41,6 @@ export function TogetherLauncher({ inset = true }: { inset?: boolean }) {
     setBusyKey(null)
     if (result.error) {
       showToast(result.error)
-    } else if (item.kind === 'choose_date') {
-      showToast('They’ll get a nudge. Submit on the planner puts it on the calendar.')
     } else {
       showToast('Calendar opened. They’ll get a nudge — no approval needed.')
     }

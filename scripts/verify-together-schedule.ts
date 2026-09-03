@@ -36,6 +36,9 @@ const words = readFileSync(join(root, 'components/CheckInMoment.tsx'), 'utf8')
 const draft = readFileSync(join(root, 'lib/checkInDraft.ts'), 'utf8')
 const schedule = readFileSync(join(root, 'lib/togetherSchedule.ts'), 'utf8')
 const playScreen = readFileSync(join(root, 'app/(app)/play/[kind].tsx'), 'utf8')
+const dateRoute = readFileSync(join(root, 'app/(app)/play/choose-date.tsx'), 'utf8')
+const dateForm = readFileSync(join(root, 'components/DatePlanForm.tsx'), 'utf8')
+const dateScreen = readFileSync(join(root, 'components/ChooseDateScreen.tsx'), 'utf8')
 const togetherLauncher = readFileSync(
   join(root, 'components/TogetherLauncher.tsx'),
   'utf8',
@@ -123,15 +126,24 @@ assert(
   ),
 )
 assert(
-  'Choose our date skips the Start gate',
-  playScreen.includes("if (!play && kind === 'choose_date')") &&
-    playScreen.includes('<DateAnswer') &&
-    playScreen.includes('What are we doing'),
+  'Choose our date has its own route',
+  dateRoute.includes('<ChooseDateScreen') &&
+    playScreen.includes("if (kind === 'choose_date')") &&
+    playScreen.includes('<ChooseDateScreen'),
+)
+assert(
+  'Choose our date opens the planner, not the Start gate',
+  dateForm.includes('What are we doing') &&
+    dateForm.includes('>When</') &&
+    dateForm.includes('>Where</') &&
+    dateForm.includes('>Why</') &&
+    dateForm.includes("label={busy ? 'Submitting…' : 'Submit'}") &&
+    !dateScreen.includes('Both of you answer privately') &&
+    !dateForm.includes('Both of you answer privately'),
 )
 assert(
   'Choose our date submits to the calendar',
-  playScreen.includes("label={busy ? 'Submitting…' : 'Submit'}") &&
-    playScreen.includes('openGoogleCalendarEvent(datePlanCalendarEvent(plan))'),
+  dateScreen.includes('openGoogleCalendarEvent(datePlanCalendarEvent(plan))'),
 )
 assert(
   'Together tap does not open a calendar for choose our date',

@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Redirect, router, useLocalSearchParams } from 'expo-router'
 
+import { ChooseDateScreen } from '../../../components/ChooseDateScreen'
 import {
   ErrorText,
   Field,
@@ -13,17 +14,7 @@ import {
 } from '../../../components/ui'
 import { useCouplePlays, type PlayWithAnswers } from '../../../hooks/useCouplePlay'
 import { useAuth } from '../../../lib/auth'
-import {
-  DATE_WHEN_TIMES,
-  DATE_WHERE_SUGGESTIONS,
-  datePlanCalendarEvent,
-  datePlanLabel,
-  datePlanReady,
-  upcomingDateChips,
-  type DateWhenTime,
-  normalizeDatePlan,
-} from '../../../lib/datePlan'
-import { openGoogleCalendarEvent } from '../../../lib/googleCalendar'
+import { datePlanLabel, normalizeDatePlan } from '../../../lib/datePlan'
 import { Icon, type IconName } from '../../../lib/icons'
 import {
   APPRECIATION_FIELDS,
@@ -111,6 +102,10 @@ export default function PlayScreen() {
     }
   }, [kind])
 
+  if (kind === 'choose_date') {
+    return <ChooseDateScreen />
+  }
+
   if (authLoading || plays.isLoading || (kind === 'repair' && consent === null)) {
     return <LoadingScreen />
   }
@@ -141,40 +136,6 @@ export default function PlayScreen() {
       return
     }
     showToast('Saved. Private until they finish too.')
-  }
-
-  const onSubmitDatePlan = async (payload: Json) => {
-    if (busy) return
-    const plan = normalizeDatePlan(payload)
-    if (!plan) {
-      setError('Choose what, when, and where first.')
-      return
-    }
-    setBusy(true)
-    setError(null)
-    let current = plays.openOfKind('choose_date')
-    if (!current) {
-      const started = await plays.startOrOpen('choose_date')
-      if (started.error || !started.data) {
-        setBusy(false)
-        setError(started.error ?? 'Could not start this date.')
-        return
-      }
-      current = started.data
-    }
-    const result = await plays.answer(current.id, payload)
-    if (result.error) {
-      setBusy(false)
-      setError(result.error)
-      return
-    }
-    const calendar = await openGoogleCalendarEvent(datePlanCalendarEvent(plan))
-    setBusy(false)
-    if (calendar.error) {
-      showToast(calendar.error)
-      return
-    }
-    showToast('Saved. Calendar opened for that day.')
   }
 
   return (
@@ -226,7 +187,6 @@ export default function PlayScreen() {
           error={error || plays.error}
           onStart={onStart}
           onAnswer={onAnswer}
-          onSubmitDatePlan={onSubmitDatePlan}
         />
       )}
     </Screen>
@@ -242,7 +202,6 @@ function KindPlay({
   error,
   onStart,
   onAnswer,
-  onSubmitDatePlan,
 }: {
   kind: NonNullable<ReturnType<typeof playKindFromRoute>>
   play: PlayWithAnswers | null
@@ -252,16 +211,7 @@ function KindPlay({
   error: string | null
   onStart: (prompt?: Json) => Promise<void>
   onAnswer: (payload: Json) => Promise<void>
-  onSubmitDatePlan: (payload: Json) => Promise<void>
 }) {
-  if (!play && kind === 'choose_date') {
-    return (
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <DateAnswer busy={busy} error={error} onSubmit={onSubmitDatePlan} />
-      </ScrollView>
-    )
-  }
-
   if (!play) {
     return (
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -314,8 +264,6 @@ function KindPlay({
     <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       {kind === 'know_me' ? (
         <KnowMeAnswer play={play} userId={userId} partnerName={partnerName} busy={busy} error={error} onAnswer={onAnswer} />
-      ) : kind === 'choose_date' ? (
-        <DateAnswer busy={busy} error={error} onSubmit={onSubmitDatePlan} />
       ) : kind === 'appreciation' ? (
         <AppreciationAnswer busy={busy} error={error} onAnswer={onAnswer} />
       ) : kind === 'memory' ? (
@@ -377,147 +325,6 @@ function KnowMeAnswer({
               ? ({ option: choice } as unknown as Json)
               : ({ guess: choice } as unknown as Json),
           )
-        }
-      />
-    </View>
-  )
-}
-
-function DateAnswer({
-  busy,
-  error,
-  onSubmit,
-}: {
-  busy: boolean
-  error: string | null
-  onSubmit: (payload: Json) => Promise<void>
-}) {
-  const days = upcomingDateChips()
-  const [whatId, setWhatId] = useState<string | null>(null)
-  const [whatCustom, setWhatCustom] = useState('')
-  const [when, setWhen] = useState('')
-  const [whenCustom, setWhenCustom] = useState('')
-  const [whenTime, setWhenTime] = useState<DateWhenTime>('evening')
-  const [wherePick, setWherePick] = useState<string | null>(null)
-  const [whereCustom, setWhereCustom] = useState('')
-  const [why, setWhy] = useState('')
-
-  const what = whatCustom.trim() || DATE_DECK.find((idea) => idea.id === whatId)?.label || ''
-  const where = whereCustom.trim() || wherePick || ''
-  const ready = datePlanReady({ what, when, where })
-
-  return (
-    <View>
-      <Text style={styles.body}>
-        Answers stay private until you both submit. Submit also puts this date on the
-        calendar.
-      </Text>
-
-      <Text style={styles.kicker}>What are we doing</Text>
-      <View style={styles.chipWrap}>
-        {DATE_DECK.map((idea) => (
-          <Chip
-            key={idea.id}
-            label={idea.label}
-            icon={idea.icon}
-            selected={!whatCustom.trim() && whatId === idea.id}
-            onPress={() => {
-              setWhatId(idea.id)
-              setWhatCustom('')
-            }}
-          />
-        ))}
-      </View>
-      <Field
-        value={whatCustom}
-        onChangeText={setWhatCustom}
-        placeholder="Or write your own"
-        accessibilityLabel="What are we doing, write your own"
-        autoCapitalize="sentences"
-      />
-
-      <Text style={styles.kicker}>When</Text>
-      <View style={styles.chipWrap}>
-        {days.map((day) => (
-          <Chip
-            key={day.iso}
-            label={day.label}
-            selected={!whenCustom.trim() && when === day.iso}
-            onPress={() => {
-              setWhen(day.iso)
-              setWhenCustom('')
-            }}
-          />
-        ))}
-      </View>
-      <View style={styles.chipWrap}>
-        {DATE_WHEN_TIMES.map((slot) => (
-          <Chip
-            key={slot.id}
-            label={slot.label}
-            selected={whenTime === slot.id}
-            onPress={() => setWhenTime(slot.id)}
-          />
-        ))}
-      </View>
-      <Field
-        value={whenCustom}
-        onChangeText={(text) => {
-          setWhenCustom(text)
-          if (/^\d{4}-\d{2}-\d{2}$/.test(text.trim())) setWhen(text.trim())
-        }}
-        placeholder="Or another day (YYYY-MM-DD)"
-        accessibilityLabel="Another day, year month day"
-        autoCapitalize="none"
-        keyboardType="numbers-and-punctuation"
-      />
-
-      <Text style={styles.kicker}>Where</Text>
-      <View style={styles.chipWrap}>
-        {DATE_WHERE_SUGGESTIONS.map((place) => (
-          <Chip
-            key={place}
-            label={place}
-            selected={!whereCustom.trim() && wherePick === place}
-            onPress={() => {
-              setWherePick(place)
-              setWhereCustom('')
-            }}
-          />
-        ))}
-      </View>
-      <Field
-        value={whereCustom}
-        onChangeText={setWhereCustom}
-        placeholder="Or write your own"
-        accessibilityLabel="Where, write your own"
-        autoCapitalize="sentences"
-      />
-
-      <Text style={styles.kicker}>Why</Text>
-      <Field
-        value={why}
-        onChangeText={setWhy}
-        placeholder="Why this date, for the two of you"
-        accessibilityLabel="Why this date"
-        autoCapitalize="sentences"
-        multiline
-        style={styles.multiline}
-      />
-
-      <ErrorText message={error} />
-      <PrimaryButton
-        label={busy ? 'Submitting…' : 'Submit'}
-        disabled={!ready}
-        loading={busy}
-        onPress={() =>
-          void onSubmit({
-            what,
-            when,
-            whenTime,
-            where,
-            why: why.trim(),
-          } as unknown as Json)
         }
       />
     </View>

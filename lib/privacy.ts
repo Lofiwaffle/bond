@@ -40,7 +40,7 @@ export const VISIBILITY_ROWS: VisibilityRow[] = [
   },
   {
     entry: 'Together activities',
-    who: 'Picking one opens a calendar invite on this device and notifies your person. They do not have to approve. Playing still stays only yours until you both finish that round, then the two of you. Repair together is optional and starts from Us.',
+    who: 'Picking one notifies your person. They do not have to approve. Most tiles also open a calendar invite. Choose our date opens the planner instead — Submit puts that day on the calendar. Playing still stays only yours until you both finish that round, then the two of you. Repair together is optional and starts from Us.',
   },
   {
     entry: 'Optional weekly suggestion',

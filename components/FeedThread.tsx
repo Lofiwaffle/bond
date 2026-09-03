@@ -3,6 +3,7 @@ import { router } from 'expo-router'
 
 import { ScoreMark } from './ui'
 import { activityById } from '../lib/activities'
+import { datePlanLabel, normalizeDatePlan } from '../lib/datePlan'
 import { formatDisplayDate } from '../lib/dates'
 import { Icon, type IconName } from '../lib/icons'
 import {
@@ -107,6 +108,25 @@ function playBody(play: PlayWithAnswers, partnerName: string): {
   }
 
   if (play.kind === 'choose_date') {
+    const myPlan = normalizeDatePlan(mine)
+    const theirPlan = normalizeDatePlan(theirs)
+    if (myPlan || theirPlan) {
+      const mineLine = myPlan
+        ? `${myPlan.what} · ${datePlanLabel(myPlan.when, myPlan.whenTime)} · ${myPlan.where}`
+        : ''
+      const theirsLine = theirPlan
+        ? `${theirPlan.what} · ${datePlanLabel(theirPlan.when, theirPlan.whenTime)} · ${theirPlan.where}`
+        : ''
+      const same = Boolean(mineLine && theirsLine && mineLine === theirsLine)
+      return {
+        body: same
+          ? mineLine
+          : [mineLine && `You: ${mineLine}`, theirsLine && `${partnerName}: ${theirsLine}`]
+              .filter(Boolean)
+              .join(' '),
+        chips: [],
+      }
+    }
     const overlap = overlapStrings(asStrings(mine.picks), asStrings(theirs.picks))
     if (!overlap.length) {
       return { body: 'No overlap this round. Try another deck whenever you like.', chips: [] }

@@ -13,6 +13,17 @@ import {
 } from '../../../components/ui'
 import { useCouplePlays, type PlayWithAnswers } from '../../../hooks/useCouplePlay'
 import { useAuth } from '../../../lib/auth'
+import {
+  DATE_WHEN_TIMES,
+  DATE_WHERE_SUGGESTIONS,
+  datePlanCalendarEvent,
+  datePlanLabel,
+  datePlanReady,
+  upcomingDateChips,
+  type DateWhenTime,
+  normalizeDatePlan,
+} from '../../../lib/datePlan'
+import { openGoogleCalendarEvent } from '../../../lib/googleCalendar'
 import { Icon, type IconName } from '../../../lib/icons'
 import {
   APPRECIATION_FIELDS,
@@ -132,6 +143,40 @@ export default function PlayScreen() {
     showToast('Saved. Private until they finish too.')
   }
 
+  const onSubmitDatePlan = async (payload: Json) => {
+    if (busy) return
+    const plan = normalizeDatePlan(payload)
+    if (!plan) {
+      setError('Choose what, when, and where first.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    let current = plays.openOfKind('choose_date')
+    if (!current) {
+      const started = await plays.startOrOpen('choose_date')
+      if (started.error || !started.data) {
+        setBusy(false)
+        setError(started.error ?? 'Could not start this date.')
+        return
+      }
+      current = started.data
+    }
+    const result = await plays.answer(current.id, payload)
+    if (result.error) {
+      setBusy(false)
+      setError(result.error)
+      return
+    }
+    const calendar = await openGoogleCalendarEvent(datePlanCalendarEvent(plan))
+    setBusy(false)
+    if (calendar.error) {
+      showToast(calendar.error)
+      return
+    }
+    showToast('Saved. Calendar opened for that day.')
+  }
+
   return (
     <Screen keyboard>
       <TextLink label="Back" onPress={() => router.back()} />
@@ -181,6 +226,7 @@ export default function PlayScreen() {
           error={error || plays.error}
           onStart={onStart}
           onAnswer={onAnswer}
+          onSubmitDatePlan={onSubmitDatePlan}
         />
       )}
     </Screen>
@@ -196,6 +242,7 @@ function KindPlay({
   error,
   onStart,
   onAnswer,
+  onSubmitDatePlan,
 }: {
   kind: NonNullable<ReturnType<typeof playKindFromRoute>>
   play: PlayWithAnswers | null
@@ -205,7 +252,16 @@ function KindPlay({
   error: string | null
   onStart: (prompt?: Json) => Promise<void>
   onAnswer: (payload: Json) => Promise<void>
+  onSubmitDatePlan: (payload: Json) => Promise<void>
 }) {
+  if (!play && kind === 'choose_date') {
+    return (
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <DateAnswer busy={busy} error={error} onSubmit={onSubmitDatePlan} />
+      </ScrollView>
+    )
+  }
+
   if (!play) {
     return (
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -259,7 +315,7 @@ function KindPlay({
       {kind === 'know_me' ? (
         <KnowMeAnswer play={play} userId={userId} partnerName={partnerName} busy={busy} error={error} onAnswer={onAnswer} />
       ) : kind === 'choose_date' ? (
-        <DateAnswer busy={busy} error={error} onAnswer={onAnswer} />
+        <DateAnswer busy={busy} error={error} onSubmit={onSubmitDatePlan} />
       ) : kind === 'appreciation' ? (
         <AppreciationAnswer busy={busy} error={error} onAnswer={onAnswer} />
       ) : kind === 'memory' ? (
@@ -330,38 +386,139 @@ function KnowMeAnswer({
 function DateAnswer({
   busy,
   error,
-  onAnswer,
+  onSubmit,
 }: {
   busy: boolean
   error: string | null
-  onAnswer: (payload: Json) => Promise<void>
+  onSubmit: (payload: Json) => Promise<void>
 }) {
-  const [picks, setPicks] = useState<string[]>([])
-  const toggle = (id: string) => {
-    setPicks((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id].slice(0, 5),
-    )
-  }
+  const days = upcomingDateChips()
+  const [whatId, setWhatId] = useState<string | null>(null)
+  const [whatCustom, setWhatCustom] = useState('')
+  const [when, setWhen] = useState('')
+  const [whenCustom, setWhenCustom] = useState('')
+  const [whenTime, setWhenTime] = useState<DateWhenTime>('evening')
+  const [wherePick, setWherePick] = useState<string | null>(null)
+  const [whereCustom, setWhereCustom] = useState('')
+  const [why, setWhy] = useState('')
+
+  const what = whatCustom.trim() || DATE_DECK.find((idea) => idea.id === whatId)?.label || ''
+  const where = whereCustom.trim() || wherePick || ''
+  const ready = datePlanReady({ what, when, where })
+
   return (
     <View>
-      <Text style={styles.body}>Pick up to five. Only mutual matches will show.</Text>
+      <Text style={styles.body}>
+        Answers stay private until you both submit. Submit also puts this date on the
+        calendar.
+      </Text>
+
+      <Text style={styles.kicker}>What are we doing</Text>
       <View style={styles.chipWrap}>
         {DATE_DECK.map((idea) => (
           <Chip
             key={idea.id}
             label={idea.label}
             icon={idea.icon}
-            selected={picks.includes(idea.id)}
-            onPress={() => toggle(idea.id)}
+            selected={!whatCustom.trim() && whatId === idea.id}
+            onPress={() => {
+              setWhatId(idea.id)
+              setWhatCustom('')
+            }}
           />
         ))}
       </View>
+      <Field
+        value={whatCustom}
+        onChangeText={setWhatCustom}
+        placeholder="Or write your own"
+        accessibilityLabel="What are we doing, write your own"
+        autoCapitalize="sentences"
+      />
+
+      <Text style={styles.kicker}>When</Text>
+      <View style={styles.chipWrap}>
+        {days.map((day) => (
+          <Chip
+            key={day.iso}
+            label={day.label}
+            selected={!whenCustom.trim() && when === day.iso}
+            onPress={() => {
+              setWhen(day.iso)
+              setWhenCustom('')
+            }}
+          />
+        ))}
+      </View>
+      <View style={styles.chipWrap}>
+        {DATE_WHEN_TIMES.map((slot) => (
+          <Chip
+            key={slot.id}
+            label={slot.label}
+            selected={whenTime === slot.id}
+            onPress={() => setWhenTime(slot.id)}
+          />
+        ))}
+      </View>
+      <Field
+        value={whenCustom}
+        onChangeText={(text) => {
+          setWhenCustom(text)
+          if (/^\d{4}-\d{2}-\d{2}$/.test(text.trim())) setWhen(text.trim())
+        }}
+        placeholder="Or another day (YYYY-MM-DD)"
+        accessibilityLabel="Another day, year month day"
+        autoCapitalize="none"
+        keyboardType="numbers-and-punctuation"
+      />
+
+      <Text style={styles.kicker}>Where</Text>
+      <View style={styles.chipWrap}>
+        {DATE_WHERE_SUGGESTIONS.map((place) => (
+          <Chip
+            key={place}
+            label={place}
+            selected={!whereCustom.trim() && wherePick === place}
+            onPress={() => {
+              setWherePick(place)
+              setWhereCustom('')
+            }}
+          />
+        ))}
+      </View>
+      <Field
+        value={whereCustom}
+        onChangeText={setWhereCustom}
+        placeholder="Or write your own"
+        accessibilityLabel="Where, write your own"
+        autoCapitalize="sentences"
+      />
+
+      <Text style={styles.kicker}>Why</Text>
+      <Field
+        value={why}
+        onChangeText={setWhy}
+        placeholder="Why this date, for the two of you"
+        accessibilityLabel="Why this date"
+        autoCapitalize="sentences"
+        multiline
+        style={styles.multiline}
+      />
+
       <ErrorText message={error} />
       <PrimaryButton
-        label="Save privately"
-        disabled={picks.length === 0}
+        label={busy ? 'Submitting…' : 'Submit'}
+        disabled={!ready}
         loading={busy}
-        onPress={() => void onAnswer({ picks } as unknown as Json)}
+        onPress={() =>
+          void onSubmit({
+            what,
+            when,
+            whenTime,
+            where,
+            why: why.trim(),
+          } as unknown as Json)
+        }
       />
     </View>
   )
@@ -559,6 +716,38 @@ function Reveal({
   }
 
   if (kind === 'choose_date') {
+    const myPlan = normalizeDatePlan(mine)
+    const theirPlan = normalizeDatePlan(theirs)
+    if (myPlan || theirPlan) {
+      return (
+        <SideBySide
+          mineLabel="You"
+          theirLabel={partnerName}
+          rows={[
+            {
+              label: 'What are we doing',
+              mine: myPlan?.what ?? '',
+              theirs: theirPlan?.what ?? '',
+            },
+            {
+              label: 'When',
+              mine: myPlan ? datePlanLabel(myPlan.when, myPlan.whenTime) : '',
+              theirs: theirPlan ? datePlanLabel(theirPlan.when, theirPlan.whenTime) : '',
+            },
+            {
+              label: 'Where',
+              mine: myPlan?.where ?? '',
+              theirs: theirPlan?.where ?? '',
+            },
+            {
+              label: 'Why',
+              mine: myPlan?.why ?? '',
+              theirs: theirPlan?.why ?? '',
+            },
+          ]}
+        />
+      )
+    }
     const overlap = overlapStrings(asStrings(mine.picks), asStrings(theirs.picks))
     return (
       <View>

@@ -7,6 +7,14 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import {
+  datePlanCalendarEvent,
+  datePlanReady,
+  datePlanStart,
+  normalizeDatePlan,
+  opensCalendarOnTogetherTap,
+  upcomingDateChips,
+} from '../lib/datePlan'
+import {
   compactLocalDateTime,
   defaultTogetherStart,
   googleCalendarEventUrl,
@@ -27,6 +35,11 @@ const checkIn = readFileSync(join(root, 'app/(app)/check-in.tsx'), 'utf8')
 const words = readFileSync(join(root, 'components/CheckInMoment.tsx'), 'utf8')
 const draft = readFileSync(join(root, 'lib/checkInDraft.ts'), 'utf8')
 const schedule = readFileSync(join(root, 'lib/togetherSchedule.ts'), 'utf8')
+const playScreen = readFileSync(join(root, 'app/(app)/play/[kind].tsx'), 'utf8')
+const togetherLauncher = readFileSync(
+  join(root, 'components/TogetherLauncher.tsx'),
+  'utf8',
+)
 const catchup = readFileSync(
   join(root, 'supabase/catchup_together_schedule.sql'),
   'utf8',
@@ -109,6 +122,72 @@ assert(
       row.who.includes('They do not have to approve'),
   ),
 )
+assert(
+  'Choose our date skips the Start gate',
+  playScreen.includes("if (!play && kind === 'choose_date')") &&
+    playScreen.includes('<DateAnswer') &&
+    playScreen.includes('What are we doing'),
+)
+assert(
+  'Choose our date submits to the calendar',
+  playScreen.includes("label={busy ? 'Submitting…' : 'Submit'}") &&
+    playScreen.includes('openGoogleCalendarEvent(datePlanCalendarEvent(plan))'),
+)
+assert(
+  'Together tap does not open a calendar for choose our date',
+  togetherLauncher.includes("item.kind === 'choose_date'") &&
+    !opensCalendarOnTogetherTap('choose_date') &&
+    opensCalendarOnTogetherTap('know_me'),
+)
+
+const from = new Date(2026, 8, 3, 10, 0, 0)
+const chips = upcomingDateChips(3, from)
+assert('Upcoming date chips start today', chips[0]?.iso === '2026-09-03')
+assert('Upcoming date chips label today', chips[0]?.label === 'Today')
+assert('Upcoming date chips label tomorrow', chips[1]?.label === 'Tomorrow')
+assert(
+  'Date plan evening starts at 18:00',
+  datePlanStart('2026-09-05', 'evening').getHours() === 18,
+)
+assert(
+  'Date plan is ready with what, when, and where',
+  datePlanReady({
+    what: 'Coffee date',
+    when: '2026-09-05',
+    where: 'A cozy cafe',
+  }),
+)
+assert(
+  'Date plan is not ready without a day',
+  !datePlanReady({ what: 'Coffee date', when: '', where: 'A cozy cafe' }),
+)
+
+const plan = normalizeDatePlan({
+  what: 'Coffee date',
+  when: '2026-09-05',
+  whenTime: 'evening',
+  where: 'A cozy cafe',
+  why: 'A slow hour together',
+})
+assert('Date plan payload normalizes', Boolean(plan))
+if (plan) {
+  const event = datePlanCalendarEvent(plan)
+  const dateUrl = googleCalendarEventUrl(event)
+  assert(
+    'Date calendar uses the chosen evening',
+    dateUrl.includes('dates=20260905T180000/20260905T200000'),
+  )
+  assert(
+    'Date calendar title includes what',
+    dateUrl.includes(encodeURIComponent('Bond: Coffee date')),
+  )
+  assert(
+    'Date calendar details include where and why',
+    decodeURIComponent(dateUrl).includes('A cozy cafe') &&
+      decodeURIComponent(dateUrl).includes('A slow hour together'),
+  )
+}
+
 assert('cream canvas is warm', colors.bg === '#FBF5EE')
 assert(
   'morning greeting',

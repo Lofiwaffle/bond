@@ -31,6 +31,8 @@ export function TogetherLauncher({ inset = true }: { inset?: boolean }) {
     setBusyKey(null)
     if (result.error) {
       showToast(result.error)
+    } else if (item.kind === 'choose_date') {
+      showToast('They’ll get a nudge. Submit on the planner puts it on the calendar.')
     } else {
       showToast('Calendar opened. They’ll get a nudge — no approval needed.')
     }
@@ -41,8 +43,9 @@ export function TogetherLauncher({ inset = true }: { inset?: boolean }) {
     <View style={styles.wrap}>
       <Text style={[styles.label, !inset && styles.flush]}>Together</Text>
       <Text style={[styles.hint, !inset && styles.flush]}>
-        One of you picks. That puts it on a calendar invite and nudges the other
-        person. They do not have to approve.
+        One of you picks. That nudges the other person — no approval needed.
+        Most tiles also open a calendar invite. Choose our date opens the
+        planner; Submit puts that day on the calendar.
       </Text>
       <ScrollView
         horizontal
@@ -52,7 +55,11 @@ export function TogetherLauncher({ inset = true }: { inset?: boolean }) {
         {FEED_LAUNCHER.map((item) => (
           <PressScale
             key={item.title}
-            accessibilityLabel={`${item.title}. ${item.body}. Schedules a calendar invite and notifies your person.`}
+            accessibilityLabel={
+              item.kind === 'choose_date'
+                ? `${item.title}. ${item.body}`
+                : `${item.title}. ${item.body}. Schedules a calendar invite and notifies your person.`
+            }
             disabled={busyKey !== null}
             scaleTo={0.94}
             onPress={() => void onPick(item)}

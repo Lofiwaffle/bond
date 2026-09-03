@@ -1,3 +1,4 @@
+import { opensCalendarOnTogetherTap } from './datePlan'
 import { LOCK_SCREEN_BODY, LOCK_SCREEN_TITLE } from './notificationCopy'
 import { defaultTogetherStart } from './googleCalendarUrl'
 import { openGoogleCalendarEvent } from './googleCalendar'
@@ -79,18 +80,22 @@ export async function scheduleTogetherActivity(args: {
   partnerPushToken?: string | null
   now?: Date
 }): Promise<{ error: string | null }> {
-  const start = defaultTogetherStart(args.now)
-  const calendar = await openGoogleCalendarEvent({
-    title: togetherCalendarTitle(args.item),
-    details: togetherCalendarDetails(args.item),
-    start,
-    durationMinutes: 60,
-  })
+  let calendarError: string | null = null
+  if (opensCalendarOnTogetherTap(args.item.kind)) {
+    const start = defaultTogetherStart(args.now)
+    const calendar = await openGoogleCalendarEvent({
+      title: togetherCalendarTitle(args.item),
+      details: togetherCalendarDetails(args.item),
+      start,
+      durationMinutes: 60,
+    })
+    calendarError = calendar.error
+  }
   const notify = await notifyPartnerTogether({
     coupleId: args.coupleId,
     actorId: args.actorId,
     title: args.item.title,
     partnerPushToken: args.partnerPushToken,
   })
-  return { error: calendar.error ?? notify.error }
+  return { error: calendarError ?? notify.error }
 }

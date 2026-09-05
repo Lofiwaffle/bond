@@ -79,7 +79,33 @@ async function headingInView(page: Page, name: string) {
   }, name)
 }
 
+async function hideDevChrome(page: Page) {
+  await page.addStyleTag({
+    content: `
+      [data-expo-hide-from-screenshots],
+      #__expo-dev-tools,
+      #__react-devtools-portal,
+      iframe[src*="expo"] {
+        display: none !important;
+      }
+    `,
+  })
+  await page.evaluate(() => {
+    for (const el of Array.from(document.querySelectorAll('body *'))) {
+      const style = window.getComputedStyle(el)
+      if (style.position !== 'fixed' && style.position !== 'sticky') continue
+      const bottom = Number.parseInt(style.bottom, 10)
+      const left = Number.parseInt(style.left, 10)
+      const width = el.getBoundingClientRect().width
+      if (Number.isFinite(bottom) && bottom < 90 && Number.isFinite(left) && left < 90 && width <= 64) {
+        ;(el as HTMLElement).style.display = 'none'
+      }
+    }
+  })
+}
+
 async function shot(page: Page, name: string) {
+  await hideDevChrome(page)
   const file = path.join(OUT_DIR, `${name}.png`)
   await page.screenshot({ path: file, fullPage: false })
   return file

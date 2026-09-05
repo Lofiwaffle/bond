@@ -1,6 +1,6 @@
 # Privacy Policy for Bond
 
-Last updated: 27 August 2026
+Last updated: 3 September 2026
 
 Bond is a couples check-in app. This policy describes what we collect and why.
 
@@ -13,7 +13,7 @@ Bond (“we”) provides a paired daily check-in space for two partners.
 - Account: email, optional password (stored by our auth provider, not in plain text), display name. If you continue with Google, Google shares your email and name so we can create the account.
 - Couple pairing: invite codes, invite links, and the link between two accounts
 - Check-ins: connection scores, shared words, activity tags, timestamps. You can correct yours until your partner submits that day.
-- Shared content you choose to save: one small action, goals (after agreement), weekly review answers, optional weekly suggestions, and achievements
+- Shared content you choose to save: one small action, goals (after agreement), weekly review answers, together-activity answers, optional weekly suggestions, and achievements
 - A push token if you turn on “Our reveal is ready”
 - Notification preferences: whether reminders are on, the time, timezone, and quiet hours
 - If you subscribe to Bond Plus: the purchaser’s account, store product, and expiry so both partners can use Plus. The receipt stays with the person who paid.
@@ -27,7 +27,7 @@ We do not collect precise location, contacts, photos, or microphone. We do not s
 
 ## Ads on the free plan
 
-If you are not on Bond Plus (including the trial), Bond shows ads: one when you open the app for the first time that calendar day, and ads in History. Ads are served by Google AdMob and may use a device advertising ID. Bond Plus and the trial remove ads. We request non-personalized ads. We do not track you across other companies’ apps or websites for Bond’s own purposes.
+If you are not on Bond Plus (including the trial), Bond shows ads: one when you open the app for the first time that calendar day, and ads in History. Until a store build has real AdMob units configured, those are labeled in-app Bond Plus house ads. When AdMob is configured, ads are served by Google AdMob and may use a device advertising ID. Bond Plus and the trial remove ads. We request non-personalized ads. We do not track you across other companies’ apps or websites for Bond’s own purposes.
 
 ## How we use data
 

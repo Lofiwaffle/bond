@@ -27,6 +27,14 @@ export function formatMonthTitle(year: number, monthIndex: number): string {
 
 export const DAILY_PROMPT = 'How connected did you feel today?'
 
+/** Short greeting for the Feed header. */
+export function timeOfDayHello(date = new Date()): string {
+  const hour = date.getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
 export { SCORE_LABELS } from './theme'
 
 /** Days in a month grid starting Sunday (0): padded with nulls */

@@ -17,7 +17,7 @@ export type PartnerSignalEvent =
   | 'partner_completed_goal'
   | 'partner_archived_goal'
   | 'partner_weekly_review'
-  | 'partner_joined'
+  | 'together_scheduled'
   | string
 
 /** In-app toast only. Still never includes scores, notes, or raw summaries. */
@@ -43,8 +43,8 @@ export function inAppSignalCopy(eventType: PartnerSignalEvent): string {
       return 'A goal was archived.'
     case 'partner_weekly_review':
       return 'Your partner finished a weekly review.'
-    case 'partner_joined':
-      return 'Your partner joined this Bond.'
+    case 'together_scheduled':
+      return 'Your partner scheduled a together time.'
     case 'daily_action_proposed':
       return 'Your partner offered a small action.'
     case 'daily_action_accepted':

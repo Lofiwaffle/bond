@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../lib/auth'
 import { isOnlineNow } from '../lib/network'
+import { isSchemaMissing } from '../lib/schemaGap'
 import { supabase } from '../lib/supabase'
 import type { CoupleGoal, CoupleGoalReview } from '../types/database'
 import {
@@ -11,13 +12,6 @@ import {
 
 const OFFLINE =
   'Reconnect to share this. It is not in the relationship until Bond confirms it.'
-
-function isSchemaMissing(message: string): boolean {
-  return (
-    message.includes('schema cache') ||
-    message.toLowerCase().includes('does not exist')
-  )
-}
 
 function sortByDeadline(goals: CoupleGoal[]): CoupleGoal[] {
   return [...goals].sort((a, b) => {

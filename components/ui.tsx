@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { forwardRef, useMemo, useState } from 'react'
+import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -31,9 +32,11 @@ import { localDateString } from '../lib/dates'
 import { FaceIcon, Icon, type IconName } from '../lib/icons'
 import { useAccessibleLayout } from '../lib/a11y'
 import { calendarCellSize } from '../lib/a11yLayout'
+import { hapticLight, hapticSelect } from '../lib/haptics'
 import {
   SCORE_LABELS,
   colors,
+  elevation,
   fonts,
   hairlineWidth,
   hit,
@@ -158,6 +161,7 @@ export function PrimaryButton({
       accessibilityState={{ disabled: busy, busy: Boolean(loading) }}
       onPress={() => {
         if (busy) return
+        hapticLight()
         onPress()
       }}
       disabled={busy}
@@ -229,16 +233,53 @@ export function IconButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      onPress={onPress}
+      onPress={() => {
+        hapticLight()
+        onPress()
+      }}
       hitSlop={8}
       style={(state) => [
         styles.iconButton,
-        state.pressed && { opacity: 0.6 },
+        state.pressed && styles.iconButtonPressed,
         isFocused(state) && styles.focusRing,
       ]}
     >
       <Icon name={name} size={18} color={color} />
     </Pressable>
+  )
+}
+
+function WarmLoader() {
+  const pulse = useRef(new Animated.Value(0.45)).current
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0.45,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ]),
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [pulse])
+
+  return (
+    <Animated.View
+      style={[styles.loaderFaces, { opacity: pulse }]}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <FaceIcon score={2} size={36} />
+      <FaceIcon score={4} size={42} />
+      <FaceIcon score={5} size={36} />
+    </Animated.View>
   )
 }
 
@@ -249,7 +290,7 @@ export function LoadingScreen({ label = 'Loading Bond' }: { label?: string }) {
       accessibilityRole="progressbar"
       accessibilityLabel={label}
     >
-      <ActivityIndicator size="large" color={colors.muted} />
+      <WarmLoader />
       <Text style={styles.loadingLabel}>{label}</Text>
     </View>
   )
@@ -393,7 +434,10 @@ export function ScoreScale({
               accessibilityRole="button"
               accessibilityState={{ selected }}
               accessibilityLabel={SCORE_LABELS[score]}
-              onPress={() => onChange(score)}
+              onPress={() => {
+                hapticSelect()
+                onChange(score)
+              }}
               style={(state) => [
                 styles.scaleCell,
                 selected && styles.scaleCellSelected,
@@ -460,7 +504,10 @@ export function ActivityChips({
             accessibilityState={{ selected, disabled: blocked }}
             accessibilityLabel={activity.label}
             disabled={blocked}
-            onPress={() => toggle(activity.id)}
+            onPress={() => {
+              hapticSelect()
+              toggle(activity.id)
+            }}
             style={(state) => [
               styles.chip,
               selected && styles.chipSelected,
@@ -757,7 +804,7 @@ const styles = StyleSheet.create({
     ...type.body,
   },
   input: {
-    backgroundColor: colors.bgSoft,
+    backgroundColor: colors.card,
     borderRadius: radii.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -774,26 +821,27 @@ const styles = StyleSheet.create({
   inputFocus: Platform.select<TextStyle>({
     web: {
       outlineWidth: 2,
-      outlineColor: colors.ink,
+      outlineColor: colors.accentFill,
       outlineStyle: 'solid',
       outlineOffset: 2,
     },
     default: {
-      borderColor: colors.ink,
+      borderColor: colors.accentFill,
     },
   }),
   button: {
     backgroundColor: colors.accentFill,
     borderRadius: radii.pill,
     minHeight: hit,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    ...elevation.button,
   },
   buttonPressed: {
     backgroundColor: colors.accentPressed,
+    transform: [{ scale: 0.97 }],
   },
   buttonDisabled: {
     opacity: 0.4,
@@ -823,6 +871,11 @@ const styles = StyleSheet.create({
     height: hit,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: radii.pill,
+  },
+  iconButtonPressed: {
+    transform: [{ scale: 0.9 }],
+    backgroundColor: colors.accentSoft,
   },
   focusRing: Platform.select({
     web: {
@@ -847,6 +900,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.bg,
     gap: 12,
+  },
+  loaderFaces: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+    minHeight: 48,
   },
   loadingLabel: {
     ...type.label,
@@ -922,12 +981,14 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: radii.md,
     borderWidth: 2,
     borderColor: 'transparent',
+    backgroundColor: colors.card,
   },
   scaleCellSelected: {
     borderColor: colors.accent,
+    backgroundColor: colors.accentSoft,
   },
   scaleCellContrast: {
     borderColor: colors.ink,
@@ -965,7 +1026,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: 'transparent',
+    backgroundColor: colors.card,
   },
   chipSelected: {
     backgroundColor: colors.accentFill,

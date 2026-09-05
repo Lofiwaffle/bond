@@ -40,7 +40,7 @@ export const VISIBILITY_ROWS: VisibilityRow[] = [
   },
   {
     entry: 'Together activities',
-    who: 'Only you until you both finish that round. Then the two of you. Repair together is optional and starts from Us.',
+    who: 'Picking one notifies your person. They do not have to approve. On iPhone and Android, Submit (and most Together tiles) add the event to the calendar on this device. Web opens a Google Calendar invite instead. Choose our date opens the planner first. Playing still stays only yours until you both finish that round, then the two of you. Repair together is optional and starts from Us.',
   },
   {
     entry: 'Optional weekly suggestion',
@@ -83,6 +83,7 @@ export const NOT_STORED = [
   'Private thoughts typed during check-in (this device only; lost if app storage is cleared).',
   'Weekly review drafts (this device only; lost if app storage is cleared).',
   'Precise location, contacts, photos, or microphone.',
+  'Device calendar contents. Bond can add a date you planned; it does not read or upload your other events.',
 ]
 
 export const UNPAIR_SEMANTICS =

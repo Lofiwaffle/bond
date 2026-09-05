@@ -17,7 +17,7 @@ const EMPTY: Omit<CheckInDraft, 'date'> = {
   activities: [],
   promptAnswer: '',
   noWords: false,
-  step: 'score',
+  step: 'words',
 }
 
 function draftKey(userId: string, date: string): string {
@@ -48,9 +48,9 @@ export async function loadCheckInDraft(
         typeof parsed.promptAnswer === 'string' ? parsed.promptAnswer : '',
       noWords: Boolean(parsed.noWords),
       step:
-        parsed.step === 'words' || parsed.step === 'extras'
+        parsed.step === 'score' || parsed.step === 'extras'
           ? parsed.step
-          : 'score',
+          : 'words',
     }
   } catch {
     return { date, ...EMPTY }

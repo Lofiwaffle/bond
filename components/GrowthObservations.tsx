@@ -4,7 +4,7 @@ import {
   OBSERVATION_DISCLAIMER,
   type GrowthObservation,
 } from '../lib/growthObservations'
-import { colors, type } from '../lib/theme'
+import { colors, radii, type } from '../lib/theme'
 
 export function GrowthObservations({
   observations,
@@ -39,6 +39,10 @@ export function GrowthObservations({
 const styles = StyleSheet.create({
   section: {
     paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    marginBottom: 8,
   },
   title: {
     ...type.heading,

@@ -3,6 +3,7 @@ import { router } from 'expo-router'
 
 import { ScoreMark } from './ui'
 import { activityById } from '../lib/activities'
+import { datePlanLabel, normalizeDatePlan } from '../lib/datePlan'
 import { formatDisplayDate } from '../lib/dates'
 import { Icon, type IconName } from '../lib/icons'
 import {
@@ -14,7 +15,7 @@ import {
   playMeta,
   type PlayKind,
 } from '../lib/plays'
-import { colors, fonts, hairlineWidth, radii, type } from '../lib/theme'
+import { colors, elevation, fonts, hairlineWidth, radii, type } from '../lib/theme'
 import type { HistoryDay } from '../hooks/useCheckIn'
 import type { PlayWithAnswers } from '../hooks/useCouplePlay'
 import type { DailyCheckIn, Json, Ritual } from '../types/database'
@@ -107,6 +108,25 @@ function playBody(play: PlayWithAnswers, partnerName: string): {
   }
 
   if (play.kind === 'choose_date') {
+    const myPlan = normalizeDatePlan(mine)
+    const theirPlan = normalizeDatePlan(theirs)
+    if (myPlan || theirPlan) {
+      const mineLine = myPlan
+        ? `${myPlan.what} · ${datePlanLabel(myPlan.when, myPlan.whenTime)} · ${myPlan.where}`
+        : ''
+      const theirsLine = theirPlan
+        ? `${theirPlan.what} · ${datePlanLabel(theirPlan.when, theirPlan.whenTime)} · ${theirPlan.where}`
+        : ''
+      const same = Boolean(mineLine && theirsLine && mineLine === theirsLine)
+      return {
+        body: same
+          ? mineLine
+          : [mineLine && `You: ${mineLine}`, theirsLine && `${partnerName}: ${theirsLine}`]
+              .filter(Boolean)
+              .join(' '),
+        chips: [],
+      }
+    }
     const overlap = overlapStrings(asStrings(mine.picks), asStrings(theirs.picks))
     if (!overlap.length) {
       return { body: 'No overlap this round. Try another deck whenever you like.', chips: [] }
@@ -356,19 +376,29 @@ const styles = StyleSheet.create({
   empty: {
     ...type.body,
     color: colors.muted,
-    paddingHorizontal: 20,
+    marginHorizontal: 16,
     marginTop: 8,
+    padding: 18,
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    borderWidth: hairlineWidth,
+    borderColor: colors.border,
   },
   post: {
     flexDirection: 'row',
     gap: 12,
-    paddingHorizontal: 20,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingHorizontal: 14,
     paddingVertical: 14,
-    borderBottomWidth: hairlineWidth,
-    borderBottomColor: colors.hairline,
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    borderWidth: hairlineWidth,
+    borderColor: colors.border,
+    ...elevation.card,
   },
   pressed: {
-    backgroundColor: colors.bgSoft,
+    backgroundColor: colors.accentSoft,
   },
   avatar: {
     width: AVATAR,
@@ -376,7 +406,7 @@ const styles = StyleSheet.create({
     borderRadius: AVATAR / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.bgSoft,
+    backgroundColor: colors.accentSoft,
   },
   avatarSelf: {
     backgroundColor: colors.accent,
@@ -456,7 +486,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: colors.card,
+    backgroundColor: colors.bgSoft,
   },
   chipLabel: {
     ...type.label,

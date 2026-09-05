@@ -362,9 +362,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   title: {
-    ...type.heading,
-    fontSize: 22,
-    lineHeight: 28,
+    ...type.display,
     marginBottom: 4,
   },
   prompt: {

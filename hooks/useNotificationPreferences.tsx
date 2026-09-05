@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import { useAuth } from '../lib/auth'
 import { reportError } from '../lib/monitor'
+import { isSchemaMissing } from '../lib/schemaGap'
 import {
   cancelAllBondNotifications,
   clearPushToken,
@@ -70,13 +71,6 @@ function fromRow(row: PrefRow): NotificationPrefs {
     quiet_hours_start: Number(row.quiet_hours_start) || 22,
     quiet_hours_end: Number(row.quiet_hours_end) || 8,
   }
-}
-
-function isSchemaMissing(message: string): boolean {
-  return (
-    message.includes('schema cache') ||
-    message.toLowerCase().includes('does not exist')
-  )
 }
 
 function prefsKey(userId: string): string {

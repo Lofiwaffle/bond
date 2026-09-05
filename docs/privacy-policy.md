@@ -23,7 +23,7 @@ We do **not** upload:
 - Private thoughts typed during check-in (this device only; lost if you clear Bond’s app storage, uninstall, or switch phones)
 - Weekly review drafts (this device only; lost if app storage is cleared)
 
-We do not collect precise location, contacts, photos, or microphone. We do not sell personal data or relationship content, and we do not use your check-in answers to target ads.
+We do not collect precise location, contacts, photos, or microphone. If you submit Choose our date (or add a goal deadline) on iPhone or Android, Bond can write that event onto the calendar on this device. We do not read or upload your other calendar events. We do not sell personal data or relationship content, and we do not use your check-in answers to target ads.
 
 ## Ads on the free plan
 

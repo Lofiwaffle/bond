@@ -37,7 +37,7 @@ import { Icon } from '../../../lib/icons'
 import { bondHubItems } from '../../../lib/nextStep'
 import { focusInput } from '../../../lib/formFocus'
 import { useToast } from '../../../lib/toast'
-import { colors, hairlineWidth, hit, type } from '../../../lib/theme'
+import { colors, elevation, hairlineWidth, hit, radii, type } from '../../../lib/theme'
 
 function initialOf(name: string): string {
   return name.trim().slice(0, 1).toUpperCase() || '?'
@@ -494,10 +494,10 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    borderWidth: 0.5,
-    borderColor: colors.border,
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
+    ...elevation.card,
   },
   avatarLetter: {
     ...type.heading,
@@ -524,9 +524,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
-    borderTopWidth: hairlineWidth,
-    borderBottomWidth: hairlineWidth,
-    borderColor: colors.hairline,
+    paddingHorizontal: 8,
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    borderWidth: hairlineWidth,
+    borderColor: colors.border,
+    marginBottom: 16,
+    ...elevation.card,
   },
   stat: {
     flex: 1,
@@ -546,9 +550,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.hairline,
   },
   section: {
-    paddingVertical: 20,
-    borderBottomWidth: hairlineWidth,
-    borderBottomColor: colors.hairline,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    borderWidth: hairlineWidth,
+    borderColor: colors.border,
+    ...elevation.card,
   },
   sectionTitle: {
     ...type.heading,
@@ -630,8 +639,14 @@ const styles = StyleSheet.create({
   },
   accountBlock: {
     marginTop: 8,
-    paddingBottom: 24,
+    marginBottom: 24,
+    padding: 16,
     gap: 8,
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    borderWidth: hairlineWidth,
+    borderColor: colors.border,
+    ...elevation.card,
   },
   accountLabel: {
     marginTop: 16,

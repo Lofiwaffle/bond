@@ -2,9 +2,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { FaceIcon, Icon, type IconName } from '../lib/icons'
 import { useAccessibleLayout } from '../lib/a11y'
+import { hapticSelect } from '../lib/haptics'
 import {
   SCORE_LABELS,
   colors,
+  elevation,
   hairlineWidth,
   hit,
   radii,
@@ -54,7 +56,10 @@ export function CompactScorePicker({
               accessibilityRole="button"
               accessibilityState={{ selected }}
               accessibilityLabel={SCORE_LABELS[score]}
-              onPress={() => onChange(score)}
+              onPress={() => {
+                hapticSelect()
+                onChange(score)
+              }}
               style={(state) => [
                 styles.scaleCell,
                 selected && styles.scaleCellSelected,
@@ -231,12 +236,14 @@ const styles = StyleSheet.create({
     minHeight: hit,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
+    borderRadius: radii.md,
     borderWidth: 2,
     borderColor: 'transparent',
+    backgroundColor: colors.card,
   },
   scaleCellSelected: {
     borderColor: colors.accent,
+    backgroundColor: colors.accentSoft,
   },
   scaleCaptions: {
     flexDirection: 'row',
@@ -359,14 +366,18 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 12,
     minHeight: hit,
-    paddingVertical: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: colors.card,
+    borderRadius: radii.md,
+    borderWidth: hairlineWidth,
+    borderColor: colors.border,
   },
   expectIcon: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    borderWidth: hairlineWidth,
-    borderColor: colors.border,
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },

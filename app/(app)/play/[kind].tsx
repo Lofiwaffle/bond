@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Redirect, router, useLocalSearchParams } from 'expo-router'
 
+import { ChooseDateScreen } from '../../../components/ChooseDateScreen'
 import {
   ErrorText,
   Field,
@@ -13,6 +14,7 @@ import {
 } from '../../../components/ui'
 import { useCouplePlays, type PlayWithAnswers } from '../../../hooks/useCouplePlay'
 import { useAuth } from '../../../lib/auth'
+import { datePlanLabel, normalizeDatePlan } from '../../../lib/datePlan'
 import { Icon, type IconName } from '../../../lib/icons'
 import {
   APPRECIATION_FIELDS,
@@ -99,6 +101,10 @@ export default function PlayScreen() {
       cancelled = true
     }
   }, [kind])
+
+  if (kind === 'choose_date') {
+    return <ChooseDateScreen />
+  }
 
   if (authLoading || plays.isLoading || (kind === 'repair' && consent === null)) {
     return <LoadingScreen />
@@ -258,8 +264,6 @@ function KindPlay({
     <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       {kind === 'know_me' ? (
         <KnowMeAnswer play={play} userId={userId} partnerName={partnerName} busy={busy} error={error} onAnswer={onAnswer} />
-      ) : kind === 'choose_date' ? (
-        <DateAnswer busy={busy} error={error} onAnswer={onAnswer} />
       ) : kind === 'appreciation' ? (
         <AppreciationAnswer busy={busy} error={error} onAnswer={onAnswer} />
       ) : kind === 'memory' ? (
@@ -322,46 +326,6 @@ function KnowMeAnswer({
               : ({ guess: choice } as unknown as Json),
           )
         }
-      />
-    </View>
-  )
-}
-
-function DateAnswer({
-  busy,
-  error,
-  onAnswer,
-}: {
-  busy: boolean
-  error: string | null
-  onAnswer: (payload: Json) => Promise<void>
-}) {
-  const [picks, setPicks] = useState<string[]>([])
-  const toggle = (id: string) => {
-    setPicks((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id].slice(0, 5),
-    )
-  }
-  return (
-    <View>
-      <Text style={styles.body}>Pick up to five. Only mutual matches will show.</Text>
-      <View style={styles.chipWrap}>
-        {DATE_DECK.map((idea) => (
-          <Chip
-            key={idea.id}
-            label={idea.label}
-            icon={idea.icon}
-            selected={picks.includes(idea.id)}
-            onPress={() => toggle(idea.id)}
-          />
-        ))}
-      </View>
-      <ErrorText message={error} />
-      <PrimaryButton
-        label="Save privately"
-        disabled={picks.length === 0}
-        loading={busy}
-        onPress={() => void onAnswer({ picks } as unknown as Json)}
       />
     </View>
   )
@@ -559,6 +523,38 @@ function Reveal({
   }
 
   if (kind === 'choose_date') {
+    const myPlan = normalizeDatePlan(mine)
+    const theirPlan = normalizeDatePlan(theirs)
+    if (myPlan || theirPlan) {
+      return (
+        <SideBySide
+          mineLabel="You"
+          theirLabel={partnerName}
+          rows={[
+            {
+              label: 'What are we doing',
+              mine: myPlan?.what ?? '',
+              theirs: theirPlan?.what ?? '',
+            },
+            {
+              label: 'When',
+              mine: myPlan ? datePlanLabel(myPlan.when, myPlan.whenTime) : '',
+              theirs: theirPlan ? datePlanLabel(theirPlan.when, theirPlan.whenTime) : '',
+            },
+            {
+              label: 'Where',
+              mine: myPlan?.where ?? '',
+              theirs: theirPlan?.where ?? '',
+            },
+            {
+              label: 'Why',
+              mine: myPlan?.why ?? '',
+              theirs: theirPlan?.why ?? '',
+            },
+          ]}
+        />
+      )
+    }
     const overlap = overlapStrings(asStrings(mine.picks), asStrings(theirs.picks))
     return (
       <View>

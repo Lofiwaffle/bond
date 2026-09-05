@@ -1,7 +1,7 @@
 {
   "name": "Bond",
   "slug": "bond",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "orientation": "portrait",
   "icon": "./assets/icon.png",
   "scheme": "bond",
@@ -17,7 +17,10 @@
     "infoPlist": {
       "CFBundleDisplayName": "Bond",
       "LSApplicationCategoryType": "public.app-category.lifestyle",
-      "NSUserNotificationsUsageDescription": "Bond can remind you to check in, and let you know when a shared day is ready to open."
+      "NSUserNotificationsUsageDescription": "Bond can remind you to check in, and let you know when a shared day is ready to open.",
+      "NSCalendarsUsageDescription": "Bond adds the date you just planned to your calendar.",
+      "NSCalendarsFullAccessUsageDescription": "Bond adds the date you just planned to your calendar.",
+      "NSCalendarsWriteOnlyAccessUsageDescription": "Bond adds the date you just planned to your calendar."
     },
     "privacyManifests": {
       "NSPrivacyTracking": false,
@@ -137,15 +140,15 @@
     "name": "Bond",
     "shortName": "Bond",
     "lang": "en",
-    "themeColor": "#F7F2EF",
-    "backgroundColor": "#F7F2EF"
+    "themeColor": "#FBF5EE",
+    "backgroundColor": "#FBF5EE"
   },
   "plugins": [
     "expo-router",
     [
       "expo-splash-screen",
       {
-        "backgroundColor": "#F7F2EF",
+        "backgroundColor": "#FBF5EE",
         "image": "./assets/splash-icon.png",
         "imageWidth": 180
       }
@@ -157,6 +160,14 @@
         "color": "#FF6B9D",
         "defaultChannel": "bond-reminders",
         "enableBackgroundRemoteNotifications": false
+      }
+    ],
+    [
+      "expo-calendar",
+      {
+        "calendarPermission": "Bond adds the date you just planned to your calendar.",
+        "writeOnlyCalendarPermission": "Bond adds the date you just planned to your calendar.",
+        "writeOnlyAccess": true
       }
     ],
     [

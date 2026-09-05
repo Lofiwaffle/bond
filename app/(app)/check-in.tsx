@@ -36,6 +36,7 @@ import {
 } from '../../lib/checkInDraft'
 import { promptForDate } from '../../lib/dailyPrompts'
 import { formatDisplayDate, localDateString } from '../../lib/dates'
+import { hapticSuccess } from '../../lib/haptics'
 import {
   clearQueuedCheckIn,
   loadQueuedCheckIn,
@@ -77,7 +78,7 @@ export default function CheckInScreen() {
   const [activities, setActivities] = useState<ActivityId[]>([])
   const [promptAnswer, setPromptAnswer] = useState('')
   const [noWords, setNoWords] = useState(false)
-  const [step, setStep] = useState<CheckInDraft['step']>('score')
+  const [step, setStep] = useState<CheckInDraft['step']>('words')
   const [draftReady, setDraftReady] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -103,7 +104,8 @@ export default function CheckInScreen() {
         draft.score == null &&
         !draft.promptAnswer &&
         !draft.noWords &&
-        draft.step === 'score'
+        draft.activities.length === 0 &&
+        (draft.step === 'words' || draft.step === 'score')
       const source =
         emptyDraft && queuedEntry
           ? {
@@ -147,7 +149,7 @@ export default function CheckInScreen() {
     setActivities((mine.activities ?? []) as ActivityId[])
     setPromptAnswer(mine.prompt_answer ?? '')
     setNoWords(!(mine.prompt_answer && mine.prompt_answer.length > 0))
-    setStep('score')
+    setStep('words')
     setSubmitError(null)
     setEditing(true)
   }, [mine, waitingForPartner])
@@ -188,7 +190,7 @@ export default function CheckInScreen() {
     setActivities([])
     setPromptAnswer('')
     setNoWords(false)
-    setStep('score')
+    setStep('words')
     setSubmitError(null)
     if (user?.id) {
       void clearCheckInDraft(user.id, today)
@@ -244,6 +246,7 @@ export default function CheckInScreen() {
     }
     if (user?.id) await clearCheckInDraft(user.id, today)
     setEditing(false)
+    hapticSuccess()
     showToast('Saved. Private until they check in too.')
   }
 
@@ -315,13 +318,6 @@ export default function CheckInScreen() {
 
         {composing ? (
           <>
-            {step === 'score' ? (
-              <ScoreStep
-                value={score}
-                onChange={setScore}
-                prompt={todayPrompt.text}
-              />
-            ) : null}
             {step === 'words' ? (
               <WordsStep
                 prompt={todayPrompt.text}
@@ -338,8 +334,14 @@ export default function CheckInScreen() {
                   }
                   setNoWords(true)
                   setPromptAnswer('')
-                  setStep('extras')
+                  setStep('score')
                 }}
+              />
+            ) : null}
+            {step === 'score' ? (
+              <ScoreStep
+                value={score}
+                onChange={setScore}
               />
             ) : null}
             {step === 'extras' ? (
@@ -350,17 +352,17 @@ export default function CheckInScreen() {
               />
             ) : null}
 
-            {step === 'score' ? (
-              <PrimaryButton
-                label="Continue"
-                onPress={() => setStep('words')}
-                disabled={score == null}
-              />
-            ) : null}
             {step === 'words' ? (
               <PrimaryButton
                 label="Continue"
+                onPress={() => setStep('score')}
+              />
+            ) : null}
+            {step === 'score' ? (
+              <PrimaryButton
+                label="Continue"
                 onPress={() => setStep('extras')}
+                disabled={score == null}
               />
             ) : null}
             {step === 'extras' ? (
@@ -382,11 +384,11 @@ export default function CheckInScreen() {
               </>
             ) : null}
 
-            {step !== 'score' ? (
+            {step !== 'words' ? (
               <TextLink
                 label="Back"
                 onPress={() =>
-                  setStep(step === 'extras' ? 'words' : 'score')
+                  setStep(step === 'extras' ? 'score' : 'words')
                 }
               />
             ) : editing ? (

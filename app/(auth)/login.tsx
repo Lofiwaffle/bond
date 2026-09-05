@@ -247,9 +247,9 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   title: {
-    ...type.heading,
+    ...type.display,
     marginTop: 12,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   subtitle: {
     ...type.body,

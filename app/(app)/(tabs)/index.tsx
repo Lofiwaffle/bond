@@ -3,13 +3,11 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native
 import { Redirect, router, useFocusEffect } from 'expo-router'
 
 import { FeedThread } from '../../../components/FeedThread'
-import { TogetherLauncher } from '../../../components/TogetherLauncher'
 import { NextStepCard } from '../../../components/NextStepCard'
 import { PlusOfferCard } from '../../../components/PlusOfferCard'
 import { SharedActionCard } from '../../../components/CheckInMoment'
 import { CheckInSyncBanner } from '../../../components/CheckInSyncBanner'
 import { LoadingScreen, Screen, StatusPanel, TextLink } from '../../../components/ui'
-import { Icon } from '../../../lib/icons'
 import {
   useTodayCheckIn,
   useCheckInGrowth,
@@ -22,8 +20,7 @@ import { useBondPlus } from '../../../hooks/useBondPlus'
 import { useDailyAction } from '../../../hooks/useDailyAction'
 import { useNotificationPreferences } from '../../../hooks/useNotificationPreferences'
 import { useAuth } from '../../../lib/auth'
-import { promptForDate } from '../../../lib/dailyPrompts'
-import { addDays, formatDisplayDate, localDateString } from '../../../lib/dates'
+import { addDays, formatDisplayDate, localDateString, timeOfDayHello } from '../../../lib/dates'
 import { useQueuedCheckIn } from '../../../lib/checkInOutbox'
 import { useOnline } from '../../../lib/network'
 import { firstInsight } from '../../../lib/firstInsight'
@@ -98,7 +95,6 @@ export default function FeedScreen() {
     waitingForPartner,
     bothSubmitted,
   })
-  const prompt = promptForDate(profile.couple_id, today)
   const gapDays = lastDate
     ? Math.max(
         0,
@@ -138,7 +134,7 @@ export default function FeedScreen() {
     <Screen style={styles.screen} keyboard>
       <View style={styles.topBar}>
         <View>
-          <Text style={styles.topTitle}>Feed</Text>
+          <Text style={styles.topTitle}>{timeOfDayHello()}</Text>
           <Text style={styles.date}>{formatDisplayDate(today)}</Text>
         </View>
       </View>
@@ -165,14 +161,13 @@ export default function FeedScreen() {
           />
         ) : null}
 
-        <CheckInSyncBanner
-          queued={queued}
-          syncing={syncing}
-          online={online}
-          allowDraft={phase === 'compose'}
-        />
-
         <View style={styles.padded}>
+          <CheckInSyncBanner
+            queued={queued}
+            syncing={syncing}
+            online={online}
+            allowDraft={phase === 'compose'}
+          />
           {accepted
             .filter(
               (action) => phase !== 'reveal' || action.check_in_date !== today,
@@ -188,25 +183,18 @@ export default function FeedScreen() {
 
           {phase === 'compose' ? (
             <>
-              <View style={styles.composer}>
-                <View style={styles.composerIcon}>
-                  <Icon name="message-circle" size={18} color={colors.accentFill} />
-                </View>
-                <View style={styles.composerCopy}>
-                  <NextStepCard
-                    kicker="Daily question"
-                    title={prompt.text}
-                    body={
-                      queued
-                        ? 'Today is queued on this device. It is not in the relationship until Bond confirms it.'
-                        : returning ??
-                          'Both of you answer privately, then answers reveal together.'
-                    }
-                    actionLabel={queued ? 'Review check-in' : 'Answer'}
-                    onAction={() => router.push('/(app)/check-in')}
-                  />
-                </View>
-              </View>
+              <NextStepCard
+                kicker="Check-in"
+                title={queued ? 'Today is queued on this device.' : 'Time to check in'}
+                body={
+                  queued
+                    ? 'It is not in the relationship until Bond confirms it. The daily question is inside check-in.'
+                    : returning ??
+                      'The daily question lives in check-in. Both of you answer privately, then answers reveal together.'
+                }
+                actionLabel={queued ? 'Review check-in' : 'Check in'}
+                onAction={() => router.push('/(app)/check-in')}
+              />
               <TextLink
                 label={
                   snoozing ? 'Setting reminder...' : 'Remind me in one hour'
@@ -232,8 +220,6 @@ export default function FeedScreen() {
             />
           ) : null}
         </View>
-
-        <TogetherLauncher />
 
         <View style={styles.feed}>
           {feedQuery.error ? (
@@ -285,23 +271,6 @@ const styles = StyleSheet.create({
   },
   padded: {
     paddingHorizontal: 20,
-  },
-  composer: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'flex-start',
-  },
-  composerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.accentSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  composerCopy: {
-    flex: 1,
   },
   feed: {
     marginTop: 8,

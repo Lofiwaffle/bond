@@ -31,6 +31,7 @@ export type PlayLauncherItem = {
   icon: IconName
 }
 
+/** Together tiles on Growth. One person picks; no approval. */
 export const FEED_LAUNCHER: PlayLauncherItem[] = [
   {
     kind: 'know_me',
@@ -45,7 +46,7 @@ export const FEED_LAUNCHER: PlayLauncherItem[] = [
     route: 'choose-date',
     href: '/(app)/play/choose-date',
     title: 'Choose our date',
-    body: 'Pick privately. Keep only the overlap.',
+    body: 'What, when, where, and why. Submit puts it on the calendar.',
     icon: 'map-pin',
   },
   {

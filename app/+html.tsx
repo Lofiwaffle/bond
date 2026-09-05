@@ -13,7 +13,7 @@ export default function Root({ children }: PropsWithChildren) {
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
         />
-        <meta name="theme-color" content="#F7F2EF" />
+        <meta name="theme-color" content="#FBF5EE" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="Bond" />
@@ -34,7 +34,7 @@ export default function Root({ children }: PropsWithChildren) {
                 margin: 0;
               }
               body {
-                background: #F7F2EF;
+                background: #FBF5EE;
                 font-family: Inter_400Regular, Inter, system-ui, sans-serif;
               }
               #root {

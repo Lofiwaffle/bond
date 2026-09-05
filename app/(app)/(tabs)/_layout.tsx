@@ -9,6 +9,7 @@ import { useAuth } from '../../../lib/auth'
 import { todayPhase } from '../../../lib/nextStep'
 import { useAccessibleLayout } from '../../../lib/a11y'
 import { tabBarHeight } from '../../../lib/a11yLayout'
+import { hapticLight } from '../../../lib/haptics'
 import { colors, elevation, fonts, radii } from '../../../lib/theme'
 
 function CheckInFab() {
@@ -29,6 +30,7 @@ function CheckInFab() {
         : "Open today's reveal"
 
   const onPress = () => {
+    hapticLight()
     if (phase === 'compose') {
       router.push('/(app)/check-in')
       return
@@ -48,7 +50,7 @@ function CheckInFab() {
       ]}
     >
       <View style={styles.fab}>
-        <Feather name={icon} size={26} color={colors.onAccent} />
+          <Feather name={icon} size={26} color={colors.onAccent} />
       </View>
       <Text style={styles.fabLabel}>{label}</Text>
     </Pressable>
@@ -138,12 +140,12 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: colors.tabBar,
-    borderTopWidth: 0.5,
-    borderTopColor: colors.hairline,
+    borderTopWidth: 0,
     height: 78,
     paddingBottom: 14,
     paddingTop: 10,
     overflow: 'visible' as const,
+    ...elevation.card,
   },
   tabLabel: {
     fontFamily: fonts.regular,

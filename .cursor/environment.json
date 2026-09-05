@@ -1,0 +1,17 @@
+{
+  "name": "Bond (Expo)",
+  "install": "npm install",
+  "terminals": [
+    {
+      "name": "expo-web",
+      "command": "npx expo start --web --port 8081",
+      "description": "Expo (React Native Web) dev server for the Bond app. Once bundled, the web app loads at http://localhost:8081/bond (the web build uses a '/bond' base path). Metro also serves the JS bundle for native clients here."
+    }
+  ],
+  "ports": [
+    {
+      "name": "expo-web",
+      "port": 8081
+    }
+  ]
+}

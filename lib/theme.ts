@@ -3,53 +3,68 @@ import { fonts } from './fonts'
 export { fonts }
 
 export const colors = {
-  bg: '#F7F2EF',
-  bgSoft: '#F1EAEB',
-  frame: '#E4D8DE',
-  ink: '#3D2C33',
-  muted: '#5E4A52',
-  accent: '#FF6B9D',
-  accentPressed: '#B83B68',
-  accentFill: '#B83B68',
+  bg: '#F3EBE3',
+  bgSoft: '#EFE6DC',
+  frame: '#E6D9CE',
+  ink: '#3A2430',
+  muted: '#6A4E58',
+  accent: '#C45C78',
+  accentPressed: '#8E3550',
+  accentFill: '#A33D5C',
   /** Dark enough for small text and white labels (WCAG AA). */
   danger: '#B4233A',
-  accentSoft: '#FFE4EE',
+  accentSoft: '#F4E1E6',
   onAccent: '#FFFFFF',
-  border: '#E8DDE2',
-  hairline: '#E4D8DE',
-  success: '#7ED9A8',
-  card: '#FFFFFF',
-  tabBar: '#FFFFFF',
-  tabBarIcon: '#3D2C33',
-  tabBarIconMuted: '#5E4A52',
+  border: '#E4D5C9',
+  hairline: '#E4D5C9',
+  success: '#5E8F6E',
+  card: '#FBF7F0',
+  surface: '#FBF7F0',
+  tabBar: '#FBF7F0',
+  tabBarIcon: '#3A2430',
+  tabBarIconMuted: '#6A4E58',
   white: '#FFFFFF',
-  black: '#3D2C33',
-  overlay: 'rgba(61, 44, 51, 0.38)',
+  black: '#3A2430',
+  overlay: 'rgba(58, 36, 48, 0.38)',
 }
 
-/** Grayscale connection scores 1–5. Accent is reserved for selected states. */
+export type ConnectionTone = {
+  fill: string
+  stroke: string
+  selected: string
+}
+
+/** Lavender, sky, sage, honey, coral — used for connection levels 1–5. */
+export const connectionTones: Record<number, ConnectionTone> = {
+  1: { fill: '#E6DCF2', stroke: '#6F5A8A', selected: '#D9CBEA' },
+  2: { fill: '#D5E6F2', stroke: '#4E7390', selected: '#C5DCEC' },
+  3: { fill: '#D8E6D2', stroke: '#5A7554', selected: '#C9DCC2' },
+  4: { fill: '#F1E1BC', stroke: '#8C6A38', selected: '#E8D4A4' },
+  5: { fill: '#F3D2C8', stroke: '#A85A48', selected: '#EBC3B6' },
+}
+
 export const scoreColors: Record<number, string> = {
-  1: '#EDE6E8',
-  2: '#D8CFD3',
-  3: '#B9AEB3',
-  4: '#8A7C82',
-  5: '#3D2C33',
+  1: connectionTones[1].stroke,
+  2: connectionTones[2].stroke,
+  3: connectionTones[3].stroke,
+  4: connectionTones[4].stroke,
+  5: connectionTones[5].stroke,
 }
 
 export const scoreColorsSoft: Record<number, string> = {
-  1: '#F7F2EF',
-  2: '#F3ECEE',
-  3: '#EDE6E8',
-  4: '#E4DCDF',
-  5: '#D8CFD3',
+  1: connectionTones[1].fill,
+  2: connectionTones[2].fill,
+  3: connectionTones[3].fill,
+  4: connectionTones[4].fill,
+  5: connectionTones[5].fill,
 }
 
 export const SCORE_LABELS: Record<number, string> = {
-  1: 'Distant',
-  2: 'A little disconnected',
-  3: 'Neutral',
-  4: 'Connected',
-  5: 'Very connected',
+  1: 'Far away',
+  2: 'Distant',
+  3: 'Steady',
+  4: 'Close',
+  5: 'Very close',
 }
 
 export const radii = {
@@ -72,18 +87,23 @@ export const weights = {
   medium: '500' as const,
 }
 
+export const motion = {
+  fast: 160,
+  duration: 180,
+}
+
 export const type = {
   label: {
     fontFamily: fonts.regular,
-    fontSize: 12,
+    fontSize: 13,
     lineHeight: 18,
     fontWeight: '400' as const,
     color: colors.muted,
   },
   body: {
     fontFamily: fonts.regular,
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: '400' as const,
     color: colors.ink,
   },

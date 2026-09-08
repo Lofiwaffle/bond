@@ -456,8 +456,8 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
       if (score < 1 || score > 5) {
         return { error: 'Choose a score from 1 to 5' }
       }
-      if (activities.length > 5) {
-        return { error: 'Pick up to 5 activity tags' }
+      if (activities.length > 8) {
+        return { error: 'Pick up to 8 activity tags' }
       }
 
       const today = days.find((day) => day.date === localDateString())
@@ -529,8 +529,8 @@ export function CheckInProvider({ children }: { children: ReactNode }) {
       if (score < 1 || score > 5) {
         return { error: 'Choose a score from 1 to 5' }
       }
-      if (activities.length > 5) {
-        return { error: 'Pick up to 5 activity tags' }
+      if (activities.length > 8) {
+        return { error: 'Pick up to 8 activity tags' }
       }
 
       const date = localDateString()

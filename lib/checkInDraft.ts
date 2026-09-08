@@ -9,6 +9,7 @@ export type CheckInDraft = {
   activities: ActivityId[]
   promptAnswer: string
   noWords: boolean
+  otherText: string
   step: 'score' | 'words' | 'extras'
 }
 
@@ -17,6 +18,7 @@ const EMPTY: Omit<CheckInDraft, 'date'> = {
   activities: [],
   promptAnswer: '',
   noWords: false,
+  otherText: '',
   step: 'score',
 }
 
@@ -47,6 +49,7 @@ export async function loadCheckInDraft(
       promptAnswer:
         typeof parsed.promptAnswer === 'string' ? parsed.promptAnswer : '',
       noWords: Boolean(parsed.noWords),
+      otherText: typeof parsed.otherText === 'string' ? parsed.otherText : '',
       step:
         parsed.step === 'words' || parsed.step === 'extras'
           ? parsed.step

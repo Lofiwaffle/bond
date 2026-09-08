@@ -66,7 +66,7 @@ export function summarizeScores(scores: number[]): {
   const rounded = Math.round(avg)
   return {
     avg,
-    label: SCORE_LABELS[rounded] ?? 'Neutral',
+    label: SCORE_LABELS[rounded] ?? SCORE_LABELS[3],
   }
 }
 

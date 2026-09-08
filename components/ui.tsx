@@ -17,7 +17,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { ACTIVITIES, type ActivityId } from '../lib/activities'
+import { ACTIVITIES, MAX_ACTIVITIES, type ActivityId } from '../lib/activities'
 import {
   BADGES,
   badgesForProgress,
@@ -144,11 +144,13 @@ export function PrimaryButton({
   onPress,
   disabled,
   loading,
+  muted,
 }: {
   label: string
   onPress: () => void
   disabled?: boolean
   loading?: boolean
+  muted?: boolean
 }) {
   const busy = disabled || loading
   return (
@@ -163,7 +165,7 @@ export function PrimaryButton({
       disabled={busy}
       style={(state) => [
         styles.button,
-        busy && styles.buttonDisabled,
+        (busy || muted) && styles.buttonDisabled,
         state.pressed && !busy && styles.buttonPressed,
         isFocused(state) && styles.focusRing,
       ]}
@@ -433,7 +435,7 @@ export function ScoreFacePicker({
 export function ActivityChips({
   value,
   onChange,
-  max = 5,
+  max = MAX_ACTIVITIES,
 }: {
   value: ActivityId[]
   onChange: (next: ActivityId[]) => void

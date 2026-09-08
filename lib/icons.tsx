@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react'
-import { Image } from 'react-native'
 import { Feather } from '@expo/vector-icons'
 
+import { PixelFace } from './pixelFace'
 import { colors } from './theme'
 
 export type IconName = ComponentProps<typeof Feather>['name']
@@ -18,15 +18,7 @@ export function Icon({
   return <Feather name={name} size={size} color={color} />
 }
 
-const FACE_IMAGES = {
-  1: require('../assets/connection/distant-purple.png'),
-  2: require('../assets/connection/disconnected-blue.png'),
-  3: require('../assets/connection/3.png'),
-  4: require('../assets/connection/4.png'),
-  5: require('../assets/connection/5.png'),
-} as const
-
-/** Illustrated kawaii connection faces, 1 disconnected → 5 proud & united. */
+/** Pixel-art connection faces, 1 far away → 5 very close. */
 export function FaceIcon({
   score,
   size = 28,
@@ -35,13 +27,5 @@ export function FaceIcon({
   size?: number
   color?: string
 }) {
-  const clamped = Math.min(5, Math.max(1, Math.round(score))) as 1 | 2 | 3 | 4 | 5
-  return (
-    <Image
-      source={FACE_IMAGES[clamped]}
-      style={{ width: size, height: size }}
-      resizeMode="contain"
-      accessibilityIgnoresInvertColors
-    />
-  )
+  return <PixelFace score={score} size={size} />
 }

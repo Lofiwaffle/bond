@@ -51,8 +51,8 @@ export function revealReflection(
   starter: string
   suggestedAction: RevealActionId
 } {
-  const myLabel = SCORE_LABELS[mine.score] ?? 'Neutral'
-  const theirLabel = SCORE_LABELS[partner.score] ?? 'Neutral'
+  const myLabel = SCORE_LABELS[mine.score] ?? SCORE_LABELS[3]
+  const theirLabel = SCORE_LABELS[partner.score] ?? SCORE_LABELS[3]
   const gap = Math.abs(mine.score - partner.score)
   const mineWords = Boolean(mine.prompt_answer?.trim())
   const theirsWords = Boolean(partner.prompt_answer?.trim())

@@ -2,42 +2,55 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Redirect, router, useLocalSearchParams } from 'expo-router'
 
+import { CheckInComposer, CheckInSaved } from '../../components/CheckInComposer'
 import {
-  ExtrasStep,
   RevealMoment,
-  ScoreStep,
   WaitingMoment,
-  WordsStep,
 } from '../../components/CheckInMoment'
 import { CheckInSyncBanner } from '../../components/CheckInSyncBanner'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import {
   IconButton,
   LoadingScreen,
-  PrimaryButton,
   Screen,
   StatusPanel,
   TextLink,
 } from '../../components/ui'
 import type { ActivityId } from '../../lib/activities'
 import {
+  OPENED_WHILE_EDITING,
   useCheckInGrowth,
   useTodayCheckIn,
-  OPENED_WHILE_EDITING,
 } from '../../hooks/useCheckIn'
 import { useAuth } from '../../lib/auth'
+import {
+  canSaveCheckIn,
+  DISCARD_BODY,
+  DISCARD_CONFIRM,
+  DISCARD_STAY,
+  DISCARD_TITLE,
+  EMPTY_CHECK_IN_FORM,
+  isCheckInDirty,
+  KEEP_SAVED_LABEL,
+  noteForSubmit,
+  otherTextFromSaved,
+  promptAnswerForSubmit,
+  REFLECTION_PROMPT,
+  REFLECTION_PROMPT_ID,
+  SAVE_ERROR,
+  SKIP_LABEL,
+  validateCheckIn,
+  type CheckInFormState,
+} from '../../lib/checkInForm'
 import {
   clearCheckInDraft,
   hasSentNudge,
   loadCheckInDraft,
   markNudgeSent,
   saveCheckInDraft,
-  type CheckInDraft,
 } from '../../lib/checkInDraft'
-import { promptForDate } from '../../lib/dailyPrompts'
 import { formatDisplayDate, localDateString } from '../../lib/dates'
 import {
-  clearQueuedCheckIn,
   loadQueuedCheckIn,
   QUEUED_TOAST,
   useQueuedCheckIn,
@@ -73,18 +86,17 @@ export default function CheckInScreen() {
   const wantEdit = (Array.isArray(params.edit) ? params.edit[0] : params.edit) === '1'
   const today = localDateString()
   const queued = useQueuedCheckIn(user?.id, today)
-  const [score, setScore] = useState<number | null>(null)
-  const [activities, setActivities] = useState<ActivityId[]>([])
-  const [promptAnswer, setPromptAnswer] = useState('')
-  const [noWords, setNoWords] = useState(false)
-  const [step, setStep] = useState<CheckInDraft['step']>('score')
+  const [form, setForm] = useState<CheckInFormState>(EMPTY_CHECK_IN_FORM)
   const [draftReady, setDraftReady] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [feelingError, setFeelingError] = useState(false)
   const [nudged, setNudged] = useState(false)
   const [nudging, setNudging] = useState(false)
   const [editing, setEditing] = useState(false)
   const [revealOpen, setRevealOpen] = useState(false)
+  const [leaveOpen, setLeaveOpen] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
   const saving = useRef(false)
   const revealAcked = useRef(false)
   const openedWhileEditing = useRef(false)
@@ -111,14 +123,16 @@ export default function CheckInScreen() {
               activities: queuedEntry.activities as ActivityId[],
               promptAnswer: queuedEntry.prompt_answer ?? '',
               noWords: !queuedEntry.prompt_answer,
-              step: 'extras' as const,
+              otherText: queuedEntry.note ?? '',
             }
           : draft
-      setScore(source.score)
-      setActivities(source.activities)
-      setPromptAnswer(source.promptAnswer)
-      setNoWords(source.noWords)
-      setStep(source.step)
+      setForm({
+        score: source.score,
+        activities: source.activities,
+        promptAnswer: source.promptAnswer,
+        noWords: source.noWords,
+        otherText: 'otherText' in source ? source.otherText : draft.otherText,
+      })
       setDraftReady(true)
     })
   }, [authLoading, isLoading, mine, today, user?.id])
@@ -127,30 +141,45 @@ export default function CheckInScreen() {
     if (!draftReady || !user?.id || mine) return
     void saveCheckInDraft(user.id, {
       date: today,
-      score,
-      activities,
-      promptAnswer,
-      noWords,
-      step,
+      score: form.score,
+      activities: form.activities,
+      promptAnswer: form.promptAnswer,
+      noWords: form.noWords,
+      otherText: form.otherText,
+      step: 'extras',
     })
-  }, [activities, draftReady, mine, noWords, promptAnswer, score, step, today, user?.id])
+  }, [draftReady, form, mine, today, user?.id])
 
   useEffect(() => {
     if (!user?.id || !mine) return
     void hasSentNudge(user.id, today).then(setNudged)
   }, [mine, today, user?.id])
 
+  const formFromMine = useCallback((): CheckInFormState => {
+    if (!mine) return EMPTY_CHECK_IN_FORM
+    const promptAnswer = mine.prompt_answer ?? ''
+    return {
+      score: mine.score,
+      activities: (mine.activities ?? []) as ActivityId[],
+      promptAnswer,
+      noWords: !promptAnswer,
+      otherText: otherTextFromSaved({
+        activities: mine.activities,
+        note: mine.note,
+        promptAnswer: mine.prompt_answer,
+      }),
+    }
+  }, [mine])
+
   const beginEdit = useCallback(() => {
     if (!mine || !waitingForPartner) return
     openedWhileEditing.current = false
-    setScore(mine.score)
-    setActivities((mine.activities ?? []) as ActivityId[])
-    setPromptAnswer(mine.prompt_answer ?? '')
-    setNoWords(!(mine.prompt_answer && mine.prompt_answer.length > 0))
-    setStep('score')
+    setForm(formFromMine())
     setSubmitError(null)
+    setFeelingError(false)
+    setJustSaved(false)
     setEditing(true)
-  }, [mine, waitingForPartner])
+  }, [formFromMine, mine, waitingForPartner])
 
   useEffect(() => {
     if (!wantEdit || startedFromQuery.current || editing) return
@@ -181,28 +210,26 @@ export default function CheckInScreen() {
     )
   }
 
-  const todayPrompt = promptForDate(profile.couple_id, today)
-
-  const resetForm = () => {
-    setScore(null)
-    setActivities([])
-    setPromptAnswer('')
-    setNoWords(false)
-    setStep('score')
-    setSubmitError(null)
-    if (user?.id) {
-      void clearCheckInDraft(user.id, today)
-      void clearQueuedCheckIn(user.id, today)
-    }
-  }
-
   const needsRevealAck = !editing && !queued && myCheckIns === 0
+  const composing = (!mine || editing) && !bothSubmitted && !justSaved
+  const dirty = isCheckInDirty(form)
+
+  const closeScreen = () => router.back()
+
+  const requestClose = () => {
+    if (composing && dirty) {
+      setLeaveOpen(true)
+      return
+    }
+    closeScreen()
+  }
 
   const onSubmit = async () => {
     if (saving.current || submitting) return
-    if (score == null) {
-      setSubmitError('Choose how connected you feel')
-      setStep('score')
+    const invalid = validateCheckIn(form)
+    if (invalid) {
+      setFeelingError(true)
+      setSubmitError(invalid)
       return
     }
     if (needsRevealAck && !revealAcked.current) {
@@ -211,23 +238,22 @@ export default function CheckInScreen() {
     }
     setRevealOpen(false)
     setSubmitError(null)
+    setFeelingError(false)
     saving.current = true
     setSubmitting(true)
+    const prompt = {
+      id: mine?.prompt_id ?? REFLECTION_PROMPT_ID,
+      text: mine?.prompt_text ?? REFLECTION_PROMPT,
+      answer: promptAnswerForSubmit(form),
+    }
+    const note = noteForSubmit(form)
     const result = editing
-      ? await revise(score, '', activities, {
-          id: todayPrompt.id,
-          text: todayPrompt.text,
-          answer: noWords ? '' : promptAnswer,
-        })
-      : await submit(score, '', activities, {
-          id: todayPrompt.id,
-          text: todayPrompt.text,
-          answer: noWords ? '' : promptAnswer,
-        })
+      ? await revise(form.score as number, note, form.activities, prompt)
+      : await submit(form.score as number, note, form.activities, prompt)
     saving.current = false
     setSubmitting(false)
     if (result.error) {
-      setSubmitError(result.error)
+      setSubmitError(result.error || SAVE_ERROR)
       return
     }
     if ('opened' in result && result.opened) {
@@ -240,11 +266,12 @@ export default function CheckInScreen() {
     }
     if ('queued' in result && result.queued) {
       showToast(QUEUED_TOAST)
+      setJustSaved(true)
       return
     }
     if (user?.id) await clearCheckInDraft(user.id, today)
     setEditing(false)
-    showToast('Saved. Private until they check in too.')
+    setJustSaved(true)
   }
 
   const onNudge = async () => {
@@ -261,38 +288,9 @@ export default function CheckInScreen() {
     showToast('Gentle reminder sent')
   }
 
-  const composing = (!mine || editing) && !bothSubmitted
-
   return (
     <Screen style={styles.screen} keyboard>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.headerRow}>
-          <View style={styles.headerCopy}>
-            <Text style={styles.heading}>
-              {editing ? 'Correct check-in' : 'Check-in'}
-            </Text>
-            <Text style={styles.date}>{formatDisplayDate(today)}</Text>
-          </View>
-          <View style={styles.headerMeta}>
-            {!mine && (score != null || promptAnswer || noWords) ? (
-              <IconButton
-                name="rotate-ccw"
-                accessibilityLabel="Start over"
-                onPress={resetForm}
-              />
-            ) : null}
-            <IconButton
-              name="x"
-              accessibilityLabel="Close"
-              onPress={() => router.back()}
-            />
-          </View>
-        </View>
-
+      <View style={styles.bannerSlot}>
         {error && !queued ? (
           <StatusPanel
             message="Couldn't load today's check-in."
@@ -312,98 +310,52 @@ export default function CheckInScreen() {
             device.
           </Text>
         ) : null}
+      </View>
 
-        {composing ? (
-          <>
-            {step === 'score' ? (
-              <ScoreStep
-                value={score}
-                onChange={setScore}
-                prompt={todayPrompt.text}
-              />
-            ) : null}
-            {step === 'words' ? (
-              <WordsStep
-                prompt={todayPrompt.text}
-                value={promptAnswer}
-                noWords={noWords}
-                onChange={(text) => {
-                  setNoWords(false)
-                  setPromptAnswer(text)
-                }}
-                onNoWords={() => {
-                  if (noWords) {
-                    setNoWords(false)
-                    return
-                  }
-                  setNoWords(true)
-                  setPromptAnswer('')
-                  setStep('extras')
-                }}
-              />
-            ) : null}
-            {step === 'extras' ? (
-              <ExtrasStep
-                value={activities}
-                onChange={setActivities}
-                error={submitError}
-              />
-            ) : null}
+      {composing ? (
+        <CheckInComposer
+          dateLabel={formatDisplayDate(today)}
+          form={form}
+          onChange={(next) => {
+            setForm(next)
+            if (feelingError && canSaveCheckIn(next)) {
+              setFeelingError(false)
+              setSubmitError(null)
+            }
+          }}
+          onClose={requestClose}
+          onSave={() => void onSubmit()}
+          onSkip={() => {
+            if (editing) {
+              setEditing(false)
+              setSubmitError(null)
+              setFeelingError(false)
+              return
+            }
+            closeScreen()
+          }}
+          skipLabel={editing ? KEEP_SAVED_LABEL : SKIP_LABEL}
+          editing={editing}
+          queued={queued}
+          submitting={submitting}
+          error={submitError}
+          feelingError={feelingError}
+        />
+      ) : null}
 
-            {step === 'score' ? (
-              <PrimaryButton
-                label="Continue"
-                onPress={() => setStep('words')}
-                disabled={score == null}
-              />
-            ) : null}
-            {step === 'words' ? (
-              <PrimaryButton
-                label="Continue"
-                onPress={() => setStep('extras')}
-              />
-            ) : null}
-            {step === 'extras' ? (
-              <>
-                <PrimaryButton
-                  label={
-                    editing
-                      ? 'Save correction'
-                      : queued
-                        ? 'Update what will send'
-                        : activities.length
-                          ? 'Save check-in'
-                          : 'Skip activities and save'
-                  }
-                  onPress={() => void onSubmit()}
-                  loading={submitting}
-                  disabled={score == null}
-                />
-              </>
-            ) : null}
+      {justSaved && !editing ? (
+        <CheckInSaved onDone={closeScreen} error={null} />
+      ) : null}
 
-            {step !== 'score' ? (
-              <TextLink
-                label="Back"
-                onPress={() =>
-                  setStep(step === 'extras' ? 'words' : 'score')
-                }
-              />
-            ) : editing ? (
-              <TextLink
-                label="Keep what I saved"
-                onPress={() => {
-                  setEditing(false)
-                  setSubmitError(null)
-                }}
-              />
-            ) : (
-              <TextLink label="Not today" onPress={() => router.back()} />
-            )}
-          </>
-        ) : null}
-
-        {mine && waitingForPartner && !editing ? (
+      {mine && waitingForPartner && !editing && !justSaved ? (
+        <ScrollView
+          contentContainerStyle={styles.moment}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.momentHeader}>
+            <IconButton name="x" accessibilityLabel="Close" onPress={closeScreen} />
+          </View>
           <WaitingMoment
             mine={mine}
             partnerName={partner.display_name}
@@ -413,21 +365,28 @@ export default function CheckInScreen() {
             onNudge={() => void onNudge()}
             onRefresh={() => void refresh()}
             onEdit={beginEdit}
-            onDone={() => router.back()}
+            onDone={closeScreen}
           />
-        ) : null}
+        </ScrollView>
+      ) : null}
 
-        {bothSubmitted && mine && partnerCheckIn && user?.id ? (
-          <>
-            <RevealMoment
-              mine={mine}
-              partner={partnerCheckIn}
-              partnerName={partner.display_name}
-            />
-            <TextLink label="Done" onPress={() => router.back()} />
-          </>
-        ) : null}
-      </ScrollView>
+      {bothSubmitted && mine && partnerCheckIn && user?.id && !justSaved ? (
+        <ScrollView
+          contentContainerStyle={styles.moment}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.momentHeader}>
+            <IconButton name="x" accessibilityLabel="Close" onPress={closeScreen} />
+          </View>
+          <RevealMoment
+            mine={mine}
+            partner={partnerCheckIn}
+            partnerName={partner.display_name}
+          />
+          <TextLink label="Done" onPress={closeScreen} />
+        </ScrollView>
+      ) : null}
+
       <ConfirmDialog
         visible={revealOpen}
         title={MUTUAL_REVEAL_TITLE}
@@ -441,40 +400,29 @@ export default function CheckInScreen() {
           void onSubmit()
         }}
       />
+      <ConfirmDialog
+        visible={leaveOpen}
+        title={DISCARD_TITLE}
+        body={DISCARD_BODY}
+        confirmLabel={DISCARD_CONFIRM}
+        cancelLabel={DISCARD_STAY}
+        onCancel={() => setLeaveOpen(false)}
+        onConfirm={() => {
+          setLeaveOpen(false)
+          closeScreen()
+        }}
+      />
     </Screen>
   )
 }
 
 const styles = StyleSheet.create({
   screen: {
-    paddingTop: 48,
     paddingHorizontal: 0,
-  },
-  scroll: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 12,
-  },
-  headerCopy: {
-    flex: 1,
-  },
-  headerMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingBottom: 0,
   },
   heading: {
     ...type.heading,
-  },
-  date: {
-    ...type.body,
-    color: colors.muted,
-    marginTop: 2,
   },
   mutedBody: {
     ...type.body,
@@ -485,5 +433,16 @@ const styles = StyleSheet.create({
     ...type.label,
     color: colors.muted,
     marginBottom: 12,
+  },
+  bannerSlot: {
+    paddingHorizontal: 20,
+  },
+  moment: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  momentHeader: {
+    alignItems: 'flex-end',
+    marginBottom: 8,
   },
 })

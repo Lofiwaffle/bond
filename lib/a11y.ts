@@ -73,3 +73,24 @@ export function useAccessibleLayout() {
     ruleWidth: highContrast ? 2 : hairlineWidth,
   }
 }
+
+export function usePrefersReducedMotion() {
+  const [reduce, setReduce] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+    void AccessibilityInfo.isReduceMotionEnabled?.().then((value) => {
+      if (mounted) setReduce(Boolean(value))
+    })
+    const sub = AccessibilityInfo.addEventListener?.(
+      'reduceMotionChanged',
+      (value) => setReduce(Boolean(value)),
+    )
+    return () => {
+      mounted = false
+      sub?.remove?.()
+    }
+  }, [])
+
+  return reduce
+}

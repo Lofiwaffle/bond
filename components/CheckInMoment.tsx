@@ -2,16 +2,13 @@ import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import {
-  ActivityChips,
   ErrorText,
   Field,
   PrimaryButton,
   ReadOnlyChips,
   ScoreMark,
-  ScoreScale,
   TextLink,
 } from './ui'
-import type { ActivityId } from '../lib/activities'
 import { loadPrivateThought, savePrivateThought } from '../lib/checkInDraft'
 import {
   REVEAL_ACTIONS,
@@ -25,29 +22,6 @@ import { DEVICE_ONLY_THOUGHTS } from '../lib/privacy'
 import { useToast } from '../lib/toast'
 import { SCORE_LABELS, colors, hairlineWidth, hit, radii, type } from '../lib/theme'
 import type { DailyAction, DailyCheckIn } from '../types/database'
-
-export function PrivacyLine() {
-  return (
-    <Text style={styles.privacy}>
-      Private until you both check in. Then only the two of you.{' '}
-      {DEVICE_ONLY_THOUGHTS}
-    </Text>
-  )
-}
-
-export function CheckInProgress({
-  step,
-  total = 3,
-}: {
-  step: number
-  total?: number
-}) {
-  return (
-    <Text style={styles.progressLabel} accessibilityLabel={`Question ${step} of ${total}`}>
-      {step} of {total}
-    </Text>
-  )
-}
 
 export function WaitingMoment({
   mine,
@@ -493,93 +467,6 @@ export function SharedActionCard({
   )
 }
 
-export function ScoreStep({
-  value,
-  onChange,
-  prompt,
-}: {
-  value: number | null
-  onChange: (score: number) => void
-  prompt?: string
-}) {
-  return (
-    <View>
-      <CheckInProgress step={1} />
-      {prompt ? (
-        <>
-          <Text style={styles.kicker}>Daily question</Text>
-          <Text style={styles.body}>{prompt}</Text>
-        </>
-      ) : null}
-      <Text style={styles.title}>How connected do you feel today?</Text>
-      <ScoreScale value={value} onChange={onChange} />
-      <PrivacyLine />
-    </View>
-  )
-}
-
-export function WordsStep({
-  prompt,
-  value,
-  noWords,
-  onChange,
-  onNoWords,
-}: {
-  prompt: string
-  value: string
-  noWords: boolean
-  onChange: (text: string) => void
-  onNoWords: () => void
-}) {
-  return (
-    <View>
-      <CheckInProgress step={2} />
-      <Text style={styles.kicker}>Daily question</Text>
-      <Text style={styles.title}>{prompt}</Text>
-      {noWords ? (
-        <Text style={styles.body}>{displaySharedWords(null)}</Text>
-      ) : (
-        <Field
-          value={value}
-          onChangeText={onChange}
-          placeholder="A few sentences, if you have them"
-          accessibilityLabel="Daily question answer"
-          autoCapitalize="sentences"
-          multiline
-          maxLength={500}
-          style={styles.note}
-        />
-      )}
-      <TextLink
-        label={noWords ? 'I want to write something' : "I don't have words today"}
-        onPress={onNoWords}
-      />
-      <PrivacyLine />
-    </View>
-  )
-}
-
-export function ExtrasStep({
-  value,
-  onChange,
-  error,
-}: {
-  value: ActivityId[]
-  onChange: (next: ActivityId[]) => void
-  error: string | null
-}) {
-  return (
-    <View>
-      <CheckInProgress step={3} />
-      <Text style={styles.title}>What shaped today?</Text>
-      <Text style={styles.body}>Optional. Skip if nothing fits.</Text>
-      <ActivityChips value={value} onChange={onChange} />
-      <PrivacyLine />
-      <ErrorText message={error} />
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
   kicker: {
     ...type.label,
@@ -595,15 +482,6 @@ const styles = StyleSheet.create({
     ...type.body,
     color: colors.muted,
     marginBottom: 12,
-  },
-  privacy: {
-    ...type.label,
-    marginTop: 16,
-    marginBottom: 0,
-  },
-  progressLabel: {
-    ...type.label,
-    marginBottom: 8,
   },
   pair: {
     flexDirection: 'row',

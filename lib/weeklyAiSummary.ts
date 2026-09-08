@@ -58,13 +58,13 @@ export function buildFallbackWeeklySummary(input: {
     const label = formatDisplayDate(day.date)
     const parts: string[] = [`• ${label}:`]
     if (day.mine) {
-      parts.push(`you felt ${SCORE_LABELS[day.mine.score] ?? 'Neutral'}.${activityLine(day.mine.activities)}`)
+      parts.push(`you felt ${SCORE_LABELS[day.mine.score] ?? SCORE_LABELS[3]}.${activityLine(day.mine.activities)}`)
       const words = day.mine.prompt_answer?.trim() || day.mine.note?.trim()
       if (words) parts.push(`You wrote: “${words}”.`)
     }
     if (day.revealed && day.partner) {
       parts.push(
-        `${partnerName} felt ${SCORE_LABELS[day.partner.score] ?? 'Neutral'}.${activityLine(day.partner.activities)}`,
+        `${partnerName} felt ${SCORE_LABELS[day.partner.score] ?? SCORE_LABELS[3]}.${activityLine(day.partner.activities)}`,
       )
       const words = day.partner.prompt_answer?.trim() || day.partner.note?.trim()
       if (words) parts.push(`They wrote: “${words}”.`)

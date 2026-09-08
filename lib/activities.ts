@@ -29,7 +29,7 @@ export const ACTIVITIES: Activity[] = [
 
 export const ACTIVITY_IDS = ACTIVITIES.map((a) => a.id) as ActivityId[]
 
-export const MAX_ACTIVITIES = 5
+export const MAX_ACTIVITIES = 8
 
 export function isActivityId(value: string): value is ActivityId {
   return (ACTIVITY_IDS as string[]).includes(value)

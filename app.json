@@ -6,7 +6,8 @@
   "icon": "./assets/icon.png",
   "scheme": "bond",
   "userInterfaceStyle": "light",
-  "primaryColor": "#FF6B9D",
+  "backgroundColor": "#F3EBE3",
+  "primaryColor": "#A33D5C",
   "ios": {
     "supportsTablet": false,
     "bundleIdentifier": "com.bond.app",
@@ -137,24 +138,30 @@
     "name": "Bond",
     "shortName": "Bond",
     "lang": "en",
-    "themeColor": "#F7F2EF",
-    "backgroundColor": "#F7F2EF"
+    "themeColor": "#F3EBE3",
+    "backgroundColor": "#F3EBE3"
   },
   "plugins": [
     "expo-router",
     [
       "expo-splash-screen",
       {
-        "backgroundColor": "#F7F2EF",
+        "backgroundColor": "#F3EBE3",
         "image": "./assets/splash-icon.png",
         "imageWidth": 180
+      }
+    ],
+    [
+      "expo-status-bar",
+      {
+        "style": "dark"
       }
     ],
     [
       "expo-notifications",
       {
         "icon": "./assets/android-icon-monochrome.png",
-        "color": "#FF6B9D",
+        "color": "#A33D5C",
         "defaultChannel": "bond-reminders",
         "enableBackgroundRemoteNotifications": false
       }

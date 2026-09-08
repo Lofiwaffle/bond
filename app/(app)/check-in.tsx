@@ -63,6 +63,7 @@ import {
 } from '../../lib/privacy'
 import { useToast } from '../../lib/toast'
 import { colors, type } from '../../lib/theme'
+import { useLeaveGuard } from '../../lib/useLeaveGuard'
 
 export default function CheckInScreen() {
   const { user, profile, partner, isLoading: authLoading } = useAuth()
@@ -95,7 +96,6 @@ export default function CheckInScreen() {
   const [nudging, setNudging] = useState(false)
   const [editing, setEditing] = useState(false)
   const [revealOpen, setRevealOpen] = useState(false)
-  const [leaveOpen, setLeaveOpen] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
   const saving = useRef(false)
   const revealAcked = useRef(false)
@@ -195,6 +195,16 @@ export default function CheckInScreen() {
     showToast(OPENED_WHILE_EDITING)
   }, [bothSubmitted, editing, showToast])
 
+  const composing =
+    Boolean(partner) && (!mine || editing) && !bothSubmitted && !justSaved
+  const {
+    promptOpen: leaveOpen,
+    requestClose,
+    stay,
+    leave,
+    leaveNow,
+  } = useLeaveGuard(composing && isCheckInDirty(form))
+
   if (authLoading || isLoading || !draftReady) return <LoadingScreen />
   if (!profile?.couple_id) return <Redirect href="/(app)/setup" />
 
@@ -211,18 +221,7 @@ export default function CheckInScreen() {
   }
 
   const needsRevealAck = !editing && !queued && myCheckIns === 0
-  const composing = (!mine || editing) && !bothSubmitted && !justSaved
-  const dirty = isCheckInDirty(form)
-
   const closeScreen = () => router.back()
-
-  const requestClose = () => {
-    if (composing && dirty) {
-      setLeaveOpen(true)
-      return
-    }
-    closeScreen()
-  }
 
   const onSubmit = async () => {
     if (saving.current || submitting) return
@@ -332,7 +331,7 @@ export default function CheckInScreen() {
               setFeelingError(false)
               return
             }
-            closeScreen()
+            leaveNow()
           }}
           skipLabel={editing ? KEEP_SAVED_LABEL : SKIP_LABEL}
           editing={editing}
@@ -406,11 +405,8 @@ export default function CheckInScreen() {
         body={DISCARD_BODY}
         confirmLabel={DISCARD_CONFIRM}
         cancelLabel={DISCARD_STAY}
-        onCancel={() => setLeaveOpen(false)}
-        onConfirm={() => {
-          setLeaveOpen(false)
-          closeScreen()
-        }}
+        onCancel={stay}
+        onConfirm={leave}
       />
     </Screen>
   )

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AppState, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { HouseAd } from './HouseAd'
+import { androidOverlayModal, rippleInk } from '../lib/androidUi'
 import { useBondPlus } from '../hooks/useBondPlus'
 import {
   HOUSE_AD_CONTINUE,
@@ -70,6 +71,7 @@ export function DailyOpenAd() {
       animationType="fade"
       onRequestClose={() => setHouseVisible(false)}
       accessibilityViewIsModal
+      {...androidOverlayModal}
     >
       <View style={styles.backdrop}>
         <View
@@ -81,6 +83,7 @@ export function DailyOpenAd() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={HOUSE_AD_CONTINUE}
+            android_ripple={rippleInk}
             onPress={() => setHouseVisible(false)}
             style={(state) => [styles.secondary, state.pressed && styles.pressed]}
           >

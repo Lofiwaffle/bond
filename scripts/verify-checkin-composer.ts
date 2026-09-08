@@ -16,6 +16,8 @@ import {
   CONNECTION_QUESTION,
   CONNECTION_SCORES,
   connectionAccessibilityName,
+  DISCARD_STAY,
+  DISCARD_TITLE,
   EMPTY_CHECK_IN_FORM,
   formsEqual,
   isCheckInDirty,
@@ -156,5 +158,7 @@ assert(
 
 assert('no-words control stays quiet copy', NO_WORDS_TODAY === 'No words today')
 assert('reflection field is inline', REFLECTION_PLACEHOLDER.startsWith('A few words'))
+assert('discard asks to leave', DISCARD_TITLE.startsWith('Leave'))
+assert('discard keep-writing stays on screen', DISCARD_STAY.includes('Keep'))
 
 console.log('verify-checkin-composer: ok')

@@ -28,6 +28,7 @@ import {
   type BadgeProgress,
 } from '../lib/badges'
 import { localDateString } from '../lib/dates'
+import { androidTextPad, rippleBorderless, rippleInk, rippleOnFill } from '../lib/androidUi'
 import { FaceIcon, Icon, type IconName } from '../lib/icons'
 import { useAccessibleLayout } from '../lib/a11y'
 import { calendarCellSize } from '../lib/a11yLayout'
@@ -74,6 +75,7 @@ export function Screen({
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      enabled={Platform.OS === 'ios'}
       style={styles.flex}
     >
       {inner}
@@ -104,6 +106,9 @@ export const Field = forwardRef<TextInput, TextInputProps>(function Field(
       placeholderTextColor={colors.muted}
       autoCapitalize="none"
       autoCorrect={false}
+      underlineColorAndroid="transparent"
+      cursorColor={colors.accentFill}
+      selectionColor={colors.accentSoft}
       accessibilityLabel={props.accessibilityLabel ?? props.placeholder}
       {...props}
       onFocus={(event) => {
@@ -114,7 +119,12 @@ export const Field = forwardRef<TextInput, TextInputProps>(function Field(
         setFocused(false)
         props.onBlur?.(event)
       }}
-      style={[styles.input, focused && styles.inputFocus, props.style]}
+      style={[
+        styles.input,
+        androidTextPad,
+        focused && styles.inputFocus,
+        props.style,
+      ]}
     />
   )
 })
@@ -158,6 +168,7 @@ export function PrimaryButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: busy, busy: Boolean(loading) }}
+      android_ripple={rippleOnFill}
       onPress={() => {
         if (busy) return
         onPress()
@@ -192,6 +203,7 @@ export function TextLink({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      android_ripple={rippleInk}
       onPress={onPress}
       disabled={disabled}
       hitSlop={8}
@@ -231,6 +243,7 @@ export function IconButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      android_ripple={rippleBorderless}
       onPress={onPress}
       hitSlop={8}
       style={(state) => [
@@ -395,6 +408,7 @@ export function ScoreScale({
               accessibilityRole="button"
               accessibilityState={{ selected }}
               accessibilityLabel={SCORE_LABELS[score]}
+              android_ripple={rippleInk}
               onPress={() => onChange(score)}
               style={(state) => [
                 styles.scaleCell,
@@ -462,6 +476,7 @@ export function ActivityChips({
             accessibilityState={{ selected, disabled: blocked }}
             accessibilityLabel={activity.label}
             disabled={blocked}
+            android_ripple={selected ? rippleOnFill : rippleInk}
             onPress={() => toggle(activity.id)}
             style={(state) => [
               styles.chip,
@@ -793,6 +808,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
+    overflow: 'hidden',
   },
   buttonPressed: {
     backgroundColor: colors.accentPressed,
@@ -968,6 +984,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     backgroundColor: 'transparent',
+    overflow: 'hidden',
   },
   chipSelected: {
     backgroundColor: colors.accentFill,

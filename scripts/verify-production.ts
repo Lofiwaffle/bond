@@ -21,6 +21,31 @@ assert('android package is com.bondcouple.app', app.android.package === 'com.bon
 assert('ios bundle is com.bond.app', app.ios.bundleIdentifier === 'com.bond.app')
 assert('EAS project id is set', app.extra.eas.projectId.length > 8)
 assert('owner is set', app.owner === 'lofiwaffle')
+assert('root chrome is oat', app.backgroundColor === '#F3EBE3')
+assert('android recents color is berry', app.primaryColor === '#A33D5C')
+assert(
+  'status bar starts dark on oat',
+  app.plugins.some((plugin) => {
+    if (!Array.isArray(plugin) || plugin[0] !== 'expo-status-bar') return false
+    return plugin[1]?.style === 'dark'
+  }),
+)
+assert(
+  'splash is oat',
+  app.plugins.some((plugin) => {
+    if (!Array.isArray(plugin) || plugin[0] !== 'expo-splash-screen') return false
+    return plugin[1]?.backgroundColor === '#F3EBE3'
+  }),
+)
+assert('web theme is oat', app.web.themeColor === '#F3EBE3')
+assert(
+  'android keyboard resizes with the window',
+  app.android.softwareKeyboardLayoutMode === 'resize',
+)
+assert(
+  'predictive back stays off',
+  app.android.predictiveBackGestureEnabled === false,
+)
 assert('target SDK 36', app.plugins.some((plugin) => {
   if (!Array.isArray(plugin) || plugin[0] !== 'expo-build-properties') return false
   return plugin[1]?.android?.targetSdkVersion === 36

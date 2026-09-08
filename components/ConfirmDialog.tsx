@@ -1,5 +1,6 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
+import { androidOverlayModal, rippleInk, rippleOnFill } from '../lib/androidUi'
 import { colors, fonts, hit, radii, type } from '../lib/theme'
 
 export function ConfirmDialog({
@@ -30,6 +31,7 @@ export function ConfirmDialog({
       animationType="fade"
       onRequestClose={onCancel}
       accessibilityViewIsModal
+      {...androidOverlayModal}
     >
       <View style={styles.backdrop}>
         <Pressable
@@ -50,6 +52,7 @@ export function ConfirmDialog({
             accessibilityRole="button"
             accessibilityLabel={busy ? 'Working' : confirmLabel}
             accessibilityState={{ disabled: Boolean(busy), busy: Boolean(busy) }}
+            android_ripple={rippleOnFill}
             onPress={() => {
               if (busy) return
               onConfirm()
@@ -76,6 +79,7 @@ export function ConfirmDialog({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={cancelLabel}
+            android_ripple={rippleInk}
             onPress={onCancel}
             disabled={busy}
             style={(state) => [
@@ -105,6 +109,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     padding: 22,
     zIndex: 1,
+    ...Platform.select({
+      android: { elevation: 16 },
+      default: {},
+    }),
   },
   title: {
     ...type.heading,
@@ -125,6 +133,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   confirmDanger: {
     backgroundColor: colors.danger,

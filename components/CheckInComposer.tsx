@@ -14,6 +14,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { FaceIcon, Icon } from '../lib/icons'
 import {
+  androidOverlayModal,
+  androidTextPad,
+  rippleBorderless,
+  rippleInk,
+  rippleOnFill,
+} from '../lib/androidUi'
+import {
   ErrorText,
   Field,
   IconButton,
@@ -169,6 +176,8 @@ export function CheckInComposer({
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        nestedScrollEnabled
         showsVerticalScrollIndicator={false}
       >
         <View
@@ -209,6 +218,7 @@ export function CheckInComposer({
             accessibilityRole="button"
             accessibilityLabel={NO_WORDS_TODAY}
             accessibilityState={{ selected: form.noWords }}
+            android_ripple={rippleBorderless}
             onPress={() => onChange(applyNoWords(form, !form.noWords))}
             style={(state) => [
               styles.quietAction,
@@ -325,6 +335,7 @@ function ConnectionScale({
             accessibilityState={{ selected, checked: selected }}
             aria-checked={selected}
             accessibilityLabel={label}
+            android_ripple={rippleInk}
             onPress={() => onChange(score)}
             style={(state) => [
               styles.scaleCell,
@@ -357,6 +368,7 @@ function ConnectionScale({
             <Text
               style={[
                 styles.scaleLabel,
+                androidTextPad,
                 selected && styles.scaleLabelOn,
               ]}
               numberOfLines={2}
@@ -391,6 +403,7 @@ function ActivitySelect({
             accessibilityState={{ selected, checked: selected }}
             aria-checked={selected}
             accessibilityLabel={activity.label}
+            android_ripple={selected ? rippleOnFill : rippleInk}
             onPress={() => onToggle(activity.id)}
             style={(state) => [
               styles.chip,
@@ -445,6 +458,7 @@ function PrivacySheet({
       animationType="fade"
       onRequestClose={onClose}
       accessibilityViewIsModal
+      {...androidOverlayModal}
     >
       <View style={styles.sheetBackdrop}>
         <Pressable
@@ -624,6 +638,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: colors.surface,
+    overflow: 'hidden',
   },
   chipSelected: {
     backgroundColor: colors.accentFill,
@@ -659,6 +674,16 @@ const styles = StyleSheet.create({
     borderTopWidth: hairlineWidth,
     borderTopColor: colors.border,
     backgroundColor: colors.bg,
+    ...Platform.select({
+      android: { elevation: 8 },
+      ios: {
+        shadowColor: '#3A2430',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      default: {},
+    }),
   },
   saved: {
     flex: 1,
@@ -701,6 +726,10 @@ const styles = StyleSheet.create({
     padding: 22,
     borderWidth: hairlineWidth,
     borderColor: colors.border,
+    ...Platform.select({
+      android: { elevation: 16 },
+      default: {},
+    }),
   },
   sheetTitle: {
     ...type.heading,

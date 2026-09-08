@@ -143,7 +143,7 @@ export function CheckInComposer({
     Animated.timing(otherOpacity, {
       toValue: otherOn ? 1 : 0,
       duration: reduceMotion ? 0 : motion.fast,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start()
   }, [otherOn, otherOpacity, reduceMotion])
 
@@ -323,7 +323,8 @@ function ConnectionScale({
             key={score}
             testID={`connection-option-${score}`}
             accessibilityRole="radio"
-            accessibilityState={{ selected }}
+            accessibilityState={{ selected, checked: selected }}
+            aria-checked={selected}
             accessibilityLabel={label}
             onPress={() => onChange(score)}
             style={(state) => [
@@ -389,6 +390,7 @@ function ActivitySelect({
             testID={`activity-${activity.id}`}
             accessibilityRole="checkbox"
             accessibilityState={{ selected, checked: selected }}
+            aria-checked={selected}
             accessibilityLabel={activity.label}
             onPress={() => onToggle(activity.id)}
             style={(state) => [

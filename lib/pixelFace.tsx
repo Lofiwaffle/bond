@@ -1,4 +1,5 @@
 import Svg, { Rect } from 'react-native-svg'
+import { View } from 'react-native'
 
 import {
   PIXEL_FACE_MAPS,
@@ -31,29 +32,33 @@ export function PixelFace({
   const rows = PIXEL_FACE_MAPS[clamped]
 
   return (
-    <Svg
-      width={size}
-      height={size}
-      viewBox={`0 0 ${PIXEL_FACE_SIZE} ${PIXEL_FACE_SIZE}`}
+    <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
+      style={{ width: size, height: size }}
     >
-      {rows.flatMap((row, y) =>
-        row.split('').map((cell, x) => {
-          const fill = swatch[cell]
-          if (!fill) return null
-          return (
-            <Rect
-              key={`${x}-${y}`}
-              x={x}
-              y={y}
-              width={1}
-              height={1}
-              fill={fill}
-            />
-          )
-        }),
-      )}
-    </Svg>
+      <Svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${PIXEL_FACE_SIZE} ${PIXEL_FACE_SIZE}`}
+      >
+        {rows.flatMap((row, y) =>
+          row.split('').map((cell, x) => {
+            const fill = swatch[cell]
+            if (!fill) return null
+            return (
+              <Rect
+                key={`${x}-${y}`}
+                x={x}
+                y={y}
+                width={1}
+                height={1}
+                fill={fill}
+              />
+            )
+          }),
+        )}
+      </Svg>
+    </View>
   )
 }

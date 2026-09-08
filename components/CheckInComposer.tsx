@@ -12,7 +12,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { PixelFace } from './PixelFace'
+import { FaceIcon, Icon } from '../lib/icons'
 import {
   ErrorText,
   Field,
@@ -51,7 +51,6 @@ import {
   saveButtonLabel,
   type CheckInFormState,
 } from '../lib/checkInForm'
-import { Icon } from '../lib/icons'
 import {
   colors,
   connectionTones,
@@ -345,7 +344,7 @@ function ConnectionScale({
             ]}
           >
             <View style={styles.faceWrap}>
-              <PixelFace score={score} size={face} />
+              <FaceIcon score={score} size={face} />
               {selected ? (
                 <View
                   style={[styles.checkBadge, { backgroundColor: tone.stroke }]}

@@ -1,1 +1,1 @@
-export { PixelFace, pixelFaceIsValid, pixelFaceMaps } from '../lib/pixelFace'
+export { FaceIcon as PixelFace } from '../lib/icons'

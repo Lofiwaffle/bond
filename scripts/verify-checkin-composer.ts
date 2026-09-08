@@ -36,16 +36,12 @@ import {
   validateCheckIn,
   type CheckInFormState,
 } from '../lib/checkInForm'
-import { pixelFaceIsValid, pixelFaceMaps } from '../lib/pixelFaceMaps'
 import { DEVICE_ONLY_THOUGHTS, MUTUAL_REVEAL_BODY } from '../lib/privacy'
 import { SCORE_LABELS } from '../lib/theme'
 
 function assert(label: string, condition: boolean) {
   if (!condition) throw new Error(label)
 }
-
-assert('pixel maps are 16×16', pixelFaceIsValid())
-assert('five distinct faces', Object.keys(pixelFaceMaps()).length === 5)
 
 assert('title', CHECK_IN_TITLE === "Today's check-in")
 assert('duration', CHECK_IN_DURATION.includes('1 minute'))

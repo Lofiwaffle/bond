@@ -25,13 +25,14 @@ assert('feed ad at 0', shouldInsertFeedAd(0))
 assert('no feed ad at 1', shouldInsertFeedAd(1) === false)
 assert('feed ad at interval', shouldInsertFeedAd(FEED_AD_INTERVAL))
 assert('negative index skipped', shouldInsertFeedAd(-1) === false)
-assert('monthly is 4.99', PLUS_PRODUCTS[0].priceLabel === '$4.99')
-assert('annual is 48', PLUS_PRODUCTS[1].priceLabel === '$48')
+assert('monthly is 5.99', PLUS_PRODUCTS[0].priceLabel === '$5.99')
+assert('annual is 60', PLUS_PRODUCTS[1].priceLabel === '$60')
 assert(
-  'founding then 48',
-  PLUS_PRODUCTS[2].periodLabel.includes('$48'),
+  'founding then 60',
+  PLUS_PRODUCTS[2].periodLabel.includes('$60'),
 )
-assert('house copy names yearly price', HOUSE_AD_BODY.includes('$48'))
+assert('house copy names yearly price', HOUSE_AD_BODY.includes('$60'))
+assert('house copy names trial', HOUSE_AD_BODY.includes('7-day'))
 assert(
   'google sample id is detected',
   isGoogleTestAdId('ca-app-pub-3940256099942544/6300978111'),

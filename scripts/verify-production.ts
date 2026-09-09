@@ -54,7 +54,7 @@ assert('minify on', app.plugins.some((plugin) => {
   if (!Array.isArray(plugin) || plugin[0] !== 'expo-build-properties') return false
   return plugin[1]?.android?.enableMinifyInReleaseBuilds === true
 }))
-assert('paid checkout stays off', PLUS_PAID_CHECKOUT_READY === false)
+assert('paid checkout is on', PLUS_PAID_CHECKOUT_READY === true)
 assert('privacy is static html', PRIVACY_POLICY_URL.endsWith('/privacy-policy.html'))
 assert('support is static html', SUPPORT_URL.endsWith('/support.html'))
 assert(

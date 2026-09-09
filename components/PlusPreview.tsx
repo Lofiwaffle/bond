@@ -4,9 +4,9 @@ import { router, type Href } from 'expo-router'
 
 import { useBondPlus } from '../hooks/useBondPlus'
 import {
-  OFFER_AFTER_REVEALS,
   PLUS_FEATURES,
   PLUS_PAID_CHECKOUT_READY,
+  PLUS_TRIAL_COPY,
   PLUS_TRUST_LINE,
   type PlusFeature,
 } from '../lib/bondPlus'
@@ -24,41 +24,25 @@ export function PlusPreview({
   const copy = PLUS_FEATURES[feature]
 
   useEffect(() => {
-    if (!plus.isLoading && plus.offerEligible) {
+    if (!plus.isLoading && !plus.active) {
       void plus.markPreviewViewed()
     }
-  }, [plus.isLoading, plus.offerEligible, plus.markPreviewViewed])
+  }, [plus.isLoading, plus.active, plus.markPreviewViewed])
 
   if (plus.isLoading) return <LoadingScreen />
   if (plus.active || !PLUS_PAID_CHECKOUT_READY) return <>{children}</>
-
-  const remaining = Math.max(0, OFFER_AFTER_REVEALS - plus.mutualReveals)
-  const ready = remaining === 0
 
   return (
     <Screen>
       <Text style={styles.kicker}>Bond Plus</Text>
       <Text style={styles.title}>{copy.title}</Text>
       <Text style={styles.body}>{copy.body}</Text>
-      {ready ? (
-        <Text style={styles.trust}>{PLUS_TRUST_LINE}</Text>
-      ) : (
-        <Text style={styles.trust}>
-          Opens after {remaining} more day{remaining === 1 ? '' : 's'} you both
-          reveal. The daily check-in stays free.
-        </Text>
-      )}
-      {ready ? (
-        <PrimaryButton
-          label="See Bond Plus"
-          onPress={() => router.push('/(app)/plus' as Href)}
-        />
-      ) : (
-        <PrimaryButton
-          label="Back to Feed"
-          onPress={() => router.replace('/(app)/(tabs)')}
-        />
-      )}
+      <Text style={styles.trust}>{PLUS_TRIAL_COPY}</Text>
+      <Text style={styles.trust}>{PLUS_TRUST_LINE}</Text>
+      <PrimaryButton
+        label="See Bond Plus"
+        onPress={() => router.push('/(app)/plus' as Href)}
+      />
       <View style={styles.back}>
         <TextLink label="Not now" onPress={() => router.back()} />
       </View>
@@ -92,7 +76,7 @@ const styles = StyleSheet.create({
   trust: {
     ...type.body,
     color: colors.muted,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   back: {
     marginTop: 12,

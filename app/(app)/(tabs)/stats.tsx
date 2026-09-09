@@ -89,7 +89,7 @@ export default function GrowthScreen() {
       ) : (
         <GrowthObservations
           observations={[]}
-          lockedHint="After three days you both open, a first look appears here. Longer trends are Bond Plus."
+          lockedHint="After three days you both open, a first look appears here. Longer trends are Bond Plus — 7-day trial, then $5.99/month or $60/year."
         />
       )}
 
@@ -132,8 +132,8 @@ export default function GrowthScreen() {
               <View style={styles.copy}>
                 <Text style={styles.rowTitle}>Bond Plus</Text>
                 <Text style={styles.rowBody}>
-                  History, State of Us, and trends — without paying to see an
-                  answer already shared.
+                  $5.99/month or $60/year, with a 7-day free trial — never a
+                  charge to see an answer already shared.
                 </Text>
               </View>
               <Icon name="chevron-right" size={16} color={colors.muted} />

@@ -70,6 +70,6 @@ export function interstitialUnitId(os: string): string | null {
 
 export const HOUSE_AD_KICKER = 'Advertisement'
 export const HOUSE_AD_BODY =
-  'Bond Plus removes ads — $4.99/month or $48/year for both of you.'
+  'Bond Plus removes ads — $5.99/month or $60/year for both of you. 7-day free trial.'
 export const HOUSE_AD_CONTINUE = 'Continue'
 export const HOUSE_AD_PLUS = 'See Bond Plus'

@@ -4,7 +4,7 @@ Couple-level subscription. One purchase unlocks Plus for both partners. The rece
 
 You never pay to see an answer a partner already shared.
 
-Bond ships the first Play release **without** paid checkout (`PLUS_PAID_CHECKOUT_READY` is false) so Google Play Billing is not required yet. The 14-day trial can still run after three mutual reveals.
+Growth features (full history, State of Us, trends, prompt decks, goals, personalized reminders, no ads) require Bond Plus. Daily check-in, pairing, and the last seven days of history stay free.
 
 ## Products
 
@@ -12,11 +12,10 @@ Create these in App Store Connect and Play Console, then map them to the `bond_p
 
 | Product id | Price | Notes |
 | --- | --- | --- |
-| `bond_plus_monthly` | $4.99 / month | Auto-renew |
-| `bond_plus_annual` | $48 / year | Auto-renew |
-| `bond_plus_founding_annual` | $29.99 first year | Cap 250 couples, then $48 / year |
+| `bond_plus_monthly` | $5.99 / month | Auto-renew |
+| `bond_plus_annual` | $60 / year | Auto-renew |
 
-Trial: 14 days, only after **three mutual reveals**. Not offered earlier.
+Trial: **7-day limited free offer**, once per Bond, after the couple is paired. It does not wait for three mutual reveals.
 
 Grace: 16 days after a paid period ends. Plus stays on during grace.
 
@@ -38,9 +37,11 @@ Us → Purchases accepts a promo code. `43v3r` grants **lifetime** Bond Plus for
 
 ## Store checkout
 
-Paid checkout needs App Store / Play products plus a service-role webhook that calls `apply_plus_purchase`. Until those exist, the paywall still starts the 14-day trial.
+Paid checkout uses Google Play Billing or StoreKit. Create `bond_plus_monthly` and `bond_plus_annual` in the consoles, then ship a store build. Until those products exist, the paywall still starts the 7-day trial; choosing a paid plan explains that billing finishes in the Bond app.
 
 Native IAP belongs in a development or production build, not Expo Go. See [Expo in-app purchases](https://docs.expo.dev/guides/in-app-purchases/).
+
+Hosted SQL: paste `supabase/catchup_plus_pricing.sql` (or apply `supabase/migrations/20260909120000_plus_pricing.sql`) so the trial lasts 7 days and opens after pairing.
 
 ## Ads (free plan)
 
@@ -53,11 +54,11 @@ Bond Plus, trial, and grace skip ads. Ads are not shown on login, onboarding, ch
 
 Native builds use `react-native-google-mobile-ads` with Google’s published **test** app IDs until you replace them with your AdMob app IDs in `app.json` and unit IDs via `EXPO_PUBLIC_ADMOB_BANNER_ID` / `EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID`. Do not invent a publisher id. Expo Go and web fall back to a labeled house unit that opens Bond Plus.
 
-Play listing: Ads **Yes**. Advertising ID is used for ads. Privacy policy must stay in sync.
+Play listing: Ads **Yes**. Advertising ID is used for ads. Privacy policy must stay in sync. Declare in-app subscriptions at $5.99/month and $60/year with a 7-day free trial.
 
 ## Funnel
 
-`invite_sent` → `partner_paired` → `first_mutual_reveal` → `third_mutual_reveal` → `plus_preview_viewed` → `trial_started` → `subscription_purchased` → `four_week_retained` → `renewal` / `cancellation`
+`invite_sent` → `partner_paired` → `trial_started` → `plus_preview_viewed` → `subscription_purchased` → `four_week_retained` → `renewal` / `cancellation`
 
 ## Apply the migration
 
@@ -66,4 +67,4 @@ Play listing: Ads **Yes**. Advertising ID is used for ads. Privacy policy must s
 supabase db push
 ```
 
-File: `supabase/migrations/20260827120000_bond_plus.sql`
+Files: `supabase/migrations/20260909120000_plus_pricing.sql` or `supabase/catchup_plus_pricing.sql`

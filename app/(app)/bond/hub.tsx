@@ -109,8 +109,8 @@ export default function GrowthHubScreen() {
               <View style={styles.copy}>
                 <Text style={styles.rowTitle}>Bond Plus</Text>
                 <Text style={styles.rowBody}>
-                  History, State of Us, and trends — without paying to see an
-                  answer already shared.
+                  $5.99/month or $60/year, with a 7-day free trial — never a
+                  charge to see an answer already shared.
                 </Text>
               </View>
               <Icon name="chevron-right" size={16} color={colors.muted} />

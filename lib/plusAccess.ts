@@ -71,13 +71,12 @@ export function offerEligible({
 }
 
 export function trialEligible({
-  mutualReveals,
   active,
   hasTrialed,
 }: {
-  mutualReveals: number
+  mutualReveals?: number
   active: boolean
   hasTrialed: boolean
 }): boolean {
-  return !active && !hasTrialed && mutualReveals >= OFFER_AFTER_REVEALS
+  return !active && !hasTrialed
 }

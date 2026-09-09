@@ -7,8 +7,11 @@ import {
   FREE_HISTORY_DAYS,
   LIFETIME_PROMO_CODE,
   OFFER_AFTER_REVEALS,
+  PLUS_PAID_CHECKOUT_READY,
+  PLUS_PAID_PLANS,
   PLUS_PRODUCTS,
   TRIAL_DAYS,
+  annualSavingsLabel,
   normalizePromoCode,
 } from '../lib/bondPlus'
 import { firstInsight } from '../lib/firstInsight'
@@ -25,7 +28,7 @@ function assert(label: string, condition: boolean) {
 }
 
 assert('founding cap', FOUNDING_COUPLE_CAP === 250)
-assert('trial days', TRIAL_DAYS === 14)
+assert('trial days', TRIAL_DAYS === 7)
 assert('history window', FREE_HISTORY_DAYS === 7)
 assert('three products', PLUS_PRODUCTS.length === 3)
 assert(
@@ -33,9 +36,12 @@ assert(
   PLUS_PRODUCTS.map((p) => p.id).join(',') ===
     'bond_plus_monthly,bond_plus_annual,bond_plus_founding_annual',
 )
-assert('monthly price', PLUS_PRODUCTS[0].priceLabel === '$4.99')
-assert('annual price', PLUS_PRODUCTS[1].priceLabel === '$48')
-assert('founding then 48', PLUS_PRODUCTS[2].periodLabel.includes('$48'))
+assert('monthly price', PLUS_PRODUCTS[0].priceLabel === '$5.99')
+assert('annual price', PLUS_PRODUCTS[1].priceLabel === '$60')
+assert('founding then 60', PLUS_PRODUCTS[2].periodLabel.includes('$60'))
+assert('paid checkout is on', PLUS_PAID_CHECKOUT_READY)
+assert('paywall shows two plans', PLUS_PAID_PLANS.length === 2)
+assert('yearly saves vs monthly', annualSavingsLabel().includes('$12'))
 assert(
   'promo code',
   normalizePromoCode(' 43V3R ') === LIFETIME_PROMO_CODE,
@@ -122,8 +128,12 @@ assert(
   !offerEligible({ mutualReveals: 5, active: true, snoozedUntil: null }),
 )
 assert(
-  'trial needs three reveals and no prior trial',
-  trialEligible({ mutualReveals: 3, active: false, hasTrialed: false }),
+  'trial needs no prior trial',
+  trialEligible({ active: false, hasTrialed: false }),
+)
+assert(
+  'trial does not wait for three reveals',
+  trialEligible({ mutualReveals: 0, active: false, hasTrialed: false }),
 )
 assert(
   'no second trial',

@@ -3,11 +3,13 @@
 export const BOND_PLUS_ENTITLEMENT = 'bond_plus' as const
 
 export const FOUNDING_COUPLE_CAP = 250
-export const TRIAL_DAYS = 14
+export const TRIAL_DAYS = 7
 export const GRACE_DAYS = 16
 export const FREE_HISTORY_DAYS = 7
 export const OFFER_AFTER_REVEALS = 3
 export const OFFER_SNOOZE_DAYS = 14
+export const PLUS_MONTHLY_USD = 5.99
+export const PLUS_ANNUAL_USD = 60
 
 export type PlusPlan = 'trial' | 'monthly' | 'annual' | 'founding_annual' | 'lifetime'
 
@@ -31,7 +33,7 @@ export const PLUS_PRODUCTS: PlusProduct[] = [
     id: 'bond_plus_monthly',
     plan: 'monthly',
     title: 'Monthly',
-    priceLabel: '$4.99',
+    priceLabel: '$5.99',
     periodLabel: 'per couple / month',
     appleProductId: 'bond_plus_monthly',
     googleProductId: 'bond_plus_monthly',
@@ -40,7 +42,7 @@ export const PLUS_PRODUCTS: PlusProduct[] = [
     id: 'bond_plus_annual',
     plan: 'annual',
     title: 'Yearly',
-    priceLabel: '$48',
+    priceLabel: '$60',
     periodLabel: 'per couple / year',
     appleProductId: 'bond_plus_annual',
     googleProductId: 'bond_plus_annual',
@@ -50,7 +52,7 @@ export const PLUS_PRODUCTS: PlusProduct[] = [
     plan: 'founding_annual',
     title: 'Founding Couple',
     priceLabel: '$29.99',
-    periodLabel: 'first year, then $48 / year',
+    periodLabel: 'first year, then $60 / year',
     appleProductId: 'bond_plus_founding_annual',
     googleProductId: 'bond_plus_founding_annual',
   },
@@ -65,6 +67,16 @@ export function productById(id: PlusProductId): PlusProduct {
 export function productByPlan(plan: PlusPlan): PlusProduct | null {
   if (plan === 'trial') return null
   return PLUS_PRODUCTS.find((item) => item.plan === plan) ?? null
+}
+
+/** Plans shown on the paywall. Founding remains in the catalog for existing Bonds. */
+export const PLUS_PAID_PLANS: PlusProduct[] = PLUS_PRODUCTS.filter(
+  (item) => item.id !== 'bond_plus_founding_annual',
+)
+
+export function annualSavingsLabel(): string {
+  const vsMonthly = Math.round(PLUS_MONTHLY_USD * 12 - PLUS_ANNUAL_USD)
+  return `Save about $${vsMonthly} a year vs monthly`
 }
 
 export type PlusFeature =
@@ -134,13 +146,22 @@ export const PLUS_NAME = 'Bond Plus'
 
 export const PLUS_SUBTITLE = 'Deeper growth for the two of you.'
 
-export const PLUS_TRIAL_COPY = `14-day trial, offered after three days you both open.`
+export const PLUS_TRIAL_COPY =
+  'Limited free offer: 7 days of growth features for both of you. Then $5.99/month or $60/year. One trial per Bond.'
 
-/** Paid StoreKit / Play Billing. Keep false until those products exist. */
-export const PLUS_PAID_CHECKOUT_READY = false
+export const PLUS_TRIAL_BUTTON = 'Start 7-day free trial'
+
+/** Growth features stay locked unless Plus, trial, or grace is on. */
+export const PLUS_PAID_CHECKOUT_READY = true
 
 export const PLUS_CHECKOUT_PENDING =
-  'Paid Bond Plus plans bill through Google Play or the App Store. They are not for sale until that billing is live. The 14-day trial is free and does not charge you.'
+  'Paid Bond Plus is $5.99/month or $60/year for both of you, billed through Google Play or the App Store.'
+
+export const PLUS_WEB_CHECKOUT =
+  'Paid plans bill in the Bond app on Google Play or the App Store. The 7-day trial works here and does not charge you.'
+
+export const PLUS_NATIVE_CHECKOUT =
+  'Create Bond Plus subscriptions in Play Console and App Store Connect as bond_plus_monthly ($5.99) and bond_plus_annual ($60), then a store build can finish checkout. The 7-day trial is available now and does not charge you.'
 
 
 export const PLUS_COUPLE_BILLING =

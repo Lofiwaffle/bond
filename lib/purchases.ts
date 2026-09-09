@@ -1,10 +1,17 @@
 import { Platform } from 'react-native'
 
-import { PLUS_PAID_CHECKOUT_READY, productById, type PlusProductId } from './bondPlus'
+import {
+  PLUS_NATIVE_CHECKOUT,
+  PLUS_PAID_CHECKOUT_READY,
+  PLUS_WEB_CHECKOUT,
+  productById,
+  type PlusProductId,
+} from './bondPlus'
 
 /**
- * Store checkout. Product IDs match App Store Connect / Play Billing.
- * Native IAP is off until PLUS_PAID_CHECKOUT_READY is true.
+ * Store checkout. Product IDs match App Store Connect / Play Billing:
+ * bond_plus_monthly ($5.99) and bond_plus_annual ($60).
+ * Native IAP completes after those products exist in a store build.
  */
 export async function purchaseBondPlus(
   productId: PlusProductId,
@@ -12,18 +19,11 @@ export async function purchaseBondPlus(
   productById(productId)
   if (!PLUS_PAID_CHECKOUT_READY) {
     return {
-      error:
-        'Paid Bond Plus plans are not for sale in this release. The 14-day trial is free.',
+      error: 'Paid Bond Plus plans are not for sale in this release.',
     }
   }
   if (Platform.OS === 'web') {
-    return {
-      error:
-        'Paid Bond Plus plans bill through the App Store or Play Store. You can start the 14-day trial here.',
-    }
+    return { error: PLUS_WEB_CHECKOUT }
   }
-  return {
-    error:
-      'Paid plans unlock when Bond Plus is listed on the App Store and Play Store. Start the 14-day trial meanwhile — one purchase will cover both of you.',
-  }
+  return { error: PLUS_NATIVE_CHECKOUT }
 }

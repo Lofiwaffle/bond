@@ -335,7 +335,7 @@ export default function UsScreen() {
                 ? plus.status === 'trialing'
                   ? 'Trial is on for both of you.'
                   : 'Bond Plus is on for both of you.'
-                : `Deeper growth after three opened days. ${PLUS_PROMO_HINT} You never pay to see an answer already shared.`}
+                : `Growth features: $5.99/month or $60/year, with a 7-day limited free trial. ${PLUS_PROMO_HINT} You never pay to see an answer already shared.`}
           </Text>
           {plus.plan === 'lifetime' ? null : (
             <>

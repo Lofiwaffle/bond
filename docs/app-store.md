@@ -110,10 +110,9 @@ Review notes to paste: Bond is a private ritual for two people who already know 
 
 Auto-renewing, per couple. One purchase unlocks both partners.
 
-- Bond Plus Monthly: $4.99
-- Bond Plus Yearly: $48
-- Founding Couple (first 250): $29.99 for the first year, then $48 / year
-- 14-day trial after three mutual reveals
+- Bond Plus Monthly: $5.99
+- Bond Plus Yearly: $60
+- 7-day limited free trial after pairing (once per Bond)
 - Privacy: https://lofiwaffle.github.io/bond/privacy-policy.html
 - EULA: Apple Standard EULA
 - Product ids and unpair rules: [docs/bond-plus.md](bond-plus.md)

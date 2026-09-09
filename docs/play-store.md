@@ -1,6 +1,6 @@
 # First Play Store release
 
-Bond ships as a **free** Android app, version **1.0.1**. Paid Bond Plus is not sold in this build (`PLUS_PAID_CHECKOUT_READY` is false) so Google Play Billing policy is not triggered.
+Bond ships as a **free** Android app, version **1.0.1**. Bond Plus is optional: **$5.99/month** or **$60/year**, with a **7-day limited free trial** after pairing. Paid checkout uses Google Play Billing product ids `bond_plus_monthly` and `bond_plus_annual`. Create those subscriptions in Play Console before the next production AAB.
 
 Production never requests Google’s sample AdMob units. Until you set real `EXPO_PUBLIC_ADMOB_*` EAS secrets (app id + banner + interstitial), the free plan shows the in-app Bond Plus house unit instead of “Test Ad”. Do not invent a publisher id.
 
@@ -102,7 +102,7 @@ Bond is a private space for two people to check in every day.
 • Optional shared words and one small next step stay between you
 • After enough opened days, Growth can notice patterns in the labels you both saved — not a verdict
 
-Bond is for two people who already know each other. There is no public feed. The free plan shows ads; Bond Plus removes them. It is not therapy or emergency support. For adults 18+.
+Bond is for two people who already know each other. There is no public feed. The free plan shows ads. Bond Plus ($5.99/month or $60/year, 7-day free trial) removes ads and unlocks growth features. It is not therapy or emergency support. For adults 18+.
 
 You can export your data or delete your account in Us. Help and a report path are on the support page.
 
@@ -144,13 +144,13 @@ Crash logs stay on device. We do not run analytics.
 
 ## 7. Review notes (closed test / production)
 
-Bond is a private daily check-in for two people who already know each other. There is no public feed. The free plan shows ads; Bond Plus removes them. Demo: create two accounts, pair with the invite code, check in on the same calendar day to see reveal. Account deletion is Us → Delete account. Notifications are optional.
+Bond is a private daily check-in for two people who already know each other. There is no public feed. The free plan shows ads; Bond Plus ($5.99/month or $60/year, 7-day trial) removes them and unlocks growth. Demo: create two accounts, pair with the invite code, check in on the same calendar day to see reveal. Account deletion is Us → Delete account. Notifications are optional.
 
 ## 8. After closed testing
 
 Apply for production access, then promote a release to Production when Google enables it. Turn on Play App Signing if the Console asks (EAS upload key is the correct upload key).
 
-Bond Plus paid plans stay off until Play subscriptions and `PLUS_PAID_CHECKOUT_READY` are set. Do not add prices to the listing until then.
+Create Play subscriptions `bond_plus_monthly` ($5.99) and `bond_plus_annual` ($60) with a 7-day free trial before charging. Bond Plus paid checkout is on (`PLUS_PAID_CHECKOUT_READY`). Add those prices to the listing.
 
 ## What this repo cannot do for you
 

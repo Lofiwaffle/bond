@@ -2948,7 +2948,7 @@ begin
     'offer_snoozed_until', row.offer_snoozed_until,
     'mutual_reveals', reveals,
     'founding_slots_remaining', public.founding_slots_remaining(),
-    'trial_eligible', (not active) and (not has_trialed) and reveals >= 3,
+    'trial_eligible', (not active) and (not has_trialed) and members >= 2,
     'offer_eligible',
       (not active)
       and reveals >= 3
@@ -2972,7 +2972,6 @@ declare
   uid uuid := auth.uid();
   cid uuid;
   row public.couple_entitlements;
-  reveals int;
   partner_count int;
 begin
   if uid is null then
@@ -2991,11 +2990,6 @@ begin
     raise exception 'Pair first';
   end if;
 
-  reveals := public.mutual_reveal_count(cid);
-  if reveals < 3 then
-    raise exception 'Trial opens after three days you both reveal';
-  end if;
-
   row := private.refresh_couple_entitlement(cid);
   if row.status in ('trialing', 'active', 'grace') then
     raise exception 'Bond Plus is already on';
@@ -3009,7 +3003,7 @@ begin
         plan = 'trial',
         purchaser_id = uid,
         trial_started_at = now(),
-        trial_ends_at = now() + interval '14 days',
+        trial_ends_at = now() + interval '7 days',
         offer_shown_at = coalesce(offer_shown_at, now()),
         updated_at = now()
     where couple_id = cid

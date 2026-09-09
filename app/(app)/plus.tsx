@@ -20,11 +20,13 @@ import {
   PLUS_LIFETIME_COPY,
   PLUS_NAME,
   PLUS_PAID_CHECKOUT_READY,
-  PLUS_PRODUCTS,
+  PLUS_PAID_PLANS,
   PLUS_SUBTITLE,
+  PLUS_TRIAL_BUTTON,
   PLUS_TRIAL_COPY,
   PLUS_TRUST_LINE,
   PLUS_UNPAIR_COPY,
+  annualSavingsLabel,
   type PlusProductId,
 } from '../../lib/bondPlus'
 import { PRIVACY_POLICY_URL } from '../../lib/appUrls'
@@ -43,11 +45,9 @@ export default function BondPlusScreen() {
 
   if (plus.isLoading) return <LoadingScreen />
 
-  const founding = PLUS_PRODUCTS.find((p) => p.id === 'bond_plus_founding_annual')
-  const monthly = PLUS_PRODUCTS.find((p) => p.id === 'bond_plus_monthly')
-  const annual = PLUS_PRODUCTS.find((p) => p.id === 'bond_plus_annual')
-  const showFounding =
-    Boolean(founding) && plus.foundingSlotsRemaining > 0 && !plus.active
+  const monthly = PLUS_PAID_PLANS.find((p) => p.id === 'bond_plus_monthly')
+  const annual = PLUS_PAID_PLANS.find((p) => p.id === 'bond_plus_annual')
+  const savings = annualSavingsLabel()
 
   const onTrial = async () => {
     if (busy) return
@@ -106,47 +106,35 @@ export default function BondPlusScreen() {
 
         {plus.plan === 'lifetime' ? null : plus.trialEligible ? (
           <PrimaryButton
-            label={busy === 'trial' ? 'Starting…' : 'Start 14-day trial'}
+            label={busy === 'trial' ? 'Starting…' : PLUS_TRIAL_BUTTON}
             onPress={() => void onTrial()}
             loading={busy === 'trial'}
             disabled={Boolean(busy)}
           />
-        ) : plus.mutualReveals < 3 ? (
+        ) : plus.hasTrialed && !plus.active ? (
           <Text style={styles.hint}>
-            The trial opens after three days you both reveal. You have{' '}
-            {plus.mutualReveals}.
+            Your limited free offer has ended. Choose a plan to keep growth
+            features.
           </Text>
-        ) : null}
+        ) : plus.active ? null : (
+          <Text style={styles.hint}>
+            Pair with your person first. The 7-day offer is for a Bond of two.
+          </Text>
+        )}
 
-        {PLUS_PAID_CHECKOUT_READY ? (
+        {plus.plan === 'lifetime' ||
+        (plus.active && plus.status !== 'trialing') ? null : PLUS_PAID_CHECKOUT_READY ? (
           <>
-            {showFounding && founding ? (
-              <View style={styles.plan}>
-                <Text style={styles.planTitle}>{founding.title}</Text>
-                <Text style={styles.planPrice}>
-                  {founding.priceLabel} · {founding.periodLabel}
-                </Text>
-                <Text style={styles.hint}>
-                  {plus.foundingSlotsRemaining} of 250 Founding Couple spots left.
-                </Text>
-                <TextLink
-                  label={
-                    busy === founding.id ? 'Opening…' : 'Choose Founding Couple'
-                  }
-                  onPress={() => void onBuy(founding.id)}
-                  disabled={Boolean(busy)}
-                />
-              </View>
-            ) : null}
-
             {annual ? (
               <View style={styles.plan}>
+                <Text style={styles.planKicker}>Best value</Text>
                 <Text style={styles.planTitle}>{annual.title}</Text>
                 <Text style={styles.planPrice}>
                   {annual.priceLabel} · {annual.periodLabel}
                 </Text>
+                <Text style={styles.hint}>{savings}</Text>
                 <TextLink
-                  label={busy === annual.id ? 'Opening…' : 'Choose yearly'}
+                  label={busy === annual.id ? 'Opening…' : 'Choose yearly · $60'}
                   onPress={() => void onBuy(annual.id)}
                   disabled={Boolean(busy)}
                 />
@@ -160,7 +148,9 @@ export default function BondPlusScreen() {
                   {monthly.priceLabel} · {monthly.periodLabel}
                 </Text>
                 <TextLink
-                  label={busy === monthly.id ? 'Opening…' : 'Choose monthly'}
+                  label={
+                    busy === monthly.id ? 'Opening…' : 'Choose monthly · $5.99'
+                  }
                   onPress={() => void onBuy(monthly.id)}
                   disabled={Boolean(busy)}
                 />
@@ -173,7 +163,7 @@ export default function BondPlusScreen() {
               disabled={Boolean(busy)}
             />
           </>
-        ) : plus.plan === 'lifetime' ? null : (
+        ) : (
           <Text style={styles.hint}>{PLUS_CHECKOUT_PENDING}</Text>
         )}
         <ErrorText message={error ?? plus.error} />
@@ -251,6 +241,11 @@ const styles = StyleSheet.create({
   planTitle: {
     ...type.body,
     fontWeight: '500',
+  },
+  planKicker: {
+    ...type.label,
+    color: colors.accentFill,
+    marginBottom: 0,
   },
   planPrice: {
     ...type.label,

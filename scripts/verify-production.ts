@@ -55,6 +55,18 @@ assert('minify on', app.plugins.some((plugin) => {
   return plugin[1]?.android?.enableMinifyInReleaseBuilds === true
 }))
 assert('paid checkout is on', PLUS_PAID_CHECKOUT_READY === true)
+assert(
+  'expo-iap plugin is on',
+  app.plugins.includes('expo-iap'),
+)
+assert(
+  'minify keeps play billing',
+  app.plugins.some((plugin) => {
+    if (!Array.isArray(plugin) || plugin[0] !== 'expo-build-properties') return false
+    const rules = String(plugin[1]?.android?.extraProguardRules ?? '')
+    return rules.includes('billingclient') && rules.includes('play_billing')
+  }),
+)
 assert('privacy is static html', PRIVACY_POLICY_URL.endsWith('/privacy-policy.html'))
 assert('support is static html', SUPPORT_URL.endsWith('/support.html'))
 assert(

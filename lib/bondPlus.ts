@@ -74,6 +74,45 @@ export const PLUS_PAID_PLANS: PlusProduct[] = PLUS_PRODUCTS.filter(
   (item) => item.id !== 'bond_plus_founding_annual',
 )
 
+/** Play Billing and App Store Connect product ids for paid checkout. */
+export const PLUS_STORE_SKUS = PLUS_PAID_PLANS.map((item) => item.id)
+
+export function isPaidStoreSku(id: string): id is Exclude<
+  PlusProductId,
+  'bond_plus_founding_annual'
+> {
+  return PLUS_STORE_SKUS.includes(id as PlusProductId)
+}
+
+export type PlusStoreName = 'apple' | 'google'
+
+export type CheckoutResult = {
+  error: string | null
+  completed: boolean
+}
+
+export function storeNameForPlatform(
+  os: 'ios' | 'android' | 'web' | string,
+): PlusStoreName | null {
+  if (os === 'ios') return 'apple'
+  if (os === 'android') return 'google'
+  return null
+}
+
+/** Paid period end when the store receipt has no expiry yet. */
+export function storePeriodEnd(
+  productId: PlusProductId,
+  now = new Date(),
+): Date {
+  const end = new Date(now.getTime())
+  if (productId === 'bond_plus_annual' || productId === 'bond_plus_founding_annual') {
+    end.setFullYear(end.getFullYear() + 1)
+  } else {
+    end.setMonth(end.getMonth() + 1)
+  }
+  return end
+}
+
 export function annualSavingsLabel(): string {
   const vsMonthly = Math.round(PLUS_MONTHLY_USD * 12 - PLUS_ANNUAL_USD)
   return `Save about $${vsMonthly} a year vs monthly`
@@ -160,8 +199,14 @@ export const PLUS_CHECKOUT_PENDING =
 export const PLUS_WEB_CHECKOUT =
   'Paid plans bill in the Bond app on Google Play or the App Store. The 7-day trial works here and does not charge you.'
 
+export const PLUS_EXPO_GO_CHECKOUT =
+  'Paid plans open Google Play or App Store billing in a development or store build of Bond. Expo Go cannot charge. The 7-day trial works here.'
+
 export const PLUS_NATIVE_CHECKOUT =
-  'Create Bond Plus subscriptions in Play Console and App Store Connect as bond_plus_monthly ($5.99) and bond_plus_annual ($60), then a store build can finish checkout. The 7-day trial is available now and does not charge you.'
+  'Google Play or the App Store does not have Bond Plus on this device yet. Create bond_plus_monthly ($5.99) and bond_plus_annual ($60) in Play Console and App Store Connect, then install this store build. The 7-day trial does not charge you.'
+
+export const PLUS_FOUNDING_UNAVAILABLE =
+  'Founding Couple is no longer for sale. Choose monthly or yearly Bond Plus.'
 
 
 export const PLUS_COUPLE_BILLING =

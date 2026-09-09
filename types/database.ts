@@ -727,6 +727,16 @@ export type Database = {
         Args: { code: string }
         Returns: Json
       }
+      claim_plus_store_purchase: {
+        Args: {
+          p_product_id: string
+          p_store: string
+          p_original_transaction_id: string
+          p_latest_transaction_id?: string
+          p_expires_at?: string
+        }
+        Returns: Json
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>

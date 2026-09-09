@@ -1,6 +1,6 @@
 # First Play Store release
 
-Bond ships as a **free** Android app, version **1.0.1**. Bond Plus is optional: **$5.99/month** or **$60/year**, with a **7-day limited free trial** after pairing. Paid checkout uses Google Play Billing product ids `bond_plus_monthly` and `bond_plus_annual`. Create those subscriptions in Play Console before the next production AAB.
+Bond ships as a **free** Android app, version **1.0.1**. Bond Plus is optional: **$5.99/month** or **$60/year**, with a **7-day limited free trial** after pairing. Paid checkout uses Google Play Billing product ids `bond_plus_monthly` and `bond_plus_annual`. Create those subscriptions in Play Console ([docs/store-products.md](store-products.md)), then ship a production AAB that includes `expo-iap`.
 
 Production never requests Google’s sample AdMob units. Until you set real `EXPO_PUBLIC_ADMOB_*` EAS secrets (app id + banner + interstitial), the free plan shows the in-app Bond Plus house unit instead of “Test Ad”. Do not invent a publisher id.
 
@@ -150,7 +150,7 @@ Bond is a private daily check-in for two people who already know each other. The
 
 Apply for production access, then promote a release to Production when Google enables it. Turn on Play App Signing if the Console asks (EAS upload key is the correct upload key).
 
-Create Play subscriptions `bond_plus_monthly` ($5.99) and `bond_plus_annual` ($60) with a 7-day free trial before charging. Bond Plus paid checkout is on (`PLUS_PAID_CHECKOUT_READY`). Add those prices to the listing.
+Create Play subscriptions `bond_plus_monthly` ($5.99) and `bond_plus_annual` ($60) as in [store-products.md](store-products.md). Bond Plus paid checkout is on (`PLUS_PAID_CHECKOUT_READY`). Add those prices to the listing.
 
 ## What this repo cannot do for you
 

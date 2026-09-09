@@ -10,9 +10,13 @@ import {
   PLUS_PAID_CHECKOUT_READY,
   PLUS_PAID_PLANS,
   PLUS_PRODUCTS,
+  PLUS_STORE_SKUS,
   TRIAL_DAYS,
   annualSavingsLabel,
+  isPaidStoreSku,
   normalizePromoCode,
+  storeNameForPlatform,
+  storePeriodEnd,
 } from '../lib/bondPlus'
 import { firstInsight } from '../lib/firstInsight'
 import {
@@ -41,6 +45,24 @@ assert('annual price', PLUS_PRODUCTS[1].priceLabel === '$60')
 assert('founding then 60', PLUS_PRODUCTS[2].periodLabel.includes('$60'))
 assert('paid checkout is on', PLUS_PAID_CHECKOUT_READY)
 assert('paywall shows two plans', PLUS_PAID_PLANS.length === 2)
+assert(
+  'store skus',
+  PLUS_STORE_SKUS.join(',') === 'bond_plus_monthly,bond_plus_annual',
+)
+assert('monthly is a store sku', isPaidStoreSku('bond_plus_monthly'))
+assert('founding is not a store sku', !isPaidStoreSku('bond_plus_founding_annual'))
+assert('android store is google', storeNameForPlatform('android') === 'google')
+assert('ios store is apple', storeNameForPlatform('ios') === 'apple')
+assert(
+  'monthly period is about a month',
+  storePeriodEnd('bond_plus_monthly', new Date('2026-01-15T00:00:00.000Z')).getTime() >=
+    new Date('2026-02-14T00:00:00.000Z').getTime(),
+)
+assert(
+  'annual period is about a year',
+  storePeriodEnd('bond_plus_annual', new Date('2026-01-15T00:00:00.000Z')).getFullYear() ===
+    2027,
+)
 assert('yearly saves vs monthly', annualSavingsLabel().includes('$12'))
 assert(
   'promo code',

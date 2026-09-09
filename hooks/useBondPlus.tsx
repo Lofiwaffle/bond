@@ -17,7 +17,7 @@ import {
 } from '../lib/bondPlus'
 import { reportError } from '../lib/monitor'
 import { isPlusActive, type PlusLifecycle } from '../lib/plusAccess'
-import { purchaseBondPlus } from '../lib/purchases'
+import { purchaseBondPlus, restoreBondPlus } from '../lib/purchases'
 import { supabase } from '../lib/supabase'
 
 export type PlusStatus = {
@@ -65,7 +65,7 @@ type PlusContextValue = PlusStatus & {
   snoozeOffer: () => Promise<void>
   markPreviewViewed: () => Promise<void>
   trackFunnel: (event: Extract<PlusFunnelEvent, 'invite_sent'>) => Promise<void>
-  purchase: (productId: PlusProductId) => Promise<{ error: string | null }>
+  purchase: (productId: PlusProductId) => Promise<{ error: string | null; completed: boolean }>
   redeemPromo: (code: string) => Promise<{ error: string | null }>
 }
 
@@ -191,10 +191,13 @@ export function BondPlusProvider({ children }: { children: ReactNode }) {
   }, [refresh])
 
   const restore = useCallback(async () => {
-    const { error: restoreError } = await supabase.rpc('restore_plus')
-    const message = await rpcError('plus-restore', restoreError)
-    if (!message) await refresh()
-    return { error: message }
+    const result = await restoreBondPlus()
+    if (result.error) {
+      reportError('supabase', result.error, { op: 'plus-restore' })
+      return result
+    }
+    await refresh()
+    return { error: null }
   }, [refresh])
 
   const snoozeOffer = useCallback(async () => {
@@ -229,7 +232,7 @@ export function BondPlusProvider({ children }: { children: ReactNode }) {
   const purchase = useCallback(
     async (productId: PlusProductId) => {
       const result = await purchaseBondPlus(productId)
-      if (!result.error) await refresh()
+      if (result.completed) await refresh()
       return result
     },
     [refresh],

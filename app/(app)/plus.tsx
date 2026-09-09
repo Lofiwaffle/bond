@@ -68,7 +68,11 @@ export default function BondPlusScreen() {
     setBusy(id)
     const result = await plus.purchase(id)
     setBusy(null)
-    if (result.error) setError(result.error)
+    if (result.error) {
+      setError(result.error)
+      return
+    }
+    if (result.completed) router.back()
   }
 
   const onRestore = async () => {

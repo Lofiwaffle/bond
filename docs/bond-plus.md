@@ -37,11 +37,13 @@ Us → Purchases accepts a promo code. `43v3r` grants **lifetime** Bond Plus for
 
 ## Store checkout
 
-Paid checkout uses Google Play Billing or StoreKit. Create `bond_plus_monthly` and `bond_plus_annual` in the consoles, then ship a store build. Until those products exist, the paywall still starts the 7-day trial; choosing a paid plan explains that billing finishes in the Bond app.
+Paid checkout uses Google Play Billing or StoreKit (`expo-iap`) with product ids `bond_plus_monthly` and `bond_plus_annual`. Create those subscriptions in the consoles, then ship a store build. Exact click-path: [store-products.md](store-products.md).
 
-Native IAP belongs in a development or production build, not Expo Go. See [Expo in-app purchases](https://docs.expo.dev/guides/in-app-purchases/).
+Native IAP belongs in a development or production build, not Expo Go. Web still explains that paid plans bill in the Bond app; the 7-day trial works on web.
 
-Hosted SQL: paste `supabase/catchup_plus_pricing.sql` (or apply `supabase/migrations/20260909120000_plus_pricing.sql`) so the trial lasts 7 days and opens after pairing.
+If `fetchProducts` cannot see the SKUs yet, the paywall explains that the store does not have Bond Plus on this device. After a successful store purchase, `claim_plus_store_purchase` grants Plus to the couple.
+
+Hosted SQL: paste `supabase/catchup_plus_pricing.sql` and `supabase/catchup_plus_store.sql` (or apply the matching migrations) so the trial lasts 7 days and paid checkout can grant Plus.
 
 ## Ads (free plan)
 
@@ -67,4 +69,4 @@ Play listing: Ads **Yes**. Advertising ID is used for ads. Privacy policy must s
 supabase db push
 ```
 
-Files: `supabase/migrations/20260909120000_plus_pricing.sql` or `supabase/catchup_plus_pricing.sql`
+Files: `supabase/migrations/20260909120000_plus_pricing.sql`, `supabase/catchup_plus_pricing.sql`, `supabase/migrations/20260909140000_claim_plus_store_purchase.sql`, `supabase/catchup_plus_store.sql`

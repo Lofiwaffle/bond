@@ -110,12 +110,14 @@ Review notes to paste: Bond is a private ritual for two people who already know 
 
 Auto-renewing, per couple. One purchase unlocks both partners.
 
-- Bond Plus Monthly: $5.99
-- Bond Plus Yearly: $60
-- 7-day limited free trial after pairing (once per Bond)
+Create these in App Store Connect (see [store-products.md](store-products.md)):
+
+- Product id `bond_plus_monthly` — Bond Plus Monthly — $5.99 / 1 month
+- Product id `bond_plus_annual` — Bond Plus Yearly — $60 / 1 year
+- 7-day limited free trial after pairing (once per Bond; in-app, not a second App Store intro offer)
 - Privacy: https://lofiwaffle.github.io/bond/privacy-policy.html
 - EULA: Apple Standard EULA
-- Product ids and unpair rules: [docs/bond-plus.md](bond-plus.md)
+- Unpair rules: [docs/bond-plus.md](bond-plus.md)
 
 ## Store copy
 

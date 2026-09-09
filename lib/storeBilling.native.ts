@@ -65,8 +65,9 @@ function waitForPurchase(
   iap: ExpoIap,
   sku: string,
   timeoutMs = 120_000,
-): Promise<StorePurchase> {
-  return new Promise((resolve, reject) => {
+): { promise: Promise<StorePurchase>; cancel: () => void } {
+  let cleanup = () => {}
+  const promise = new Promise<StorePurchase>((resolve, reject) => {
     const timer = setTimeout(() => {
       cleanup()
       reject(new Error('Store checkout timed out. Try again.'))
@@ -82,12 +83,13 @@ function waitForPurchase(
       reject(error)
     })
 
-    function cleanup() {
+    cleanup = () => {
       clearTimeout(timer)
       success.remove()
       fail.remove()
     }
   })
+  return { promise, cancel: () => cleanup() }
 }
 
 function isIosPurchase(
@@ -205,26 +207,31 @@ export async function startStorePurchase(
 
     const pending = waitForPurchase(iap, productId)
 
-    await iap.requestPurchase({
-      type: 'subs',
-      request: {
-        apple: { sku: productId },
-        google: {
-          skus: [productId],
-          subscriptionOffers: googleOffer
-            ? [{ sku: productId, offerToken: googleOffer }]
-            : [],
+    try {
+      await iap.requestPurchase({
+        type: 'subs',
+        request: {
+          apple: { sku: productId },
+          google: {
+            skus: [productId],
+            subscriptionOffers: googleOffer
+              ? [{ sku: productId, offerToken: googleOffer }]
+              : [],
+          },
         },
-      },
-    })
+      })
 
-    const purchase = await pending
-    const claimed = await claimPurchase(purchase, productId)
-    if (!claimed.error) {
-      await finishIfPossible(iap, purchase)
-      return { error: null, completed: true }
+      const purchase = await pending.promise
+      const claimed = await claimPurchase(purchase, productId)
+      if (!claimed.error) {
+        await finishIfPossible(iap, purchase)
+        return { error: null, completed: true }
+      }
+      return { error: claimed.error, completed: false }
+    } catch (error) {
+      pending.cancel()
+      throw error
     }
-    return { error: claimed.error, completed: false }
   } catch (error) {
     if (isCancelled(error, iap)) {
       return { error: null, completed: false }
@@ -244,6 +251,14 @@ export async function startStorePurchase(
       return { error: PLUS_NATIVE_CHECKOUT, completed: false }
     }
     const message = error instanceof Error ? error.message : PLUS_NATIVE_CHECKOUT
+    if (
+      code === iap.ErrorCode.IapNotAvailable ||
+      code === iap.ErrorCode.InitConnection ||
+      code === iap.ErrorCode.NotPrepared ||
+      /native module/i.test(message)
+    ) {
+      return { error: PLUS_EXPO_GO_CHECKOUT, completed: false }
+    }
     return { error: message || PLUS_NATIVE_CHECKOUT, completed: false }
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ScrollView, StyleSheet, Text, type TextInput } from 'react-native'
 import { Link, Redirect, useLocalSearchParams, type Href } from 'expo-router'
 
+import { AppleSignInButton } from '../../components/AppleSignInButton'
 import { AuthFooter } from '../../components/AuthFooter'
 import { GoogleSignInButton } from '../../components/GoogleSignInButton'
 import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen } from '../../components/ui'
@@ -24,6 +25,7 @@ export default function SignUpScreen() {
     passwordRecovery,
     authLinkExpired,
     signUp,
+    signInWithApple,
     signInWithGoogle,
     resendConfirmation,
     verifyEmailOtp,
@@ -110,6 +112,15 @@ export default function SignUpScreen() {
     setError(null)
     setSubmitting(true)
     const result = await signInWithGoogle()
+    setSubmitting(false)
+    if (result.error) setError(result.error)
+  }
+
+  const onApple = async () => {
+    if (submitting) return
+    setError(null)
+    setSubmitting(true)
+    const result = await signInWithApple()
     setSubmitting(false)
     if (result.error) setError(result.error)
   }
@@ -223,6 +234,10 @@ export default function SignUpScreen() {
             : "Two minutes a day, just the two of you. You'll invite them after this."}
         </Text>
 
+        <AppleSignInButton
+          onPress={() => void onApple()}
+          loading={submitting}
+        />
         <GoogleSignInButton
           onPress={() => void onGoogle()}
           loading={submitting}

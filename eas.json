@@ -36,7 +36,8 @@
         "track": "internal",
         "releaseStatus": "draft",
         "changesNotSentForReview": true
-      }
+      },
+      "ios": {}
     }
   }
 }

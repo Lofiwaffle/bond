@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ScrollView, StyleSheet, Text, type TextInput } from 'react-native'
 import { Link, Redirect, useLocalSearchParams, type Href } from 'expo-router'
 
+import { AppleSignInButton } from '../../components/AppleSignInButton'
 import { AuthFooter } from '../../components/AuthFooter'
 import { GoogleSignInButton } from '../../components/GoogleSignInButton'
 import { ErrorText, Field, Label, LoadingScreen, PrimaryButton, Screen, StatusPanel } from '../../components/ui'
@@ -18,6 +19,7 @@ export default function LoginScreen() {
     profile,
     isLoading,
     signIn,
+    signInWithApple,
     signInWithGoogle,
     sessionError,
     retrySession,
@@ -107,6 +109,16 @@ export default function LoginScreen() {
     if (result.error) setError(result.error)
   }
 
+  const onApple = async () => {
+    if (submitting) return
+    setError(null)
+    setNeedsConfirmation(false)
+    setSubmitting(true)
+    const result = await signInWithApple()
+    setSubmitting(false)
+    if (result.error) setError(result.error)
+  }
+
   const onResend = async () => {
     if (submitting || remaining > 0) return
     setError(null)
@@ -155,6 +167,10 @@ export default function LoginScreen() {
           />
         ) : null}
 
+        <AppleSignInButton
+          onPress={() => void onApple()}
+          loading={submitting}
+        />
         <GoogleSignInButton
           onPress={() => void onGoogle()}
           loading={submitting}

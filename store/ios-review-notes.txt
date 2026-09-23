@@ -1,0 +1,10 @@
+Bond is a private daily check-in for two people who already know each other. There is no public feed.
+
+Demo: sign in with the two review accounts below (already paired). Check in on the same calendar day on both devices to see reveal. Bond Plus is optional and is not required to see a partner’s already-opened day.
+
+Sign in with Apple and email/password both work. Continue with Google is also offered.
+
+Account deletion: Us → Delete account.
+Notifications are optional.
+Privacy: https://lofiwaffle.github.io/bond/privacy-policy.html
+Support: https://lofiwaffle.github.io/bond/support.html

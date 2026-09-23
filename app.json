@@ -12,13 +12,15 @@
     "supportsTablet": false,
     "bundleIdentifier": "com.bond.app",
     "buildNumber": "1",
+    "usesAppleSignIn": true,
     "config": {
       "usesNonExemptEncryption": false
     },
     "infoPlist": {
       "CFBundleDisplayName": "Bond",
       "LSApplicationCategoryType": "public.app-category.lifestyle",
-      "NSUserNotificationsUsageDescription": "Bond can remind you to check in, and let you know when a shared day is ready to open."
+      "NSUserNotificationsUsageDescription": "Bond can remind you to check in, and let you know when a shared day is ready to open.",
+      "NSUserTrackingUsageDescription": "Bond uses this identifier only for ads on the free plan. Bond Plus and the trial do not show ads."
     },
     "privacyManifests": {
       "NSPrivacyTracking": false,
@@ -203,7 +205,8 @@
       }
     ],
     "expo-web-browser",
-    "expo-iap"
+    "expo-iap",
+    "expo-apple-authentication"
   ],
   "experiments": {
     "typedRoutes": true,

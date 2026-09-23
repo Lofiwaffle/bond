@@ -2,6 +2,32 @@
 
 Expo SDK 57 builds with Xcode 16 / the iOS 18 SDK, which App Store Connect requires.
 
+**Listing paste pack:** [store/ios-listing.md](../store/ios-listing.md). Subscriptions: [store-products.md](store-products.md).
+
+## Upload (do this on a machine where you can `eas login`)
+
+This cloud environment is not logged into Expo or App Store Connect. After pulling `main`:
+
+1. Paid [Apple Developer](https://developer.apple.com/programs/) membership.
+2. Create the app in [App Store Connect](https://appstoreconnect.apple.com/): name **Bond**, English, bundle id `com.bond.app`.
+3. Enable **Sign in with Apple** for `com.bond.app`. In Supabase → Authentication → Providers → Apple, turn it on and add audience `com.bond.app`.
+4. Create Bond Plus subscriptions `bond_plus_monthly` ($5.99) and `bond_plus_annual` ($60).
+5. Copy the numeric Apple ID from App Information into `eas.json` → `submit.production.ios.ascAppId`.
+6. Set EAS secrets (hosted Supabase, never localhost):
+
+```sh
+eas login
+eas secret:create --name EXPO_PUBLIC_SUPABASE_URL --value https://YOUR-PROJECT.supabase.co
+eas secret:create --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value YOUR_ANON_OR_PUBLISHABLE_KEY
+eas credentials --platform ios
+npm run build:ios
+npm run submit:ios
+```
+
+7. In App Store Connect, attach the TestFlight build to 1.0.1, paste [store/ios-listing.md](../store/ios-listing.md), add two paired review accounts, then Submit for Review.
+
+Guideline 4.8 is covered: iPhone login and signup show **Continue with Apple** next to Google.
+
 The iPhone UI is phone-width only (`supportsTablet` is false), so you do **not** need iPad screenshots.
 
 Listing URLs are static files in `public/`. GitHub Pages must include them (workflow runs on `main` and `master`). After deploy, open the privacy and support links and confirm they are HTML documents, not the JavaScript app.
@@ -104,7 +130,7 @@ Create two production accounts, pair them, and paste both emails and passwords i
 
 Review notes to paste: Bond is a private ritual for two people who already know each other. There is no public feed. Demo: sign in with the two review accounts below (already paired), or Continue with Google if that is enabled on the review project. Check in on the same calendar day on both devices to see reveal. Bond Plus is optional and is not required to see a partner’s already-opened day.
 
-**Guideline 4.8:** Google sign-in is offered on login and signup. Before the first iOS submission with that button live, add Sign in with Apple as an equivalent option (email/password alone is not enough once a third-party social login is present).
+**Guideline 4.8:** Login and signup show Continue with Apple on iPhone, next to Google and email/password. Enable the Apple provider in Supabase before review.
 
 ## Subscriptions (Bond Plus)
 

@@ -19,6 +19,11 @@ function assert(label: string, condition: boolean) {
 assert('app version is 1.0.1', app.version === '1.0.1')
 assert('android package is com.bondcouple.app', app.android.package === 'com.bondcouple.app')
 assert('ios bundle is com.bond.app', app.ios.bundleIdentifier === 'com.bond.app')
+assert('Sign in with Apple capability', app.ios.usesAppleSignIn === true)
+assert(
+  'apple authentication plugin',
+  app.plugins.includes('expo-apple-authentication'),
+)
 assert('EAS project id is set', app.extra.eas.projectId.length > 8)
 assert('owner is set', app.owner === 'lofiwaffle')
 assert('root chrome is oat', app.backgroundColor === '#F3EBE3')

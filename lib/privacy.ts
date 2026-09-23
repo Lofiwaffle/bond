@@ -1,4 +1,4 @@
-export const PRIVACY_UPDATED = '27 August 2026'
+export const PRIVACY_UPDATED = '23 September 2026'
 
 export const NOT_THERAPY =
   'Bond is a daily check-in habit for two people. It is not therapy, counseling, medical care, or emergency support. If you are in danger, contact local emergency services.'
@@ -57,7 +57,7 @@ export const VISIBILITY_ROWS: VisibilityRow[] = [
 ]
 
 export const STORED_ON_SERVER = [
-  'Account: email, optional password (held by our auth provider, not in plain text), display name. If you continue with Google, Google shares your email and name so we can create the account.',
+  'Account: email, optional password (held by our auth provider, not in plain text), display name. If you continue with Google or Apple, they share your email and name so we can create the account.',
   'Pairing: invite code, invite link, and the link between two accounts.',
   'Shared ritual: check-in scores, shared words, activity tags, one small action, weekly answers, goals, achievements, and optional weekly suggestions.',
   'Your hide or edit choice for a weekly suggestion. Your partner cannot see that preference.',

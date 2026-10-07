@@ -84,3 +84,5 @@ Bond Plus (optional couple subscription) is documented in [docs/bond-plus.md](do
 
 
 <!-- Security scan triggered at 2026-09-05 07:23:33 -->
+
+<!-- Security scan triggered at 2026-10-07 11:45:02 -->

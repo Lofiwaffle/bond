@@ -163,20 +163,44 @@ async function readHostedConfig(): Promise<SupabaseAppConfig | null> {
 
 let initPromise: Promise<void> | null = null
 
-async function resolveConfig(): Promise<SupabaseAppConfig | null> {
-  const stored = await readStoredConfig()
-  if (stored && !configIssue(stored.url, stored.key)) return stored
+function sameProjectHost(a: string, b: string): boolean {
+  try {
+    return new URL(a).host === new URL(b).host
+  } catch {
+    return false
+  }
+}
 
+/** Key shipped with this build: env, then hosted supabase.json, then the repo fallback. */
+async function shippedConfig(): Promise<SupabaseAppConfig | null> {
   if (envUrl && envKey && !configIssue(envUrl, envKey)) {
-    return { url: envUrl, key: envKey }
+    return { url: envUrl.trim(), key: envKey.trim() }
+  }
+  const hosted = await readHostedConfig()
+  if (hosted && !configIssue(hosted.url, hosted.key)) {
+    return { url: hosted.url.trim(), key: hosted.key.trim() }
+  }
+  if (!configIssue(HOSTED_BOND.url, HOSTED_BOND.key)) return HOSTED_BOND
+  return null
+}
+
+async function resolveConfig(): Promise<SupabaseAppConfig | null> {
+  const shipped = await shippedConfig()
+  const stored = await readStoredConfig()
+  if (stored && !configIssue(stored.url, stored.key)) {
+    if (
+      shipped &&
+      sameProjectHost(stored.url, shipped.url) &&
+      stored.key.trim() !== shipped.key.trim()
+    ) {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(shipped))
+      return shipped
+    }
+    return stored
   }
 
-  const hosted = await readHostedConfig()
-  if (hosted && !configIssue(hosted.url, hosted.key)) return hosted
-
-  if (!configIssue(HOSTED_BOND.url, HOSTED_BOND.key)) return HOSTED_BOND
-
-  return stored ?? (envUrl && envKey ? { url: envUrl, key: envKey } : hosted)
+  if (shipped) return shipped
+  return stored ?? (envUrl && envKey ? { url: envUrl, key: envKey } : null)
 }
 
 function bootConfig(): SupabaseAppConfig {

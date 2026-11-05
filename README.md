@@ -38,7 +38,7 @@ Or skip local setup and use the live app: [https://lofiwaffle.github.io/bond/](h
 ### Deploy notes
 
 - Pushing to `main` / `master` runs [.github/workflows/pages.yml](.github/workflows/pages.yml) and republishes Pages.
-- Pages secrets: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+- The Pages build reads the hosted URL and publishable key from [public/supabase.json](public/supabase.json).
 - Supabase Auth URL allowlist must include `https://lofiwaffle.github.io/bond/**` and `bond://**`.
 
 ## Install from GitHub
@@ -81,8 +81,3 @@ First release is a free AAB to internal testing, then closed testing. Personal P
 Production iOS builds use EAS (`npm run build:ios`). See [docs/app-store.md](docs/app-store.md).
 
 Bond Plus (optional couple subscription) is documented in [docs/bond-plus.md](docs/bond-plus.md).
-
-
-<!-- Security scan triggered at 2026-09-05 07:23:33 -->
-
-<!-- Security scan triggered at 2026-10-07 11:45:02 -->

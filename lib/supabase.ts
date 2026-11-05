@@ -27,7 +27,7 @@ const envKey =
 /** Public publishable key for the hosted Bond project (safe in the client). */
 export const HOSTED_BOND: SupabaseAppConfig = {
   url: 'https://melmzlgzfcysbnvtuksv.supabase.co',
-  key: 'sb_publishable_I3LAmPEB6tGY-1l2-_-9ng_xu-PRSGh',
+  key: 'sb_publishable_7Ys1ycjpFEip2A85ACJcYA_gw-cxQCp',
 }
 
 function isLoopbackUrl(url: string): boolean {

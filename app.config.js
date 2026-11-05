@@ -58,16 +58,16 @@ module.exports = () => {
     return plugin
   })
 
-  const nativeStoreBuild =
-    process.env.EAS_BUILD_PLATFORM === 'android' ||
-    process.env.EAS_BUILD_PLATFORM === 'ios'
+  // /bond is only the GitHub Pages web prefix. Android and iOS builds
+  // and Expo Go must not inherit it.
+  const webBase = process.env.EXPO_PUBLIC_BASE_PATH
 
   return {
     ...base,
     plugins,
     experiments: {
       typedRoutes: true,
-      ...(nativeStoreBuild ? {} : { baseUrl: '/bond' }),
+      ...(webBase ? { baseUrl: webBase } : {}),
     },
     'react-native-google-mobile-ads': {
       android_app_id: androidAppId,

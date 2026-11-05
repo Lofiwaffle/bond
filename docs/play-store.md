@@ -12,12 +12,7 @@ Do not run `eas build` until `eas login` and `eas init` have written a real `ext
 
 1. Google Play developer account ($25 one-time).
 2. Expo account; `npm install -g eas-cli && eas login && eas init`.
-3. Hosted Supabase (not localhost). Apply migrations including Bond Plus if you want the free trial. Set EAS secrets:
-
-```sh
-eas secret:create --name EXPO_PUBLIC_SUPABASE_URL --value https://YOUR-PROJECT.supabase.co
-eas secret:create --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value YOUR_ANON_OR_PUBLISHABLE_KEY
-```
+3. Hosted Supabase (not localhost). Apply migrations including Bond Plus if you want the free trial. The production, preview, and development profiles in `eas.json` already set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the current hosted project. Delete any older EAS secret of that name before building. The revoked key `sb_publishable_I3LAm…` makes the app show “Unregistered API key.”
 
 `APP_ENV=production` is already on the production profile. Release builds refuse localhost.
 

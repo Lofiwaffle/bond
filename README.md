@@ -81,8 +81,3 @@ First release is a free AAB to internal testing, then closed testing. Personal P
 Production iOS builds use EAS (`npm run build:ios`). See [docs/app-store.md](docs/app-store.md).
 
 Bond Plus (optional couple subscription) is documented in [docs/bond-plus.md](docs/bond-plus.md).
-
-
-<!-- Security scan triggered at 2026-09-05 07:23:33 -->
-
-<!-- Security scan triggered at 2026-10-07 11:45:02 -->

@@ -30,6 +30,26 @@ export const HOSTED_BOND: SupabaseAppConfig = {
   key: 'sb_publishable_7Ys1ycjpFEip2A85ACJcYA_gw-cxQCp',
 }
 
+/**
+ * Keys Supabase has dropped for this project. EAS can still inject the old
+ * publishable key, and a phone can still have it saved. Never send them.
+ */
+const REVOKED_PUBLISHABLE_KEYS = new Set([
+  'sb_publishable_I3LAmPEB6tGY-1l2-_-9ng_xu-PRSGh',
+])
+
+function isRevokedKey(key?: string | null): boolean {
+  return REVOKED_PUBLISHABLE_KEYS.has((key ?? '').trim())
+}
+
+function acceptedConfig(
+  url?: string | null,
+  key?: string | null,
+): SupabaseAppConfig | null {
+  if (isRevokedKey(key) || configIssue(url, key)) return null
+  return { url: url!.trim(), key: key!.trim() }
+}
+
 function isLoopbackUrl(url: string): boolean {
   try {
     const { hostname } = new URL(url)
@@ -173,13 +193,11 @@ function sameProjectHost(a: string, b: string): boolean {
 
 /** Key shipped with this build: env, then hosted supabase.json, then the repo fallback. */
 async function shippedConfig(): Promise<SupabaseAppConfig | null> {
-  if (envUrl && envKey && !configIssue(envUrl, envKey)) {
-    return { url: envUrl.trim(), key: envKey.trim() }
-  }
+  const fromEnv = acceptedConfig(envUrl, envKey)
+  if (fromEnv) return fromEnv
   const hosted = await readHostedConfig()
-  if (hosted && !configIssue(hosted.url, hosted.key)) {
-    return { url: hosted.url.trim(), key: hosted.key.trim() }
-  }
+  const fromFile = hosted ? acceptedConfig(hosted.url, hosted.key) : null
+  if (fromFile) return fromFile
   if (!configIssue(HOSTED_BOND.url, HOSTED_BOND.key)) return HOSTED_BOND
   return null
 }
@@ -187,7 +205,9 @@ async function shippedConfig(): Promise<SupabaseAppConfig | null> {
 async function resolveConfig(): Promise<SupabaseAppConfig | null> {
   const shipped = await shippedConfig()
   const stored = await readStoredConfig()
-  if (stored && !configIssue(stored.url, stored.key)) {
+  if (stored && isRevokedKey(stored.key)) {
+    await AsyncStorage.removeItem(STORAGE_KEY)
+  } else if (stored && !configIssue(stored.url, stored.key)) {
     if (
       shipped &&
       sameProjectHost(stored.url, shipped.url) &&
@@ -200,14 +220,11 @@ async function resolveConfig(): Promise<SupabaseAppConfig | null> {
   }
 
   if (shipped) return shipped
-  return stored ?? (envUrl && envKey ? { url: envUrl, key: envKey } : null)
+  return stored && !isRevokedKey(stored.key) ? stored : null
 }
 
 function bootConfig(): SupabaseAppConfig {
-  if (envUrl && envKey && !configIssue(envUrl, envKey)) {
-    return { url: envUrl, key: envKey }
-  }
-  return HOSTED_BOND
+  return acceptedConfig(envUrl, envKey) ?? HOSTED_BOND
 }
 
 applyConfig(bootConfig())
